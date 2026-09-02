@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f5f2">
+<title>小小留言室</title>
+<style>
+:root{
+  --bg:#f7f5f2;--panel:#fffdfb;--text:#3d3a38;--muted:#96918b;
+  --line:#ebe7e2;--mine:#e9e3dc;--other:#fff;--accent:#756c63;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:var(--bg)}
+body{display:flex;justify-content:center}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+.app{width:100%;max-width:720px;min-height:100vh;background:var(--panel);display:flex;flex-direction:column}
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column}
+
+/* 首页 */
+.home{align-items:center;justify-content:center;padding:28px}
+.logo{font-size:42px;margin-bottom:12px}
+.home h1{margin:0;font-size:25px;font-weight:600}
+.home p{color:var(--muted);margin:10px 0 34px;text-align:center;line-height:1.8}
+.primary{border:0;border-radius:14px;background:var(--accent);color:white;padding:13px 26px;font-size:16px}
+.secondary{border:1px solid var(--line);background:white;border-radius:12px;padding:11px 18px;color:var(--text)}
+.room-form{width:min(420px,100%);display:none;margin-top:18px}
+.room-form input{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:none;background:white}
+.room-form .row{display:flex;gap:8px;margin-top:9px}
+.room-form .row button{flex:1}
+
+/* 聊天 */
+.chat{background:var(--bg)}
+.topbar{height:62px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--line);background:rgba(255,253,251,.94);position:sticky;top:0;z-index:5}
+.back{border:0;background:transparent;font-size:24px;color:var(--text);width:42px}
+.title{flex:1;text-align:center;margin-right:42px}
+.title strong{display:block;font-size:16px;font-weight:600}
+.title small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.messages{flex:1;padding:18px 14px 110px;overflow:auto}
+.day{text-align:center;color:var(--muted);font-size:11px;margin:10px 0 16px}
+.msg{display:flex;margin:9px 0;align-items:flex-end;gap:7px}
+.msg.mine{justify-content:flex-end}
+.avatar{width:31px;height:31px;border-radius:50%;background:#e8e3de;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+.bubble-wrap{max-width:76%}
+.bubble{padding:10px 13px;border-radius:15px;background:var(--other);border:1px solid var(--line);line-height:1.55;word-break:break-word;white-space:pre-wrap}
+.mine .bubble{background:var(--mine);border-color:transparent}
+.time{font-size:10px;color:var(--muted);margin:3px 5px 0}
+.mine .time{text-align:right}
+.empty{text-align:center;color:var(--muted);padding-top:22vh;font-size:14px;line-height:1.9}
+.composer{position:fixed;bottom:0;width:min(720px,100%);padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:rgba(255,253,251,.96);border-top:1px solid var(--line);display:flex;gap:8px}
+.composer textarea{flex:1;resize:none;min-height:42px;max-height:120px;border:1px solid var(--line);border-radius:13px;padding:10px 12px;outline:none;background:white;line-height:1.4}
+.send{border:0;border-radius:13px;background:var(--accent);color:white;width:62px}
+.notice{text-align:center;color:var(--muted);font-size:11px;margin:12px 0}
+
+/* 设置 */
+.settings{padding:22px}
+.settings h2{margin:8px 0 20px;font-size:22px}
+.card{background:white;border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:12px}
+.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:7px}
+.card input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+.actions{display:flex;gap:8px}
+.actions button{flex:1}
+.footer{text-align:center;color:var(--muted);font-size:11px;margin-top:30px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<section id="home" class="screen active home">
+  <div class="logo">✉</div>
+  <h1>小小留言室</h1>
+  <p>有些话不用马上说。<br>什么时候回来，都可以继续写。</p>
+  <button class="primary" id="enterBtn">进入留言室</button>
+  <div class="room-form" id="roomForm">
+    <input id="roomInput" placeholder="输入房间编号，或粘贴完整房间链接">
+    <div class="row">
+      <button class="secondary" id="localBtn">创建本地房间</button>
+      <button class="primary" id="joinBtn">进入</button>
+    </div>
+  </div>
+</section>
+
+<section id="chat" class="screen chat">
+  <header class="topbar">
+    <button class="back" id="backBtn">‹</button>
+    <div class="title">
+      <strong id="roomTitle">我们的小房间</strong>
+      <small id="roomStatus">本地演示模式</small>
+    </div>
+  </header>
+  <main class="messages" id="messages"></main>
+  <div class="composer">
+    <textarea id="input" rows="1" placeholder="写点什么……"></textarea>
+    <button class="send" id="sendBtn">发送</button>
+  </div>
+</section>
+
+<section id="settings" class="screen settings">
+  <button class="secondary" id="settingsBack">‹ 返回</button>
+  <h2>房间设置</h2>
+  <div class="card">
+    <label>你的昵称</label>
+    <input id="nameInput" maxlength="20" placeholder="小辞">
+  </div>
+  <div class="card">
+    <label>对方昵称</label>
+    <input id="otherInput" maxlength="20" placeholder="朋友">
+  </div>
+  <div class="actions">
+    <button class="secondary" id="clearBtn">清空本机留言</button>
+    <button class="primary" id="saveBtn">保存</button>
+  </div>
+  <div class="footer">第一版 · 当前使用浏览器本地存储<br>接入云数据库后即可变成真正的在线留言室</div>
+</section>
+
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const state={
+  room:new URLSearchParams(location.search).get("room")||"",
+  me:localStorage.getItem("guest_name")||"我",
+  other:localStorage.getItem("guest_other")||"朋友",
+  messages:[]
+};
+
+function key(){return "message_room_"+(state.room||"demo")}
+function save(){localStorage.setItem(key(),JSON.stringify(state.messages))}
+function load(){
+  try{state.messages=JSON.parse(localStorage.getItem(key())||"[]")}catch(e){state.messages=[]}
+}
+function show(id){
+  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+  $("#"+id).classList.add("active");
+}
+function escapeHTML(s){
+  return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function render(){
+  const box=$("#messages");
+  if(!state.messages.length){
+    box.innerHTML='<div class="empty">这里还没有留言。<br>写下第一句话吧。</div>';
+    return;
+  }
+  box.innerHTML="";
+  let last="";
+  state.messages.forEach(m=>{
+    const d=new Date(m.time), day=d.toLocaleDateString("zh-CN",{month:"long",day:"numeric"});
+    if(day!==last){const el=document.createElement("div");el.className="day";el.textContent=day;box.appendChild(el);last=day}
+    const row=document.createElement("div");
+    row.className="msg "+(m.mine?"mine":"");
+    const time=d.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"});
+    row.innerHTML=(m.mine?"":"<div class='avatar'>"+escapeHTML(state.other[0]||"友")+"</div>")+
+      "<div class='bubble-wrap'><div class='bubble'>"+escapeHTML(m.text)+"</div><div class='time'>"+time+"</div></div>";
+    if(m.mine) row.innerHTML+="<div class='avatar'>"+escapeHTML(state.me[0]||"我")+"</div>";
+    box.appendChild(row);
+  });
+  box.scrollTop=box.scrollHeight;
+}
+function openRoom(room){
+  state.room=room||("demo-"+Math.random().toString(36).slice(2,8));
+  load(); updateURL(); render();
+  $("#roomStatus").textContent=location.protocol==="file:"?"本地演示模式":"房间："+state.room;
+  show("chat");
+}
+function updateURL(){
+  if(location.protocol!=="file"){
+    const u=new URL(location.href);u.searchParams.set("room",state.room);history.replaceState({},'',u);
+  }
+}
+function send(){
+  const text=$("#input").value.trim(); if(!text)return;
+  state.messages.push({text,time:Date.now(),mine:true});
+  save();$("#input").value="";resize();render();
+}
+function resize(){const t=$("#input");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,120)+"px"}
+
+$("#enterBtn").onclick=()=>{$("#roomForm").style.display="block";$("#roomInput").focus()}
+$("#localBtn").onclick=()=>openRoom("")
+$("#joinBtn").onclick=()=>{
+  let v=$("#roomInput").value.trim();
+  try{if(v.includes("http"))v=new URL(v).searchParams.get("room")||v}catch(e){}
+  openRoom(v||"demo")
+}
+$("#backBtn").onclick=()=>show("home")
+$("#settingsBack").onclick=()=>show("chat")
+$("#sendBtn").onclick=send
+$("#input").addEventListener("input",resize)
+$("#input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}})
+$("#saveBtn").onclick=()=>{
+  state.me=$("#nameInput").value.trim()||"我";
+  state.other=$("#otherInput").value.trim()||"朋友";
+  localStorage.setItem("guest_name",state.me);localStorage.setItem("guest_other",state.other);
+  render();show("chat");
+}
+$("#clearBtn").onclick=()=>{
+  if(confirm("确定清空这个浏览器里的留言吗？")){state.messages=[];save();render()}
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&$("#chat").classList.contains("active"))show("home")
+});
+
+// 首次打开若 URL 有 room，直接进入
+if(state.room){load();$("#roomStatus").textContent="房间："+state.room;render();show("chat")}
+</script>
+</body>
+</html>
