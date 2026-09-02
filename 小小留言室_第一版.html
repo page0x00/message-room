@@ -4,90 +4,108 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f7f5f2">
-<title>小小留言室</title>
+<title>留言</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
-  --bg:#f7f5f2;--panel:#fffdfb;--text:#3d3a38;--muted:#96918b;
-  --line:#ebe7e2;--mine:#e9e3dc;--other:#fff;--accent:#756c63;
+ --bg:#f5f3f0;--card:#fffdfb;--text:#353230;--muted:#99938d;
+ --line:#e8e4df;--mine:#e8e2da;--accent:#70675f;--danger:#b76b6b;
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:var(--bg)}
-body{display:flex;justify-content:center}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
 button,input,textarea{font:inherit}
 button{cursor:pointer}
-.app{width:100%;max-width:720px;min-height:100vh;background:var(--panel);display:flex;flex-direction:column}
-.screen{display:none;min-height:100vh}
-.screen.active{display:flex;flex-direction:column}
-
-/* 首页 */
+.app{width:100%;max-width:720px;min-height:100vh;margin:auto;background:var(--card)}
+.screen{display:none;min-height:100vh}.screen.active{display:flex;flex-direction:column}
 .home{align-items:center;justify-content:center;padding:28px}
-.logo{font-size:42px;margin-bottom:12px}
-.home h1{margin:0;font-size:25px;font-weight:600}
-.home p{color:var(--muted);margin:10px 0 34px;text-align:center;line-height:1.8}
-.primary{border:0;border-radius:14px;background:var(--accent);color:white;padding:13px 26px;font-size:16px}
-.secondary{border:1px solid var(--line);background:white;border-radius:12px;padding:11px 18px;color:var(--text)}
-.room-form{width:min(420px,100%);display:none;margin-top:18px}
-.room-form input{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:none;background:white}
-.room-form .row{display:flex;gap:8px;margin-top:9px}
-.room-form .row button{flex:1}
-
-/* 聊天 */
+.home-mark{font-size:36px;margin-bottom:15px}
+.home h1{font-size:26px;font-weight:600;margin:0 0 25px}
+.home-actions{width:min(380px,100%);display:grid;gap:10px}
+.btn{border:0;border-radius:13px;padding:13px 18px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-light{background:#fff;border:1px solid var(--line);color:var(--text)}
+.join-box{display:none;margin-top:10px;width:min(380px,100%)}
+.join-box input{width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;outline:none;background:#fff}
+.join-row{display:flex;gap:8px;margin-top:8px}.join-row .btn{flex:1}
+.hint{font-size:11px;color:var(--muted);margin-top:25px}
 .chat{background:var(--bg)}
-.topbar{height:62px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--line);background:rgba(255,253,251,.94);position:sticky;top:0;z-index:5}
-.back{border:0;background:transparent;font-size:24px;color:var(--text);width:42px}
-.title{flex:1;text-align:center;margin-right:42px}
+.topbar{height:62px;flex:none;display:flex;align-items:center;border-bottom:1px solid var(--line);
+background:rgba(255,253,251,.96);padding:0 10px;position:sticky;top:0;z-index:5}
+.icon-btn{border:0;background:transparent;width:44px;height:44px;border-radius:12px;font-size:23px;color:var(--text)}
+.icon-btn:active{background:#f0ece8}
+.title{flex:1;text-align:center;min-width:0}
 .title strong{display:block;font-size:16px;font-weight:600}
-.title small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
-.messages{flex:1;padding:18px 14px 110px;overflow:auto}
-.day{text-align:center;color:var(--muted);font-size:11px;margin:10px 0 16px}
-.msg{display:flex;margin:9px 0;align-items:flex-end;gap:7px}
+.title small{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.menu{position:relative}
+.menu-panel{display:none;position:absolute;right:8px;top:53px;background:#fff;border:1px solid var(--line);
+border-radius:13px;box-shadow:0 8px 25px #00000012;overflow:hidden;z-index:10;width:150px}
+.menu-panel button{display:block;width:100%;border:0;background:#fff;text-align:left;padding:12px 14px;color:var(--text)}
+.menu-panel button+button{border-top:1px solid var(--line)}
+.messages{flex:1;overflow:auto;padding:15px 13px 100px}
+.day{text-align:center;color:var(--muted);font-size:10px;margin:11px 0 14px}
+.msg{display:flex;gap:7px;align-items:flex-end;margin:9px 0}
 .msg.mine{justify-content:flex-end}
-.avatar{width:31px;height:31px;border-radius:50%;background:#e8e3de;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
-.bubble-wrap{max-width:76%}
-.bubble{padding:10px 13px;border-radius:15px;background:var(--other);border:1px solid var(--line);line-height:1.55;word-break:break-word;white-space:pre-wrap}
+.avatar{width:30px;height:30px;flex:none;border-radius:50%;background:#e7e2dd;
+display:flex;align-items:center;justify-content:center;font-size:13px}
+.bubble-wrap{max-width:min(76%,540px)}
+.bubble{background:#fff;border:1px solid var(--line);border-radius:15px;padding:9px 12px;
+line-height:1.55;white-space:pre-wrap;word-break:break-word}
 .mine .bubble{background:var(--mine);border-color:transparent}
-.time{font-size:10px;color:var(--muted);margin:3px 5px 0}
-.mine .time{text-align:right}
-.empty{text-align:center;color:var(--muted);padding-top:22vh;font-size:14px;line-height:1.9}
-.composer{position:fixed;bottom:0;width:min(720px,100%);padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:rgba(255,253,251,.96);border-top:1px solid var(--line);display:flex;gap:8px}
-.composer textarea{flex:1;resize:none;min-height:42px;max-height:120px;border:1px solid var(--line);border-radius:13px;padding:10px 12px;outline:none;background:white;line-height:1.4}
-.send{border:0;border-radius:13px;background:var(--accent);color:white;width:62px}
-.notice{text-align:center;color:var(--muted);font-size:11px;margin:12px 0}
-
-/* 设置 */
-.settings{padding:22px}
-.settings h2{margin:8px 0 20px;font-size:22px}
-.card{background:white;border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:12px}
-.card label{display:block;color:var(--muted);font-size:12px;margin-bottom:7px}
-.card input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
-.actions{display:flex;gap:8px}
-.actions button{flex:1}
-.footer{text-align:center;color:var(--muted);font-size:11px;margin-top:30px}
+.meta{font-size:10px;color:var(--muted);margin:3px 5px 0}
+.mine .meta{text-align:right}
+.empty{text-align:center;color:var(--muted);padding-top:25vh;line-height:1.9;font-size:13px}
+.composer{position:fixed;bottom:0;width:min(720px,100%);display:flex;gap:7px;
+padding:8px 9px calc(8px + env(safe-area-inset-bottom));background:#fffdfbf5;border-top:1px solid var(--line);z-index:4}
+.composer textarea{flex:1;min-height:42px;max-height:120px;resize:none;border:1px solid var(--line);
+border-radius:13px;padding:9px 11px;outline:none;background:#fff;line-height:1.45}
+.send{width:62px;border:0;border-radius:13px;background:var(--accent);color:#fff}
+.send:disabled{opacity:.45}
+.overlay{display:none;position:fixed;inset:0;background:#0003;z-index:30;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{width:min(720px,100%);background:#fffdfb;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.modal h3{margin:0 0 15px;font-size:18px}.modal label{font-size:11px;color:var(--muted);display:block;margin:12px 0 6px}
+.modal input{width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;outline:none}
+.modal-row{display:flex;gap:8px;margin-top:15px}.modal-row button{flex:1}
+.link-box{display:flex;gap:7px}.link-box input{min-width:0}.link-box button{white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:85px;transform:translateX(-50%);background:#333;color:#fff;
+padding:8px 13px;border-radius:10px;font-size:12px;display:none;z-index:50}
 </style>
 </head>
 <body>
 <div class="app">
 
 <section id="home" class="screen active home">
-  <div class="logo">✉</div>
-  <h1>小小留言室</h1>
-  <p>有些话不用马上说。<br>什么时候回来，都可以继续写。</p>
-  <button class="primary" id="enterBtn">进入留言室</button>
-  <div class="room-form" id="roomForm">
-    <input id="roomInput" placeholder="输入房间编号，或粘贴完整房间链接">
-    <div class="row">
-      <button class="secondary" id="localBtn">创建本地房间</button>
-      <button class="primary" id="joinBtn">进入</button>
+  <div class="home-mark">✉</div>
+  <h1>留言</h1>
+  <div class="home-actions">
+    <button class="btn btn-primary" id="createBtn">创建一个房间</button>
+    <button class="btn btn-light" id="joinToggle">进入已有房间</button>
+  </div>
+  <div class="join-box" id="joinBox">
+    <input id="roomInput" autocomplete="off" placeholder="粘贴房间链接或输入房间号">
+    <div class="join-row">
+      <button class="btn btn-light" id="cancelJoin">取消</button>
+      <button class="btn btn-primary" id="joinBtn">进入</button>
     </div>
   </div>
+  <div class="hint">留言已同步到云端</div>
 </section>
 
 <section id="chat" class="screen chat">
   <header class="topbar">
-    <button class="back" id="backBtn">‹</button>
+    <button class="icon-btn" id="backBtn" aria-label="返回">‹</button>
     <div class="title">
-      <strong id="roomTitle">我们的小房间</strong>
-      <small id="roomStatus">本地演示模式</small>
+      <strong id="roomTitle">留言</strong>
+      <small id="roomStatus"></small>
+    </div>
+    <div class="menu">
+      <button class="icon-btn" id="menuBtn" aria-label="菜单">···</button>
+      <div class="menu-panel" id="menuPanel">
+        <button id="shareBtn">复制房间链接</button>
+        <button id="settingsBtn">房间设置</button>
+        <button id="clearBtn">清空本机缓存</button>
+      </div>
     </div>
   </header>
   <main class="messages" id="messages"></main>
@@ -97,113 +115,390 @@ button{cursor:pointer}
   </div>
 </section>
 
-<section id="settings" class="screen settings">
-  <button class="secondary" id="settingsBack">‹ 返回</button>
-  <h2>房间设置</h2>
-  <div class="card">
-    <label>你的昵称</label>
-    <input id="nameInput" maxlength="20" placeholder="小辞">
-  </div>
-  <div class="card">
-    <label>对方昵称</label>
-    <input id="otherInput" maxlength="20" placeholder="朋友">
-  </div>
-  <div class="actions">
-    <button class="secondary" id="clearBtn">清空本机留言</button>
-    <button class="primary" id="saveBtn">保存</button>
-  </div>
-  <div class="footer">第一版 · 当前使用浏览器本地存储<br>接入云数据库后即可变成真正的在线留言室</div>
-</section>
-
 </div>
 
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h3>房间设置</h3>
+    <label>你的昵称</label>
+    <input id="myName" maxlength="20" placeholder="我">
+    <label>对方昵称</label>
+    <input id="otherName" maxlength="20" placeholder="朋友">
+    <div class="modal-row">
+      <button class="btn btn-light" id="closeSettings">取消</button>
+      <button class="btn btn-primary" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="shareOverlay">
+  <div class="modal">
+    <h3>房间链接</h3>
+    <div class="link-box">
+      <input id="shareLink" readonly>
+      <button class="btn btn-primary" id="copyLink">复制</button>
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-light" id="closeShare">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
-const $=s=>document.querySelector(s);
-const state={
-  room:new URLSearchParams(location.search).get("room")||"",
-  me:localStorage.getItem("guest_name")||"我",
-  other:localStorage.getItem("guest_other")||"朋友",
-  messages:[]
+(function(){
+"use strict";
+
+var SUPABASE_URL = "https://yuzgbxeprpohlakxjcut.supabase.co";
+var SUPABASE_KEY = "sb_publishable_qB-zsA_IpH-Pab0rJJ4_YA_Pos792yq";
+
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+var state = {
+  room: "",
+  messages: [],
+  me: localStorage.getItem("guest_name") || "我",
+  other: localStorage.getItem("guest_other") || "朋友",
+  channel: null
 };
 
-function key(){return "message_room_"+(state.room||"demo")}
-function save(){localStorage.setItem(key(),JSON.stringify(state.messages))}
-function load(){
-  try{state.messages=JSON.parse(localStorage.getItem(key())||"[]")}catch(e){state.messages=[]}
+function $(s){ return document.querySelector(s); }
+
+function makeRoom(){
+  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  var x = "";
+  for(var i = 0; i < 8; i++) x += chars[Math.floor(Math.random() * chars.length)];
+  return x;
 }
+
+function parseRoom(value){
+  value = (value || "").trim();
+  if(!value) return "";
+  try{
+    if(/^https?:\/\//i.test(value)){
+      var u = new URL(value);
+      return u.searchParams.get("room") || "";
+    }
+  }catch(e){}
+  return value.replace(/^\/+|\/+$/g, "");
+}
+
+function updateURL(){
+  if(location.protocol === "file:") return;
+  var u = new URL(location.href);
+  u.searchParams.set("room", state.room);
+  history.replaceState({}, "", u);
+}
+
+function currentLink(){
+  if(location.protocol === "file:") return "部署后会生成真正的房间链接";
+  var u = new URL(location.href);
+  u.search = "";
+  u.searchParams.set("room", state.room);
+  return u.toString();
+}
+
 function show(id){
-  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
-  $("#"+id).classList.add("active");
+  var screens = document.querySelectorAll(".screen");
+  for(var i = 0; i < screens.length; i++) screens[i].classList.remove("active");
+  $("#" + id).classList.add("active");
+  $("#menuPanel").style.display = "none";
 }
-function escapeHTML(s){
-  return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+function toast(text){
+  var el = $("#toast");
+  el.textContent = text;
+  el.style.display = "block";
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ el.style.display = "none"; }, 1600);
 }
+
 function render(){
-  const box=$("#messages");
+  var box = $("#messages");
   if(!state.messages.length){
-    box.innerHTML='<div class="empty">这里还没有留言。<br>写下第一句话吧。</div>';
+    box.innerHTML = "<div class='empty'>这里还没有留言。<br>写下第一句话吧。</div>";
     return;
   }
-  box.innerHTML="";
-  let last="";
-  state.messages.forEach(m=>{
-    const d=new Date(m.time), day=d.toLocaleDateString("zh-CN",{month:"long",day:"numeric"});
-    if(day!==last){const el=document.createElement("div");el.className="day";el.textContent=day;box.appendChild(el);last=day}
-    const row=document.createElement("div");
-    row.className="msg "+(m.mine?"mine":"");
-    const time=d.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"});
-    row.innerHTML=(m.mine?"":"<div class='avatar'>"+escapeHTML(state.other[0]||"友")+"</div>")+
-      "<div class='bubble-wrap'><div class='bubble'>"+escapeHTML(m.text)+"</div><div class='time'>"+time+"</div></div>";
-    if(m.mine) row.innerHTML+="<div class='avatar'>"+escapeHTML(state.me[0]||"我")+"</div>";
+  box.innerHTML = "";
+  var lastDay = "";
+  for(var i = 0; i < state.messages.length; i++){
+    var m = state.messages[i];
+    var d = new Date(m.time);
+    var day = d.toLocaleDateString("zh-CN", {year:"numeric", month:"long", day:"numeric"});
+    if(day !== lastDay){
+      var dayEl = document.createElement("div");
+      dayEl.className = "day";
+      dayEl.textContent = day;
+      box.appendChild(dayEl);
+      lastDay = day;
+    }
+    var row = document.createElement("div");
+    row.className = "msg " + (m.mine ? "mine" : "");
+
+    var avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = (m.mine ? state.me : state.other).slice(0, 1);
+
+    var wrap = document.createElement("div");
+    wrap.className = "bubble-wrap";
+
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = m.text;
+
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = d.toLocaleTimeString("zh-CN", {hour:"2-digit", minute:"2-digit"});
+
+    wrap.appendChild(bubble);
+    wrap.appendChild(meta);
+    if(m.mine){
+      row.appendChild(wrap);
+      row.appendChild(avatar);
+    } else {
+      row.appendChild(avatar);
+      row.appendChild(wrap);
+    }
     box.appendChild(row);
-  });
-  box.scrollTop=box.scrollHeight;
+  }
+  box.scrollTop = box.scrollHeight;
 }
+
+function loadMessages(){
+  sb.from("messages")
+    .select("*")
+    .eq("room_id", state.room)
+    .order("created_at", { ascending: true })
+    .then(function(result){
+      if(result.error){
+        console.error(result.error);
+        toast("加载失败：" + (result.error.message || "请检查网络"));
+        state.messages = [];
+      } else {
+        var data = result.data || [];
+        state.messages = [];
+        for(var i = 0; i < data.length; i++){
+          var m = data[i];
+          state.messages.push({
+            id: m.id,
+            text: m.content,
+            time: new Date(m.created_at).getTime(),
+            mine: m.sender === state.me,
+            sender: m.sender
+          });
+        }
+      }
+      render();
+    });
+}
+
+function subscribeTo(){
+  if(state.channel){
+    sb.removeChannel(state.channel);
+  }
+  state.channel = sb
+    .channel("room-" + state.room)
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: "messages",
+      filter: "room_id=eq." + state.room
+    }, function(payload){
+      var m = payload.new;
+      for(var i = 0; i < state.messages.length; i++){
+        if(state.messages[i].id === m.id) return;
+      }
+      state.messages.push({
+        id: m.id,
+        text: m.content,
+        time: new Date(m.created_at).getTime(),
+        mine: m.sender === state.me,
+        sender: m.sender
+      });
+      render();
+    })
+    .subscribe();
+}
+
 function openRoom(room){
-  state.room=room||("demo-"+Math.random().toString(36).slice(2,8));
-  load(); updateURL(); render();
-  $("#roomStatus").textContent=location.protocol==="file:"?"本地演示模式":"房间："+state.room;
+  state.room = room || makeRoom();
+  updateURL();
+  $("#roomStatus").textContent = "房间 " + state.room;
   show("chat");
+  loadMessages();
+  subscribeTo();
 }
-function updateURL(){
-  if(location.protocol!=="file"){
-    const u=new URL(location.href);u.searchParams.set("room",state.room);history.replaceState({},'',u);
+
+function send(){
+  var input = $("#input");
+  var text = input.value.trim();
+  if(!text) return;
+
+  sb.from("messages")
+    .insert({
+      room_id: state.room,
+      content: text,
+      sender: state.me
+    })
+    .select()
+    .single()
+    .then(function(result){
+      if(result.error){
+        console.error(result.error);
+        toast("发送失败：" + (result.error.message || "请稍后再试"));
+        return;
+      }
+      var data = result.data;
+      var exists = false;
+      for(var i = 0; i < state.messages.length; i++){
+        if(state.messages[i].id === data.id){ exists = true; break; }
+      }
+      if(!exists){
+        state.messages.push({
+          id: data.id,
+          text: data.content,
+          time: new Date(data.created_at).getTime(),
+          mine: true,
+          sender: data.sender
+        });
+      }
+      input.value = "";
+      resize();
+      render();
+      input.focus();
+    });
+}
+
+function resize(){
+  var t = $("#input");
+  t.style.height = "auto";
+  t.style.height = Math.min(t.scrollHeight, 120) + "px";
+}
+
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      toast("链接已复制");
+    }).catch(function(){
+      fallbackCopy();
+    });
+  } else {
+    fallbackCopy();
+  }
+  function fallbackCopy(){
+    var inp = $("#shareLink");
+    inp.select();
+    try{ document.execCommand("copy"); toast("链接已复制"); }
+    catch(e){ toast("请长按链接手动复制"); }
   }
 }
-function send(){
-  const text=$("#input").value.trim(); if(!text)return;
-  state.messages.push({text,time:Date.now(),mine:true});
-  save();$("#input").value="";resize();render();
-}
-function resize(){const t=$("#input");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,120)+"px"}
 
-$("#enterBtn").onclick=()=>{$("#roomForm").style.display="block";$("#roomInput").focus()}
-$("#localBtn").onclick=()=>openRoom("")
-$("#joinBtn").onclick=()=>{
-  let v=$("#roomInput").value.trim();
-  try{if(v.includes("http"))v=new URL(v).searchParams.get("room")||v}catch(e){}
-  openRoom(v||"demo")
-}
-$("#backBtn").onclick=()=>show("home")
-$("#settingsBack").onclick=()=>show("chat")
-$("#sendBtn").onclick=send
-$("#input").addEventListener("input",resize)
-$("#input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}})
-$("#saveBtn").onclick=()=>{
-  state.me=$("#nameInput").value.trim()||"我";
-  state.other=$("#otherInput").value.trim()||"朋友";
-  localStorage.setItem("guest_name",state.me);localStorage.setItem("guest_other",state.other);
-  render();show("chat");
-}
-$("#clearBtn").onclick=()=>{
-  if(confirm("确定清空这个浏览器里的留言吗？")){state.messages=[];save();render()}
-}
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"&&$("#chat").classList.contains("active"))show("home")
+// 首页按钮
+$("#createBtn").onclick = function(){ openRoom(""); };
+
+$("#joinToggle").onclick = function(){
+  var box = $("#joinBox");
+  if(box.style.display === "block"){
+    box.style.display = "none";
+  } else {
+    box.style.display = "block";
+    $("#roomInput").focus();
+  }
+};
+
+$("#cancelJoin").onclick = function(){
+  $("#joinBox").style.display = "none";
+  $("#roomInput").value = "";
+};
+
+$("#joinBtn").onclick = function(){
+  var room = parseRoom($("#roomInput").value);
+  if(!room){ toast("请输入房间号或链接"); return; }
+  openRoom(room);
+};
+
+// 聊天页按钮
+$("#backBtn").onclick = function(){
+  if(state.channel) sb.removeChannel(state.channel);
+  show("home");
+};
+
+$("#menuBtn").onclick = function(e){
+  e.stopPropagation();
+  var p = $("#menuPanel");
+  p.style.display = (p.style.display === "block") ? "none" : "block";
+};
+
+document.addEventListener("click", function(){
+  $("#menuPanel").style.display = "none";
 });
 
-// 首次打开若 URL 有 room，直接进入
-if(state.room){load();$("#roomStatus").textContent="房间："+state.room;render();show("chat")}
+$("#shareBtn").onclick = function(){
+  $("#menuPanel").style.display = "none";
+  $("#shareLink").value = currentLink();
+  $("#shareOverlay").classList.add("open");
+};
+
+$("#settingsBtn").onclick = function(){
+  $("#menuPanel").style.display = "none";
+  $("#myName").value = state.me;
+  $("#otherName").value = state.other;
+  $("#settingsOverlay").classList.add("open");
+};
+
+$("#clearBtn").onclick = function(){
+  $("#menuPanel").style.display = "none";
+  if(confirm("清空本机缓存？（云端留言不受影响）")){
+    localStorage.removeItem("guest_name");
+    localStorage.removeItem("guest_other");
+    state.me = "我";
+    state.other = "朋友";
+    toast("本机缓存已清空");
+  }
+};
+
+$("#sendBtn").onclick = send;
+
+$("#input").addEventListener("input", resize);
+$("#input").addEventListener("keydown", function(e){
+  if(e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    send();
+  }
+});
+
+// 弹窗
+$("#closeShare").onclick = function(){ $("#shareOverlay").classList.remove("open"); };
+$("#copyLink").onclick = function(){ copyText($("#shareLink").value); };
+
+$("#closeSettings").onclick = function(){ $("#settingsOverlay").classList.remove("open"); };
+$("#saveSettings").onclick = function(){
+  var me = $("#myName").value.trim() || "我";
+  var other = $("#otherName").value.trim() || "朋友";
+  state.me = me;
+  state.other = other;
+  localStorage.setItem("guest_name", me);
+  localStorage.setItem("guest_other", other);
+  $("#settingsOverlay").classList.remove("open");
+  render();
+  toast("设置已保存");
+};
+
+// 点弹窗背景关闭
+$("#settingsOverlay").onclick = function(e){
+  if(e.target === this) this.classList.remove("open");
+};
+$("#shareOverlay").onclick = function(e){
+  if(e.target === this) this.classList.remove("open");
+};
+
+// URL 带 room 参数时自动进入
+var urlParams = new URLSearchParams(window.location.search);
+var urlRoom = urlParams.get("room");
+if(urlRoom) openRoom(urlRoom);
+
+})();
 </script>
 </body>
 </html>
