@@ -1,21 +1,24 @@
 {
   "name": "little-message-room",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/core.test.mjs",
+    "test": "node --test tests/core.test.mjs tests/features.test.mjs tests/notifications.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:db": "node tests/database.mjs",
-    "check": "node --check app.js && node --check core.js && node --check backend.js"
+    "check": "node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js",
+    "build:sql": "node scripts/build-sql.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",
     "@fontsource/noto-sans-sc": "5.3.0",
     "@sparticuz/chromium": "153.0.0",
+    "happy-dom": "20.0.10",
     "playwright": "^1.55.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.57.4"
+    "@supabase/supabase-js": "2.57.4",
+    "tesseract.js": "6.0.1"
   }
 }

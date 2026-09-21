@@ -47,15 +47,15 @@ async function insert(
 }
 try {
   await db.exec(`
-    create role anon; create role authenticated;
+    create role anon; create role authenticated; create role service_role bypassrls;
     create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as
       $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema auth, public to anon, authenticated;
     create schema storage;
-    create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint);
-    create table storage.objects(id uuid default gen_random_uuid(), bucket_id text, name text);
+    create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+    create table storage.objects(id uuid default gen_random_uuid(), bucket_id text, name text, metadata jsonb);
     alter table storage.objects enable row level security;
     grant usage on schema storage to anon, authenticated;
     grant all on storage.objects to anon, authenticated;
@@ -315,6 +315,108 @@ try {
       );
     },
   );
+  const features = await readFile(new URL('../supabase/migrations/20260922_mailbox_features.sql',import.meta.url),'utf8');
+  await db.exec('reset role');
+  await check('feature migration executes and can be rerun without data loss',async()=>{await db.exec(features);await db.exec(features);});
+  await as(a);
+  const otherRoom=await scalar("select mailbox_create_room('another room')");
+  const mediaNonce=crypto.randomUUID(), mediaPath=`${room.room_id}/${a}/${mediaNonce}`;
+  await check('own pending attachment uploads into room/user/nonce only',async()=>{
+    await db.query("insert into storage.objects(bucket_id,name,metadata) values('message-media',$1,$2)",[mediaPath,JSON.stringify({size:12,mimetype:'image/png'})]);
+    await denied("insert into storage.objects(bucket_id,name) values('message-media',$1)",[`${room.room_id}/${b}/${crypto.randomUUID()}`]);
+    await denied("insert into storage.objects(bucket_id,name) values('message-media',$1)",[`v2_noaccess/${a}/${crypto.randomUUID()}`]);
+    await denied("insert into storage.objects(bucket_id,name) values('message-media',$1)",[`${room.room_id}/${a}/../escape`]);
+  });
+  const mediaRow=(path,nonce,kind='image',mime='image/png',size=12)=>db.query(`insert into messages(room_id,content,sender,author_id,client_nonce,message_type,media_path,media_mime,media_name,media_size)
+    values($1,'',$2::text,$2::uuid,$3,$4,$5,$6,'photo.png',$7) returning id`,[room.room_id,a,nonce,kind,path,mime,size]);
+  await check('attachments reject nonexistent objects, forged metadata and wrong room paths',async()=>{
+    await assert.rejects(mediaRow(`${room.room_id}/${a}/${crypto.randomUUID()}`,crypto.randomUUID()),e=>e.code==='22023');
+    await assert.rejects(mediaRow(mediaPath,mediaNonce,'image','image/png',99),e=>e.code==='22023');
+    await assert.rejects(mediaRow(mediaPath,mediaNonce,'image','text/html'),e=>e.code==='22023');
+    await assert.rejects(mediaRow(mediaPath,mediaNonce,'video','image/png'),e=>e.code==='22023');
+  });
+  await as(b);
+  await check('unpublished attachment is hidden from other members',async()=>{assert.equal(await scalar('select count(*) from storage.objects where name=$1',[mediaPath]),0);});
+  await as(a);
+  let photo;
+  await check('matching uploaded object can be committed as an attachment',async()=>{photo=(await mediaRow(mediaPath,mediaNonce)).rows[0].id;});
+  await check('published attachment is immutable, including for its uploader',async()=>{
+    assert.equal((await db.query('delete from storage.objects where name=$1 returning id',[mediaPath])).rows.length,0);
+    assert.equal((await db.query("update storage.objects set name='overwrite' where name=$1 returning id",[mediaPath])).rows.length,0);
+    await db.query("update messages set display_date='2026-09-04' where id=$1",[photo]);
+  });
+  await as(b);
+  await check('room members can read published attachments',async()=>{assert.equal(await scalar('select count(*) from storage.objects where name=$1',[mediaPath]),1);});
+  await as(c);
+  await check('nonmembers cannot read even with broad legacy Storage policy',async()=>{assert.equal(await scalar('select count(*) from storage.objects where name=$1',[mediaPath]),0);});
+  await as(a);
+  const eventId=crypto.randomUUID(),memoirId=crypto.randomUUID();
+  await check('member may save shared origin date and own calendar event',async()=>{
+    await db.query("update mailbox_rooms set relationship_since='2024-09-04' where room_id=$1",[room.room_id]);
+    await db.query("insert into anniversaries(id,room_id,owner_user_id,title,event_date) values($1,$2,$3,'初见','2024-09-04')",[eventId,room.room_id,a]);
+  });
+  await check('calendar metadata cannot be used to move an entry across rooms',()=>denied('update anniversaries set room_id=$1 where id=$2',[otherRoom.room_id,eventId]));
+  await check('owner can create and revise a private memoir with compare-and-swap',async()=>{
+    await db.query("insert into memoirs(id,room_id,owner_user_id,title,body,range_start,range_end) values($1,$2,$3,'回忆','draft','2026-01-01','2026-09-20')",[memoirId,room.room_id,a]);
+    await db.query("update memoirs set body='revised',revision=revision+1 where id=$1 and revision=1",[memoirId]);
+    assert.equal((await db.query("update memoirs set body='stale',revision=revision+1 where id=$1 and revision=1 returning id",[memoirId])).rows.length,0);
+    await denied("update memoirs set body='no revision' where id=$1",[memoirId],'40001');
+    await denied("update memoirs set owner_user_id=$1,revision=revision+1 where id=$2",[b,memoirId]);
+  });
+  await as(b);
+  await check('other members see calendar but cannot change another author event',async()=>{
+    assert.equal(await scalar('select count(*) from anniversaries where id=$1',[eventId]),1);
+    assert.equal((await db.query("update anniversaries set title='stolen' where id=$1 returning id",[eventId])).rows.length,0);
+    assert.equal((await db.query('delete from anniversaries where id=$1 returning id',[eventId])).rows.length,0);
+  });
+  await check('same-room peers cannot read, modify or forge another user memoir',async()=>{
+    assert.equal(await scalar('select count(*) from memoirs where id=$1',[memoirId]),0);
+    assert.equal((await db.query("update memoirs set body='leak',revision=revision+1 where id=$1 returning id",[memoirId])).rows.length,0);
+    await denied("insert into memoirs(room_id,owner_user_id,title,body,range_start,range_end) values($1,$2,'fake','x','2026-01-01','2026-09-20')",[room.room_id,a]);
+  });
+  await check('import source labels never replace the authenticated sender',async()=>{
+    await db.query("insert into messages(room_id,content,sender,author_id,client_nonce,message_type,import_label) values($1,'quote',$2::text,$2::uuid,gen_random_uuid(),'import','截图中的人')",[room.room_id,b]);
+    await denied("insert into messages(room_id,content,sender,author_id,client_nonce,message_type,import_label) values($1,'forged',$2::text,$2::uuid,gen_random_uuid(),'import','我')",[room.room_id,a]);
+  });
+  let session;
+  await check('listening state uses server timestamp, identity and monotonic revision',async()=>{
+    session=await scalar('select mailbox_set_listen($1,$2,$3,true,12.5,0)',[room.room_id,'a'.repeat(64),'song']);
+    assert.equal(session.session.updated_by,b);assert.equal(session.session.revision,1);assert.equal(session.session.position_seconds,12.5);assert.ok(session.server_now);
+    await denied("update listen_sessions set updated_by=$1",[a]);
+    await denied('select mailbox_set_listen($1,$2,$3,false,0,0)',[room.room_id,'a'.repeat(64),'song'],'40001');
+  });
+  await as(a);
+  await check('other members can pause the same room; invalid transport states are denied',async()=>{
+    const next=await scalar('select mailbox_set_listen($1,$2,$3,false,15,1)',[room.room_id,'a'.repeat(64),'song']);assert.equal(next.session.revision,2);assert.equal(next.session.updated_by,a);
+    await denied('select mailbox_set_listen($1,$2,$3,true,0,1)',[room.room_id,'a'.repeat(64),'song'],'40001');
+    await denied("select mailbox_set_listen($1,$2,$3,true,'NaN',2)",[room.room_id,'a'.repeat(64),'song'],'22023');
+    await denied('select mailbox_set_listen($1,$2,$3,true,0,2)',[room.room_id,'bad-key','song'],'22023');
+  });
+  await as(c);
+  await check('uninvited identity cannot access shared or private features',async()=>{
+    for(const table of ['anniversaries','memoirs','listen_sessions'])assert.equal(await scalar('select count(*) from '+table),0);
+    await denied('select mailbox_read_listen($1)',[room.room_id]);
+    await denied('select mailbox_set_listen($1,$2,$3,false,0,2)',[room.room_id,'a'.repeat(64),'song']);
+    await denied("insert into anniversaries(room_id,owner_user_id,title,event_date) values($1,$2,'x','2026-09-20')",[room.room_id,c]);
+  });
+  await as();
+  await check('signed-out callers cannot access any new feature',async()=>{for(const table of ['anniversaries','memoirs','listen_sessions'])await denied('select * from '+table);await denied('select mailbox_read_listen($1)',[room.room_id]);assert.equal(await scalar("select count(*) from storage.objects where bucket_id='message-media'"),0);});
+  await db.exec('reset role');
+  await check('third migration reapplication preserves legacy messages and feature records',async()=>{await db.exec(features);assert.equal(await scalar("select count(*) from messages where room_id='OLDroom'"),3);assert.equal(await scalar('select body from memoirs where id=$1',[memoirId]),'revised');});
+  const push=await readFile(new URL('../supabase/migrations/20260923_mailbox_push.sql',import.meta.url),'utf8');
+  await check('Push migration is additive and safely re-runnable',async()=>{await db.exec(push);await db.exec(push);assert.equal(await scalar("select count(*) from messages where room_id='OLDroom'"),3);});
+  await as(a);const subId=crypto.randomUUID();
+  await check('authenticated member can save their own Push subscription',async()=>{await db.query("insert into push_subscriptions(id,user_id,room_id,endpoint,p256dh,auth) values($1,$2,$3,$4,$5,$6)",[subId,a,room.room_id,'https://fcm.googleapis.com/fcm/send/test','A'.repeat(87),'B'.repeat(22)]);assert.equal(await scalar('select count(*) from push_subscriptions'),1);});
+  await check('subscription origin and delivery state cannot be forged',async()=>{await denied('update push_subscriptions set room_id=$1 where id=$2',[otherRoom.room_id,subId]);await denied('select * from mailbox_push_deliveries');await denied('select mailbox_claim_push($1,$2)',[subId,'1']);});
+  await as(b);
+  await check('room peer cannot list, remove or steal another member endpoint',async()=>{assert.equal(await scalar('select count(*) from push_subscriptions'),0);assert.equal((await db.query('delete from push_subscriptions where id=$1 returning id',[subId])).rows.length,0);await denied('insert into push_subscriptions(user_id,room_id,endpoint,p256dh,auth) values($1,$2,$3,$4,$5)',[a,room.room_id,'https://fcm.googleapis.com/fcm/send/fake','A'.repeat(87),'B'.repeat(22)]);});
+  await as(c);
+  await check('uninvited identity cannot subscribe to a room',()=>denied('insert into push_subscriptions(user_id,room_id,endpoint,p256dh,auth) values($1,$2,$3,$4,$5)',[c,room.room_id,'https://fcm.googleapis.com/fcm/send/no','A'.repeat(87),'B'.repeat(22)]));
+  await as();await check('anonymous callers cannot inspect endpoints',()=>denied('select * from push_subscriptions'));
+  await db.exec('reset role');await db.exec('set role service_role');
+  await check('Push claims deduplicate client and webhook requests, retry failures, stop delivered retries',async()=>{assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),true);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),false);await db.query("update mailbox_push_deliveries set status='failed',lease_until=now()-interval '2 minutes' where subscription_id=$1",[subId]);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),true);await db.query("update mailbox_push_deliveries set status='sent',lease_until=now()-interval '2 minutes' where subscription_id=$1",[subId]);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),false);});
+  await db.exec('reset role');
+  await check('single INSTALL.sql transaction reapplies without losing messages or private drafts',async()=>{await db.exec(await readFile(new URL('../supabase/INSTALL.sql',import.meta.url),'utf8'));assert.equal(await scalar("select count(*) from messages where room_id='OLDroom'"),3);assert.equal(await scalar('select body from memoirs where id=$1',[memoirId]),'revised');});
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );

@@ -1,0 +1,1 @@
+{"name":"小小留言室","short_name":"留言室","id":"./","start_url":"./","scope":"./","display":"standalone","background_color":"#fdfdfb","theme_color":"#565e54","lang":"zh-CN","icons":[{"src":"./assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"./assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"}]}

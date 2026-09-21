@@ -1,4 +1,4 @@
-import { missingSchema, normalizeMessage } from "./core.js?v=2.0.0-20260920";
+import { missingSchema, normalizeMessage } from "./core.js?v=2.2.0";
 
 // This is the project's public browser key, never a service-role secret.
 const URL = "https://yuzgbxeprpohlakxjcut.supabase.co";
@@ -133,7 +133,10 @@ export async function loadMessages(room, secure, before) {
 export async function sendMessage(row, secure) {
   const sb = client(secure);
   const result = await sb.from("messages").insert(row).select().single();
-  if (!result.error) return normalizeMessage(result.data);
+  if (!result.error) {
+    if(secure)void dispatchPush(result.data.id);
+    return normalizeMessage(result.data);
+  }
   // A response can be lost after INSERT committed. Retry with the same nonce;
   // the unique index prevents a second message, then we retrieve the first.
   if (secure && result.error.code === "23505") {
@@ -144,7 +147,7 @@ export async function sendMessage(row, secure) {
       .eq("author_id", row.author_id)
       .eq("client_nonce", row.client_nonce)
       .single();
-    if (!existing.error) return normalizeMessage(existing.data);
+    if (!existing.error) {void dispatchPush(existing.data.id);return normalizeMessage(existing.data);}
   }
   throw result.error;
 }
@@ -190,4 +193,44 @@ export function subscribe(room, secure, onMessage, onMembers, onStatus) {
   return () => {
     void sb.removeChannel(channel);
   };
+}
+
+// Binary upload with real progress; a retry reuses the immutable nonce path.
+export async function uploadMedia(path, file, mime, onProgress, signal) {
+  const {data,error}=await client(true).auth.getSession();
+  if(error) throw error;
+  if(!data.session) throw new Error('Authentication required');
+  if(signal?.aborted) throw new DOMException('Cancelled','AbortError');
+  try {
+    await new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      const abort=()=>xhr.abort();
+      const done=()=>signal?.removeEventListener('abort',abort);
+      xhr.open('POST',URL+'/storage/v1/object/message-media/'+path);
+      xhr.setRequestHeader('Authorization','Bearer '+data.session.access_token);
+      xhr.setRequestHeader('apikey',KEY);
+      xhr.setRequestHeader('Content-Type',mime);
+      xhr.setRequestHeader('x-upsert','false');
+      xhr.timeout=120000;
+      xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(event.loaded/event.total);};
+      xhr.onload=()=>{done();if(xhr.status>=200&&xhr.status<300)resolve();else{let detail={};try{detail=JSON.parse(xhr.responseText);}catch{}reject(Object.assign(new Error(detail.message||detail.error||'Upload failed'),{status:xhr.status}));}};
+      xhr.onerror=()=>{done();reject(new Error('Upload network error'));};
+      xhr.ontimeout=()=>{done();reject(new Error('Upload timeout'));};
+      xhr.onabort=()=>{done();reject(new DOMException('Cancelled','AbortError'));};
+      signal?.addEventListener('abort',abort,{once:true});
+      xhr.send(file);
+    });
+  } catch(error) {
+    if(error.name==='AbortError')throw error;
+    // Includes a lost response after upload committed. Own pending objects are readable.
+    const result=await client(true).storage.from('message-media').createSignedUrl(path,60);
+    if(result.error)throw error;
+  }
+  onProgress(1);
+}
+
+// Fire-and-forget fallback. The database webhook is authoritative and works if
+// this tab closes immediately after INSERT; delivery claims deduplicate both.
+async function dispatchPush(id){
+  try{await client(true).functions.invoke('mailbox-push',{body:{message_id:String(id)}});}catch{/* Never make a delivered chat message look failed because Push is unavailable. */}
 }

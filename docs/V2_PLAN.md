@@ -1,34 +1,21 @@
-# Mailbox v2 roadmap
+# 2.2 状态与后续验收
 
-## Compatibility contract
+本文件取代早期“自己在左”的设计。当前明确要求：自己右、对方左；聊天是主界面，左滑到关系空间。
 
-- Existing `public.messages` data remains the source for legacy text messages.
-- No destructive migration without a separately reviewed rollback plan.
-- User-authored display date is separate from immutable `created_at`.
-- Messages are stored once; chat, diary and memory-wall are projections of the same records.
-- **Layout invariant:** current user's messages render on the LEFT; the other participant renders on the RIGHT.
+20:00 轮 `7cb7575`：四主题/空间入口已推送，部分按钮尚未接业务；通知依据 DOM 变化，存在历史误报。上一轮未提交的附件、日历、音乐、OCR、回忆录代码随后在当前轮接入。
 
-## Implemented in the current frontend
+已同步随后 `c777321` 的布局调整和 `2dbcdab` 的本机工具初版；旧版纪念日可找回到编辑区，私人回忆录/歌词备注和主题偏好继续保留，不自动上传旧的本机内容。
 
-- Clean / warm themes, responsive app shell, rotating daily copy, recent joined rooms.
-- Legacy text compatibility, per-room drafts, accurate timestamp/keyset pagination.
-- Self-left / other-right chat, editable own nickname/avatar and local counterpart overrides.
-- Up to eight quoted messages, display date for new messages, owner-only date edits in invitation rooms.
-- Chat / diary / memory-wall projections over the same message records.
-- Anonymous Auth + token-gated new room memberships, member profile sync and authenticated nonce deduplication.
-- SQL migrations, isolated authorization tests, browser integration tests and deployment notes.
+当前轮：接入上述业务流程，重做最近联系人首页、四套完整主题、多端布局、日记/回忆墙；修复功能 migration 的 SQL CASE 语法；新增录音、Office 附件、本地音乐持久化、引用追溯、邮箱/链接收藏、真实消息通知及可部署 Push 服务。数据库只提供迁移，未冒称执行线上 SQL。
 
-These are code-level implementations. The user must execute the SQL and enable anonymous Auth before protected features become live. Old rooms retain their old permissions and do not silently become private.
+本轮验证：25 项逻辑检查、47 项隔离 PostgreSQL 权限/兼容性检查、31 项浏览器集成检查通过；浏览器覆盖 6 个屏幕尺寸 × 4 套主题 × 3 种内容视图，以及左滑关系空间。已逐张抽查真实渲染截图，Deno 2.5.1 的 Edge Function 类型检查通过。浏览器后端请求被测试夹具拦截，未向线上发送测试留言。
 
-## Front-end slices
+仍需环境/设备验收：
 
-1. Account linking/recovery and CAPTCHA before broader public use; invitation rotation/revocation and abuse controls.
-2. Attachments: room-member Storage policies, progress/retry/preview. Currently unavailable, private bucket remains closed.
-3. Relationship panel: swipe-right route, days connected, anniversaries/events.
-4. Together listening: local audio + imported lyrics; fingerprint/key match before syncing playback state; chat remains usable.
-5. Screenshot import: browser OCR first, editable reconstructed draft, explicit confirmation before sending.
-6. Memoir: owner-only editable generated drafts by date range; never exposed through normal conversation reads.
+- Supabase 执行 INSTALL.sql、匿名 Auth、VAPID secrets、Edge Function 与数据库 webhook。
+- 真双设备 Auth 身份、附件 RLS、一起听实时通信与系统音频限制。
+- OCR 模型 CDN 可达性及不同聊天截图识别质量；原媒体无法从截图自动恢复。
+- 手机麦克风、通知授权、后台杀进程/省电策略、iOS 主屏幕 Web Push。
+- 匿名身份跨设备恢复/账号绑定、联系人云端同步、Push 失败定时重试队列尚未提供。
 
-## Security gate
-
-The legacy client uses a random local device id, not a secure identity. Member policies are now available only for new token-gated invitation rooms. Legacy profiles remain local. Media, anniversaries, listen state and memoir remain fail-closed until each feature's policy and UI workflow is implemented and tested. Never add permissive anon RLS merely to make a demo work.
+下一轮从 main 核对已提交功能，避免重复重建或建分支/PR。

@@ -16,6 +16,8 @@ const mime = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".woff2": "font/woff2",
+  ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json",
 };
 const server = createServer(async (req, res) => {
   try {
@@ -100,11 +102,16 @@ async function setup({
   secure = false,
   viewport = { width: 390, height: 844 },
   rows = null,
+  notificationFixture = false,
 } = {}) {
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport, serviceWorkers:"block" });
   await context.addInitScript(() => {
     localStorage.setItem("device_id", "test-device");
     localStorage.setItem("nickname", "小辞");
+  });
+  if(notificationFixture)await context.addInitScript(()=>{
+    window.noticeFixture={requests:0,shown:[]};class TestNotification{static permission='default';static async requestPermission(){window.noticeFixture.requests++;return this.permission='granted';}}
+    window.Notification=TestNotification;const reg={showNotification:async(title,options)=>window.noticeFixture.shown.push({title,...options})};Object.defineProperty(navigator,'serviceWorker',{value:{register:async()=>reg,ready:Promise.resolve(reg),addEventListener:()=>{}}});
   });
   const records = rows || [
     fixture(1, "OldRoom1", "你到宿舍了吗？\n一路辛苦了。", "friend-device"),
@@ -135,6 +142,7 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
+    events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
   };
   const errors = [];
   await context.routeWebSocket(/supabase\.co/, (ws) => {
@@ -147,7 +155,7 @@ async function setup({
         url = new URL(request.url());
       const path = url.pathname,
         method = request.method();
-      const json = request.postData() ? JSON.parse(request.postData()) : null;
+      let json=null;if(request.postData()&&request.headers()['content-type']?.includes('json'))json=JSON.parse(request.postData());
       const reply = (data, status = 200) =>
         route.fulfill({
           status,
@@ -220,6 +228,28 @@ async function setup({
         }
         return reply(memberRows);
       }
+      if(path.endsWith('/mailbox_rooms'))return reply({room_id:secureId,created_at:'2026-09-01T00:00:00Z',relationship_since:json?.relationship_since||'2026-09-03'});
+      if(path.endsWith('/anniversaries')){
+        if(method==='GET')return reply(control.events);
+        if(method==='POST'){control.events.push(json);return reply(json);}
+        if(method==='PATCH'){const row=control.events.find(r=>r.id===url.searchParams.get('id')?.slice(3));Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){control.events=control.events.filter(r=>r.id!==url.searchParams.get('id')?.slice(3));return reply([]);}
+      }
+      if(path.endsWith('/memoirs')){
+        if(method==='GET'){const id=url.searchParams.get('id')?.slice(3);return reply(id?control.memoirs.find(r=>r.id===id):control.memoirs);}
+        if(method==='POST'){const row={...json,revision:1};control.memoirs.push(row);return reply(row);}
+        if(method==='PATCH'){const row=control.memoirs.find(r=>r.id===url.searchParams.get('id')?.slice(3));Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){control.memoirs=control.memoirs.filter(r=>r.id!==url.searchParams.get('id')?.slice(3));return reply([]);}
+      }
+      if(path.endsWith('/rpc/mailbox_read_listen'))return reply({session:control.listen,server_now:new Date().toISOString()});
+      if(path.endsWith('/rpc/mailbox_set_listen')){if(json.p_revision!==(control.listen?.revision||0))return reply({code:'40001'},409);control.listen={track_key:json.p_key,track_name:json.p_name,position_seconds:json.p_position,is_playing:json.p_playing,revision:json.p_revision+1,updated_at:new Date().toISOString()};return reply({session:control.listen,server_now:new Date().toISOString()});}
+      if(path.endsWith('/functions/v1/mailbox-push'))return reply({error:'Push not configured'},503);
+      if(path.startsWith('/storage/v1/object/sign/message-media/')){
+        const key=path.split('/message-media/')[1];
+        if(method==='POST'){if(!control.uploads.has(key))return reply({message:'not found'},404);return reply({signedURL:'/object/sign/message-media/'+key+'?token=test'});}
+        const file=control.uploads.get(key);return file?route.fulfill({contentType:file.mime,body:file.buffer}):reply({},404);
+      }
+      if(path.startsWith('/storage/v1/object/message-media/')){const key=path.split('/message-media/')[1];if(control.uploads.has(key))return reply({message:'exists'},409);control.uploads.set(key,{buffer:request.postDataBuffer(),mime:request.headers()['content-type']});return reply({Key:key});}
       if (path.endsWith("/messages")) {
         if (method === "POST") {
           control.sends.push(json);
@@ -308,13 +338,13 @@ async function setup({
   );
   assert.equal(navigation.status(), 200);
   async function join(id = "OldRoom1") {
+    await page.locator("#addRoomBtn").click();
     await page.locator("#joinToggle").click();
     await page.locator("#roomInput").fill(id);
     await page.locator("#joinForm button").click();
     await page.waitForFunction(
       () =>
-        document.querySelector("#roomStatus").textContent.includes("同步") ||
-        document.querySelector("#roomStatus").textContent.includes("实时连接"),
+        document.querySelector("#roomStatus").textContent.includes("左滑"),
     );
   }
   return { page, context, control, errors, join };
@@ -323,25 +353,26 @@ try {
   const t = await setup();
   const { page, control } = t;
   await check(
-    "home: sheets and join form start hidden, both themes persist",
+    "home: sheets and join form start hidden, four-theme choice persists",
     async () => {
       assert.equal(await page.locator(".scrim:visible").count(), 0);
       assert.equal(await page.locator("#joinForm").isVisible(), false);
       await page.locator("#themeBtn").click();
+      await page.locator("[data-theme-pick=warm-light]").click();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
-        "warm",
+        "warm-light",
       );
       await page.reload();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
-        "warm",
+        "warm-light",
       );
     },
   );
   await t.join();
   await check(
-    "old room opens without Auth, own messages left / friend right",
+    "old room opens without Auth, own messages right / friend left",
     async () => {
       assert.equal(control.authCalls, 0);
       assert.equal(await page.locator(".msg").count(), 2);
@@ -351,7 +382,7 @@ try {
           .locator(".msg:not(.mine) .avatar")
           .boundingBox(),
         theirB = await page.locator(".msg:not(.mine) .bubble").boundingBox();
-      assert.ok(ownA.x < ownB.x && theirA.x > theirB.x);
+      assert.ok(ownA.x > ownB.x && theirA.x < theirB.x);
       assert.match(
         await page.locator("#connectionNote").innerText(),
         /公开权限/,
@@ -392,6 +423,7 @@ try {
     async () => {
       await page.locator('[data-quote-id="1"]').click();
       await page.locator('[data-quote-id="2"]').click();
+      await page.locator("#composeMore").click();
       await page.locator("#dateBtn").click();
       await page.locator("#displayDate").fill("2024-09-04");
       await page.locator("#saveDate").click();
@@ -404,7 +436,7 @@ try {
       assert.deepEqual(control.sends[0].reply_to, ["1", "2"]);
       assert.equal(control.sends[0].display_date, "2024-09-04");
       for (const view of ["diary", "wall", "chat"]) {
-        await page.locator(`[data-view=${view}]`).click();
+        if(view==='chat')await page.locator('#returnChat').click();else{await page.locator('#relationHandle').click();await page.locator(`[data-open-view=${view}]`).click();}
         assert.equal(await page.locator(".msg").count(), 3);
       }
       assert.equal(control.sends.length, 1);
@@ -535,11 +567,20 @@ try {
       assert.equal(Object.hasOwn(old.control.sends[0], "author_id"), false);
     },
   );
+  await check('previous release local utilities and theme are recovered without publishing',async()=>{
+    await old.page.evaluate(()=>{localStorage.setItem('anniversary.OldRoom1',JSON.stringify({name:'原来那一天',date:'2020-05-20'}));localStorage.setItem('memoir.OldRoom1','上一版只写给自己的内容');localStorage.setItem('lyrics.OldRoom1','旧的歌词和备注');localStorage.setItem('theme.v2','warm-dark');localStorage.setItem('mailbox.theme','"clean"');});
+    await old.page.reload();await old.page.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));assert.equal(await old.page.locator('html').getAttribute('data-theme'),'warm-dark');
+    const sent=old.control.sends.length;
+    await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('[data-close=relationshipScrim]').click();
+    await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('[data-close=memoirScrim]').click();
+    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('[data-close=listenScrim]').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
+  });
   await old.page.locator("#backBtn").click();
   old.control.failAuth = true;
   await check(
     "legacy room creation requires explicit privacy acknowledgment",
     async () => {
+      await old.page.locator("#addRoomBtn").click();
       await old.page.locator("#createBtn").click();
       await old.page.locator("#noticeScrim").waitFor({ state: "visible" });
       assert.match(
@@ -621,7 +662,10 @@ try {
   await check("tablet layout and warm memory wall remain usable", async () => {
     await s.page.locator("#menuBtn").click();
     await s.page.locator("#themeMenuBtn").click();
-    await s.page.locator("[data-view=wall]").click();
+    await s.page.locator('[data-theme-pick=warm-light]').click();
+    await s.page.locator('[data-close=settingsScrim]').click();
+    await s.page.locator('#relationHandle').click();
+    await s.page.locator('[data-open-view=wall]').click();
     assert.ok(
       await s.page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -630,6 +674,74 @@ try {
     await s.page.screenshot({
       path: resolve(root, "test-results/tablet-wall.png"),
     });
+  });
+  await s.page.locator('#returnChat').click();
+  await check('left swipe opens relationship space; vertical gesture and right swipe do not',async()=>{
+    await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchstart',{touches:[new Touch({identifier:1,target:el,clientX:600,clientY:300})]}));});
+    await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchend',{changedTouches:[new Touch({identifier:1,target:el,clientX:450,clientY:305})]}));});
+    assert.equal(await s.page.locator('#relationSpace').getAttribute('aria-hidden'),'false');
+    await s.page.locator('#relationClose').click();
+    await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchstart',{touches:[new Touch({identifier:2,target:el,clientX:300,clientY:300})]}));});
+    await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchend',{changedTouches:[new Touch({identifier:2,target:el,clientX:430,clientY:390})]}));});
+    assert.equal(await s.page.locator('#relationSpace').getAttribute('aria-hidden'),'true');
+  });
+  await check('relationship calendar adds shared anniversaries and paints memory wall nodes',async()=>{
+    await s.page.locator('#relationHandle').click();await s.page.locator('#relationshipBtn').click();
+    await s.page.locator('#relationshipSince').fill('2024-09-04');await s.page.locator('#relationshipForm button').click();
+    await s.page.locator('#eventTitle').fill('第一次听同一首歌');await s.page.locator('#eventDate').fill('2026-09-20');await s.page.locator('#eventSave').click();
+    await s.page.locator('.event-card').waitFor();assert.equal(s.control.events[0].owner_user_id,user);
+    await s.page.locator('[data-close=relationshipScrim]').click();
+    await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=wall]').click();
+    assert.match(await s.page.locator('.wall-event').textContent(),/第一次听同一首歌/);await s.page.locator('#returnChat').click();
+  });
+  await check('attachment retry after ambiguous send reuses upload path and message nonce',async()=>{
+    await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('a shared note')});
+    await s.page.locator('#attachmentCaption').fill('一起留在这里');s.control.ambiguousNext=true;
+    await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentStatus').textContent.includes('保留'));
+    await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);
+    assert.equal(s.control.records.filter(r=>r.media_name==='note.txt').length,1);assert.equal(s.control.uploads.size,1);
+  });
+  await check('image preview loads privately and survives unrelated message refresh',async()=>{
+    const buffer=await readFile(resolve(root,'test-results/mobile-chat.png'));await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'moment.png',mimeType:'image/png',buffer});await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);await s.page.locator('.media-card img').waitFor();
+    await s.page.locator('#menuBtn').click();await s.page.locator('#refreshBtn').click();await s.page.locator('[data-close=menuScrim]').click();assert.equal(await s.page.locator('.media-card img').count(),1);
+  });
+  await check('voice recording creates an editable playable attachment before any send',async()=>{
+    await s.page.evaluate(()=>{const ac=new AudioContext(),destination=ac.createMediaStreamDestination(),oscillator=ac.createOscillator();oscillator.connect(destination);oscillator.start();window.testAudio=ac;navigator.mediaDevices.getUserMedia=async()=>destination.stream;});
+    const sends=s.control.sends.length;await s.page.locator('#attachBtn').click();await s.page.locator('#recordStart').click();await s.page.locator('#recordStop').waitFor();await s.page.waitForTimeout(160);await s.page.locator('#recordStop').click();await s.page.locator('#attachmentPreview audio').waitFor();assert.equal(s.control.sends.length,sends);await s.page.locator('[data-close=attachmentScrim]').click();await s.page.evaluate(()=>window.testAudio.close());
+  });
+  await check('OCR recognition produces editable drafts and sends only after explicit confirmation',async()=>{
+    await s.page.evaluate(()=>{window.Tesseract={createWorker:async()=>({recognize:async()=>({data:{blocks:[{paragraphs:[{text:'一起看晚霞',bbox:{x0:10,x1:100}}]}]}}),terminate:async()=>{}})};});
+    const count=s.control.sends.length;await s.page.locator('#composeMore').click();await s.page.locator('#importBtn').click();await s.page.locator('#ocrFile').setInputFiles({name:'chat.png',mimeType:'image/png',buffer:await readFile(resolve(root,'test-results/mobile-chat.png'))});await s.page.locator('#ocrRecognize').click();await s.page.locator('.import-row textarea').waitFor();assert.equal(s.control.sends.length,count);
+    await s.page.locator('.import-row textarea').fill('修改过的摘录');await s.page.locator('.import-row input[type=file]').setInputFiles({name:'supplement.txt',mimeType:'text/plain',buffer:Buffer.from('original supplement')});await s.page.waitForFunction(()=>document.querySelector('.import-row').textContent.includes('已就绪'));await s.page.locator('#importSend').click();assert.equal(s.control.sends.length,count);await s.page.locator('#noticeConfirm').click();await s.page.waitForFunction(()=>document.querySelector('.import-row').classList.contains('sent'));assert.equal(s.control.sends.at(-1).author_id,user);assert.equal(s.control.sends.at(-1).content,'修改过的摘录');assert.equal(s.control.sends.at(-1).media_name,'supplement.txt');assert.equal(s.control.sends.at(-1).message_type,'file');await s.page.locator('[data-close=importScrim]').click();
+  });
+  await check('private memoir generates a date projection, saves privately and does not send chat',async()=>{
+    const count=s.control.sends.length;await s.page.locator('#relationHandle').click();await s.page.locator('#memoirBtn').click();await s.page.locator('#memoirStart').fill('2020-01-01');await s.page.locator('#memoirEnd').fill('2099-01-01');await s.page.locator('#memoirGenerate').click();await s.page.waitForFunction(()=>document.querySelector('#memoirBody').value.includes('第一封信'));await s.page.locator('#memoirTitle').fill('这一页，只有我');await s.page.locator('#memoirSave').click();await s.page.waitForFunction(()=>document.querySelector('#memoirNote').textContent.includes('已保存'));assert.equal(s.control.memoirs.length,1);assert.equal(s.control.memoirs[0].owner_user_id,user);assert.equal(s.control.sends.length,count);await s.page.locator('[data-close=memoirScrim]').click();
+  });
+  await check('local audio persists, publishes playback and responds to remote pause',async()=>{
+    const samples=8000*8,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF');buffer.writeUInt32LE(36+samples*2,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(8000,24);buffer.writeUInt32LE(16000,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i*.1)*1000),44+i*2);
+    await s.page.locator('#relationHandle').click();await s.page.locator('#listenBtn').click();await s.page.locator('#listenFile').setInputFiles({name:'our-song.wav',mimeType:'audio/wav',buffer});await s.page.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await s.page.locator('#lyricsFile').setInputFiles({name:'song.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]这一刻\n[00:02.00]在同一首歌里')});await s.page.locator('#listenShare').click();await s.page.waitForFunction(()=>document.querySelector('#listenSync').checked);assert.equal(s.control.listen.track_key.length,64);const playing=s.page.waitForResponse(r=>r.url().endsWith('/rpc/mailbox_set_listen')&&r.request().postDataJSON().p_playing===true);await s.page.locator('#listenToggle').click();await playing;await s.page.waitForFunction(()=>!document.querySelector('#listenAudio').paused);assert.equal(s.control.listen.is_playing,true);
+    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('[data-close=listenScrim]').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
+  });
+  await check('four themes across phone, tablet portrait/landscape and desktop have usable chat, drawer, diary, wall',async()=>{
+    for(const [device,width,height] of [['phone',390,844],['small-phone',320,680],['tablet-portrait',820,1180],['tablet-landscape',1180,820],['desktop',1440,900],['phone-landscape',844,390]]){
+      await s.page.setViewportSize({width,height});
+      for(const theme of ['ins-light','ins-dark','warm-light','warm-dark']){
+        await s.page.locator('#menuBtn').click();await s.page.locator('#themeMenuBtn').click();await s.page.locator(`[data-theme-pick=${theme}]`).click();await s.page.locator('[data-close=settingsScrim]').click();
+        for(const view of ['chat','diary','wall']){
+          if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});}
+          assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme} ${view} overflow`);assert.ok(await s.page.locator('#messages').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${device} ${theme} ${view} pane overflow`);
+          const pane=await s.page.locator('#messages').boundingBox();assert.ok(pane.height>90,`${device} ${view} missing content`);
+          if(view==='chat'){const box=await s.page.locator('#composer').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,`${device} ${theme} composer`);}
+          if(['phone','tablet-landscape','desktop'].includes(device))await s.page.screenshot({path:resolve(root,`test-results/${device}-${theme}-${view}.png`)});
+        }
+        await s.page.locator('#returnChat').click();await s.page.locator('#relationHandle').click();const drawer=await s.page.locator('#relationSpace').boundingBox();assert.ok(drawer.width<=width&&drawer.height<=height);if(device==='phone')await s.page.screenshot({animations:'disabled',path:resolve(root,`test-results/${device}-${theme}-space.png`)});await s.page.locator('#relationClose').click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});
+      }
+    }
+  });
+  await check('new incoming messages notify once; history, theme and view changes do not notify',async()=>{
+    const id=s.control.records.length+100;s.control.records.push(fixture(id,secureId,'新的晚安',friend,{author_id:friend,created_at:new Date(Date.now()+1000).toISOString()}));
+    await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('新留言'));
+    await s.page.evaluate(()=>document.querySelector('#toast').textContent='已读检查');await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=diary]').click();await s.page.locator('#returnChat').click();await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForTimeout(150);assert.equal(await s.page.locator('#toast').textContent(),'已读检查');
   });
   await check(
     "secure invite rejection never falls back to legacy reads",
@@ -650,6 +762,13 @@ try {
   assert.deepEqual(s.errors, []);
   await s.context.close();
 
+  const n=await setup({notificationFixture:true});await n.join();
+  await check('system notification permission is user-triggered, generic, and room unread clears on entry',async()=>{
+    assert.equal(await n.page.evaluate(()=>window.noticeFixture.requests),0);
+    await n.page.locator('#menuBtn').click();await n.page.locator('#notifyMenuBtn').click();await n.page.locator('#notifyBtn').click();assert.equal(await n.page.evaluate(()=>window.noticeFixture.requests),1);await n.page.locator('[data-close=settingsScrim]').click();await n.page.locator('#backBtn').click();
+    n.control.records.push(fixture(900,'OldRoom1','PRIVATE BODY MUST NOT APPEAR IN SYSTEM NOTICE','friend-device',{created_at:new Date(Date.now()+2000).toISOString()}));await n.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await n.page.waitForFunction(()=>window.noticeFixture.shown.length===1);const notice=await n.page.evaluate(()=>window.noticeFixture.shown[0]);assert.equal(notice.body,'你有一条新留言');assert.equal(notice.data.room,'OldRoom1');assert.ok(!JSON.stringify(notice).includes('PRIVATE BODY'));assert.equal(await n.page.locator('.unread-count').textContent(),'1');
+    await n.page.locator('.room-card').click();await n.page.waitForFunction(()=>!document.title.startsWith('('));assert.equal(await n.page.locator('.unread-count').count(),0);assert.equal(await n.page.evaluate(()=>window.noticeFixture.shown.length),1);
+  });assert.deepEqual(n.errors,[]);await n.context.close();
   const many = Array.from({ length: 125 }, (_, index) =>
     fixture(index + 1, "OldRoom1", "留言 " + (index + 1), "test-device", {
       created_at: "2026-09-20T10:00:00Z",

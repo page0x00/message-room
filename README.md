@@ -1,18 +1,19 @@
 # 小小留言室
 
-轻量的异步留言网站，静态前端 + 原有 Supabase。无需构建即可部署；本轮开发直接进入 `main`。
+[打开留言室](https://page0x00.github.io/message-room/) · [Supabase 开通步骤](SETUP.md)
 
-- 简洁 / 暖色主题，手机与平板适配。
-- 聊天里自己在左、对方在右；双方昵称头像可自定义。
-- 最近加入房间、本机草稿、最多 8 条多引用。
-- 聊天 / 日记 / 回忆墙使用同一份消息，显示日期独立于真实发送时间。
-- 保留旧链接与旧文字数据；新邀请房间支持匿名 Auth、成员资料与邀请权限。
+四种心情，留给重要的人。静态前端 + 原有 Supabase，直接部署到 GitHub Pages。
 
-**先读 [SETUP.md](SETUP.md)**：代码更新不等于数据库已经迁移。旧房间沿用原权限，新房间需要依次执行两份 SQL 并启用 Anonymous Sign-Ins。
+- Ins Light / Ins Dark / Warm Light / Warm Dark：独立配色和窗景；手机、平板横竖屏、电脑布局。
+- 首页最近联系人、置顶/未读/搜索；`＋` 创建加入，网址/邮箱收藏。聊天自己右、对方左，双方昵称头像可自定义。
+- 左滑进入关系空间：认识天数、纪念日、按日整理的日记、错落回忆墙、私人回忆录、一起听。
+- 最多 8 条可追溯引用，补录显示日期保留真实创建时间，草稿/安全重试、历史分页。
+- 私有图片/语音/视频/文档，麦克风录制、试听、进度、失败重试。
+- 本地歌曲/LRC 保留在本机；同文件身份校验、共享播放/暂停/进度，可边聊边听。
+- 本机截图 OCR → 可编辑草稿 → 明确确认后发送；私人回忆录按日期整理、编辑保存及 Markdown 导出。
+- Toast、未读/标题/应用角标、可选提示音、权限触发的系统通知；离线 Push 客户端、订阅/RLS、VAPID Edge Function、webhook 去重均已提供，需配置 Secrets 和 webhook。
 
-一起听、附件、关系页、OCR、回忆录编辑器尚未实现，见 [后续计划](docs/V2_PLAN.md)。
-
-## 开发与验证
+**代码更新不等于数据库已经迁移。** 基础开通只需执行 [`supabase/INSTALL.sql`](supabase/INSTALL.sql) 并启用 Anonymous Sign-Ins。旧数据不会清空。真实双设备一起听、OCR 质量、麦克风/系统通知/离线推送送达需部署后验收。
 
 ```sh
 npm ci
@@ -22,16 +23,15 @@ npm run test:db
 npm run test:browser
 ```
 
-浏览器测试会启动本地静态服务并拦截所有 Supabase 请求。日常开发可用任意静态 HTTP 服务启动仓库根目录；GitHub Pages 部署时保留完整文件结构。
+| 文件 | 用途 |
+| --- | --- |
+| `index.html`, `styles.css`, `ui-v2.css`, `assets/` | 页面、四主题及本地窗景 |
+| `app.js`, `core.js`, `backend.js` | 聊天、身份、排序、草稿、Supabase |
+| `ui-v2.js`, `notifications.js`, `sw.js` | 关系空间、联系列表、通知 |
+| `features.js`, `feature-core.js`, `feature-backend.js` | 附件、纪念、一起听、回忆录 |
+| `ocr.js`, `local-music.js` | 本机 OCR、音频持久化 |
+| `supabase/migrations/`, `supabase/INSTALL.sql` | 增量迁移及一份完整安装 SQL |
+| `supabase/functions/mailbox-push/` | 经过身份检查的离线推送服务 |
+| `tests/` | 逻辑、浏览器与隔离 PostgreSQL 检查 |
 
-## 文件说明
-
-| 路径                        | 用途                                   |
-| --------------------------- | -------------------------------------- |
-| `index.html` / `styles.css` | 页面结构与双主题                       |
-| `app.js`                    | 交互、房间、草稿与三种视图             |
-| `core.js`                   | 校验、身份显示判断、排序等纯逻辑       |
-| `backend.js`                | Supabase Auth / 数据 / Realtime        |
-| `vendor/`                   | 固定版本 SDK 与许可证                  |
-| `supabase/migrations/`      | 增量数据库迁移，不删除旧消息           |
-| `tests/`                    | 逻辑、浏览器与隔离 PostgreSQL 权限测试 |
+本机保存的邀请链接/联系人和匿名身份请自行保管；换设备不会自动恢复原身份。旧房间沿用原权限，新邀请房间才有成员隔离。原始数据与展示视图不复制成多份。

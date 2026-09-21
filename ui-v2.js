@@ -1,20 +1,64 @@
-if(!document.querySelector('link[href*="utility-v2.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href='./utility-v2.css?v=2.2.0-20260921';document.head.append(l)}
-const $=(id)=>document.getElementById(id);const THEMES=["clean","ins-dark","warm-light","warm-dark"];const LABEL={clean:"Ins · 日间","ins-dark":"Ins · 夜间","warm-light":"暖色 · 日间","warm-dark":"暖色 · 夜间"};
-function toast2(text){const el=$("toast");if(!el)return;el.textContent=text;el.classList.add("show");clearTimeout(toast2.t);toast2.t=setTimeout(()=>el.classList.remove("show"),2800)}
-function saveTheme(t){document.documentElement.dataset.theme=t;try{localStorage.setItem("theme.v2",t)}catch{}document.querySelector('meta[name="theme-color"]')?.setAttribute("content",t.includes("dark")?"#171819":t.startsWith("warm")?"#f8f2ed":"#f6f6f4")}
-function cycleTheme(){const now=document.documentElement.dataset.theme;saveTheme(THEMES[(THEMES.indexOf(now)+1)%THEMES.length]);toast2(LABEL[document.documentElement.dataset.theme])}
-function initTheme(){let t="clean";try{t=localStorage.getItem("theme.v2")||"clean"}catch{}if(!THEMES.includes(t))t="clean";saveTheme(t);document.querySelectorAll("[data-theme-pick]").forEach(b=>b.addEventListener("click",()=>{saveTheme(b.dataset.themePick);toast2(`已切换：${LABEL[b.dataset.themePick]}`)}));["themeBtn","themeMenuBtn"].forEach(id=>$(id)?.addEventListener("click",e=>{e.preventDefault();e.stopImmediatePropagation();cycleTheme()},true))}
-function drawer(open){$("relationSpace")?.classList.toggle("open",open);$("relationSpace")?.setAttribute("aria-hidden",String(!open))}
-function roomKey(prefix){let r="home";try{r=new URL(location.href).searchParams.get("room")||"home"}catch{}return prefix+r}
-function daysSince(){let first=null;try{const key=roomKey("relation.first.");first=localStorage.getItem(key);if(!first){first=new Date().toISOString();localStorage.setItem(key,first)}}catch{first=new Date().toISOString()}return Math.max(1,Math.floor((Date.now()-new Date(first).getTime())/86400000)+1)}
-function modal(title,body){let root=$("utilityModal");if(!root){root=document.createElement("div");root.id="utilityModal";root.className="utility-modal";root.innerHTML='<section class="utility-card" role="dialog" aria-modal="true"><header><h2></h2><button type="button" aria-label="关闭">×</button></header><div class="utility-body"></div></section>';document.body.append(root);root.addEventListener("click",e=>{if(e.target===root||e.target.closest("header button"))root.classList.remove("open")})}root.querySelector("h2").textContent=title;const box=root.querySelector(".utility-body");box.replaceChildren();box.append(body);root.classList.add("open");return root}
-function anniversary(){const wrap=document.createElement("div");wrap.innerHTML='<label class="utility-field">纪念日名称<input id="annName" maxlength="30" placeholder="第一次见面"></label><label class="utility-field">日期<input id="annDate" type="date"></label><p class="utility-note" id="annResult"></p><button class="utility-save" type="button">保存纪念日</button>';let saved={};try{saved=JSON.parse(localStorage.getItem(roomKey("anniversary."))||"{}") }catch{}wrap.querySelector("#annName").value=saved.name||"";wrap.querySelector("#annDate").value=saved.date||"";const paint=()=>{const out=wrap.querySelector("#annResult");if(!saved.date){out.textContent="给这段关系留一个值得记住的日期。";return}const n=Math.floor((Date.now()-new Date(saved.date+"T00:00:00").getTime())/86400000);out.textContent=`${saved.name||"这个纪念日"} · ${n>=0?`已经 ${n+1} 天`:`还有 ${Math.abs(n)} 天`}`};paint();wrap.querySelector("button").onclick=()=>{saved={name:wrap.querySelector("#annName").value.trim(),date:wrap.querySelector("#annDate").value};if(!saved.date)return toast2("先选一个日期");localStorage.setItem(roomKey("anniversary."),JSON.stringify(saved));paint();toast2("纪念日保存好了")};modal("纪念日",wrap)}
-function memoir(){const wrap=document.createElement("div");wrap.innerHTML='<p class="utility-note">只保存在这台设备，不会发送给房间另一边。</p><textarea class="memoir-text" maxlength="20000" placeholder="把只想留给自己的那一页写在这里……"></textarea><button class="utility-save" type="button">保存到本机</button>';const ta=wrap.querySelector("textarea");try{ta.value=localStorage.getItem(roomKey("memoir."))||""}catch{}wrap.querySelector("button").onclick=()=>{try{localStorage.setItem(roomKey("memoir."),ta.value);toast2("私人回忆录已保存到本机")}catch{toast2("本机存储不可用")}};modal("私人回忆录",wrap)}
-function listenTogether(){const wrap=document.createElement("div");wrap.innerHTML='<p class="utility-note">选择本机音频即可播放；音频文件不会自动上传。共享同步仍需要后端房间播放状态。</p><label class="utility-file">选择本地音乐<input type="file" accept="audio/*"></label><audio controls class="utility-audio"></audio><label class="utility-field">歌词 / 备注<textarea class="lyrics" placeholder="可粘贴歌词或写下这首歌的备注"></textarea></label>';const input=wrap.querySelector("input"),audio=wrap.querySelector("audio"),lyrics=wrap.querySelector(".lyrics");try{lyrics.value=localStorage.getItem(roomKey("lyrics."))||""}catch{}lyrics.addEventListener("input",()=>{try{localStorage.setItem(roomKey("lyrics."),lyrics.value)}catch{}});input.onchange=()=>{const f=input.files?.[0];if(!f)return;audio.src=URL.createObjectURL(f);audio.play().catch(()=>{});toast2(`已载入：${f.name}`)};modal("一起听",wrap)}
-function initUtilities(){document.querySelectorAll(".relation-card").forEach(card=>{const name=card.querySelector("b")?.textContent.trim();if(name==="纪念日")card.addEventListener("click",anniversary);if(name==="私人回忆录")card.addEventListener("click",memoir);if(name==="一起听")card.addEventListener("click",listenTogether)})}
-function initDrawer(){$("relationHandle")?.addEventListener("click",()=>drawer(true));$("relationClose")?.addEventListener("click",()=>drawer(false));if($("relationDays"))$("relationDays").textContent=daysSince();document.querySelectorAll("[data-open-view]").forEach(b=>b.addEventListener("click",()=>{document.querySelector(`[data-view="${b.dataset.openView}"]`)?.click();drawer(false)}));let x=0,y=0;const room=$("room");room?.addEventListener("touchstart",e=>{x=e.touches[0].clientX;y=e.touches[0].clientY},{passive:true});room?.addEventListener("touchend",e=>{const dx=e.changedTouches[0].clientX-x,dy=e.changedTouches[0].clientY-y;if(dx<-70&&Math.abs(dx)>Math.abs(dy)*1.4&&x>innerWidth*.65)drawer(true)},{passive:true})}
-async function enableNotifications(){if(!("Notification" in window)){toast2("当前浏览器不支持系统通知");return}const p=await Notification.requestPermission();toast2(p==="granted"?"新留言系统通知已开启":"没有获得通知权限");try{if("serviceWorker" in navigator)await navigator.serviceWorker.register("./sw.js?v=2")}catch{}}
-function notifyNew(){toast2("收到一条新留言");if(document.hidden&&Notification.permission==="granted"){try{navigator.serviceWorker?.ready.then(reg=>reg.showNotification("小小留言室",{body:"你有一条新留言",tag:"message-room",data:{url:location.href}})).catch(()=>new Notification("小小留言室",{body:"你有一条新留言",tag:"message-room"}))}catch{}}}
-function initMessageWatch(){const box=$("messages");if(!box)return;let ready=false,last="";const scan=()=>{const row=[...box.querySelectorAll(".msg")].at(-1);if(!row)return;const id=row.dataset.messageId||row.textContent;if(ready&&id!==last&&!row.classList.contains("mine"))notifyNew();last=id;ready=true};new MutationObserver(scan).observe(box,{childList:true,subtree:true});scan()}
-function init(){initTheme();initDrawer();initUtilities();$("notifyBtn")?.addEventListener("click",enableNotifications);initMessageWatch();if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=2").catch(()=>{})}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.2.0';
+export const THEMES=['ins-light','ins-dark','warm-light','warm-dark'];
+export function setTheme(value){
+  value=({clean:'ins-light',warm:'warm-light'})[value]||value;
+  const theme=THEMES.includes(value)?value:'ins-light';
+  document.documentElement.dataset.theme=theme;storeSet('theme',theme);
+  document.querySelector('meta[name=theme-color]').content={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522'}[theme];
+  document.querySelectorAll('[data-theme-pick]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themePick===theme)));
+}
+export function contactTarget(value){
+  value=String(value||'').trim();
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return 'mailto:'+value;
+  try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)?url.href:null;}catch{return null;}
+}
+export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home}){
+  let previousFocus, start;
+  function drawer(open){
+    if(open&&!state.room)return;
+    $('relationSpace').classList.toggle('open',open);$('relationSpace').inert=!open;
+    $('relationSpace').setAttribute('aria-hidden',String(!open));$('relationHandle').setAttribute('aria-expanded',String(open));$('relationBackdrop').hidden=!open;
+    if(open){previousFocus=document.activeElement;$('relationClose').focus();document.dispatchEvent(new Event('mailbox:space-open'));}else if(previousFocus){previousFocus.focus();previousFocus=null;}
+  }
+  function settings(){drawer(false);closeSheet('menuScrim');showSheet('settingsScrim');document.dispatchEvent(new Event('mailbox:settings-open'));}
+  for(const id of ['themeBtn','themeMenuBtn','homeSettings','spaceSettings','notifyMenuBtn'])$(id).onclick=settings;
+  document.querySelectorAll('[data-theme-pick]').forEach(button=>button.onclick=()=>setTheme(button.dataset.themePick));
+  $('relationHandle').onclick=()=>drawer(true);$('relationClose').onclick=()=>drawer(false);$('relationBackdrop').onclick=()=>drawer(false);
+  document.querySelectorAll('[data-open-view]').forEach(button=>button.onclick=()=>{drawer(false);setView(button.dataset.openView);});
+  for(const id of ['relationshipBtn','listenBtn','memoirBtn'])$(id).addEventListener('click',()=>drawer(false));
+  $('returnChat').onclick=()=>setView('chat');$('writeFromView').onclick=()=>{setView('chat');$('messageInput').focus();};
+  $('backBtn').onclick=()=>state.view==='chat'?home():setView('chat');
+  const pane=$('messages');
+  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.view!=='chat'||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
+  pane.addEventListener('touchcancel',()=>start=null,{passive:true});
+  pane.addEventListener('touchend',event=>{const from=start;start=null;const end=event.changedTouches[0];if(!from||!end||window.getSelection()?.isCollapsed===false)return;if(end.clientX-from.x<-85&&Math.abs(end.clientY-from.y)<35&&Date.now()-from.t<600)drawer(true);},{passive:true});
+  document.addEventListener('keydown',event=>{
+    if($('relationSpace').inert)return;
+    if(event.key==='Escape'){drawer(false);return;}
+    if(event.key==='Tab'){const controls=[...$('relationSpace').querySelectorAll('button')].filter(b=>!b.disabled);if(event.shiftKey&&document.activeElement===controls[0]){event.preventDefault();controls.at(-1).focus();}else if(!event.shiftKey&&document.activeElement===controls.at(-1)){event.preventDefault();controls[0].focus();}}
+  });
+  $('addRoomBtn').onclick=()=>showSheet('addRoomScrim');$('composeMore').onclick=()=>showSheet('composeScrim');
+  $('recordMenuBtn').onclick=()=>{closeSheet('composeScrim');$('attachBtn').click();};
+  for(const id of ['dateBtn','importBtn'])$(id).addEventListener('click',()=>closeSheet('composeScrim'));
+  $('roomSearch').oninput=renderRecent;
+  document.querySelectorAll('[data-room-filter]').forEach(button=>button.onclick=()=>{state.roomFilter=button.dataset.roomFilter;document.querySelectorAll('[data-room-filter]').forEach(b=>b.classList.toggle('active',b===button));renderRecent();});
+  document.querySelectorAll('[data-diary-filter]').forEach(button=>button.onclick=()=>{state.diaryFilter=button.dataset.diaryFilter;document.querySelectorAll('[data-diary-filter]').forEach(b=>b.classList.toggle('active',b===button));setView(state.view);});
+  $('diaryDate').onchange=()=>setView(state.view);
+  function contacts(){
+    const rows=storeGet('contacts',[]);$('contactList').replaceChildren();
+    if(!Array.isArray(rows))return;
+    const query=$('roomSearch').value.toLowerCase();
+    for(const row of rows){const href=contactTarget(row.address);if(!href||![row.name,row.address].join(' ').toLowerCase().includes(query))continue;
+      const card=node('div','contact-card'),link=node('a','',row.name);link.href=href;if(!href.startsWith('mailto:')){link.target='_blank';link.rel='noopener noreferrer';}link.append(node('small','',row.address));
+      const remove=node('button','','×');remove.setAttribute('aria-label','移除 '+row.name);remove.onclick=()=>{persist('contacts',rows.filter(x=>x.id!==row.id));contacts();};card.append(link,remove);$('contactList').append(card);
+    }
+  }
+  $('contactForm').onsubmit=event=>{event.preventDefault();const address=$('contactAddress').value.trim(),name=$('contactName').value.trim();if(!contactTarget(address)){toast('请输入 http(s) 网址或有效邮箱。');return;}const old=storeGet('contacts',[]);if(!persist('contacts',[{id:randomId(),address,name},...(Array.isArray(old)?old:[]).filter(c=>c.address!==address)].slice(0,100)))return;$('contactForm').reset();closeSheet('addRoomScrim');contacts();toast('联系方式已留下。');};
+  $('roomSearch').addEventListener('input',contacts);
+  let previous;try{previous=localStorage.getItem('theme.v2');}catch{}
+  const savedTheme=storeGet('theme',null);
+  setTheme(THEMES.includes(savedTheme)?savedTheme:previous||savedTheme||'ins-light');
+  const copies=['今天也辛苦了。\n把想说的话，慢慢留在这里。','把普通的一天，\n留成可以重读的一页。','有些瞬间很轻，\n但我们会记得。','等你有空，\n再拆开这封信。','天色慢下来，\n我们也可以。','今天的风，\n也想分给你一点。','见字如面。\n有空再接着聊。','一首歌的时间，\n刚好留给想念。','不用写成故事，\n小事也值得记录。','晚一点抵达，\n也没有关系。'];
+  const day=localDate();$('dailyCopy').textContent=copies[Math.floor(Date.parse(day+'T00:00:00Z')/86400000)%copies.length];contacts();
+  return {drawer,settings};
+}

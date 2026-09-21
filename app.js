@@ -14,8 +14,11 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.0.0-20260920";
-import * as api from "./backend.js?v=2.0.0-20260920";
+} from "./core.js?v=2.2.0";
+import * as api from "./backend.js?v=2.2.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.2.0";
+import { initNotifications } from "./notifications.js?v=2.2.0";
+import { initFeatures } from "./features.js?v=2.2.0";
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -95,6 +98,7 @@ function showSheet(id) {
 
 function closeSheet(id) {
   $(id).hidden = true;
+  document.dispatchEvent(new CustomEvent('mailbox:sheet-close',{detail:{id}}));
   focusBeforeSheet?.focus();
   if (id === "noticeScrim" && noticeResolve) {
     noticeResolve(false);
@@ -113,26 +117,6 @@ function notice(title, body, confirm = "知道了", cancel = false, link = "") {
   return new Promise((resolve) => {
     noticeResolve = resolve;
   });
-}
-
-function setTheme(theme, announce = false) {
-  theme = theme === "warm" ? "warm" : "clean";
-  document.documentElement.dataset.theme = theme;
-  document.querySelector("meta[name=theme-color]").content =
-    theme === "warm" ? "#f5eee5" : "#f5f5f2";
-  $("themeBtn").setAttribute(
-    "aria-label",
-    theme === "warm" ? "切换为简洁风" : "切换为暖色风",
-  );
-  persist("theme", theme);
-  if (announce) toast(theme === "warm" ? "暖色信纸" : "简洁留白");
-}
-
-function toggleTheme() {
-  setTheme(
-    document.documentElement.dataset.theme === "warm" ? "clean" : "warm",
-    true,
-  );
 }
 
 function defaultName() {
@@ -165,46 +149,23 @@ function recentRooms() {
 }
 
 function rememberRoom() {
-  const record = {
-    room: state.room,
-    invite: state.invite,
-    title: state.profile.otherName || "留言室",
-    secure: state.secure,
-    visited: Date.now(),
-  };
-  persist(
-    "recent",
-    [record, ...recentRooms().filter((r) => r.room !== record.room)].slice(
-      0,
-      40,
-    ),
-  );
-  renderRecent();
+  const existing=recentRooms().find(r=>r.room===state.room)||{};
+  const last=state.messages.at(-1),friend=state.members.find(m=>m.user_id!==state.userId);
+  const record={...existing,room:state.room,invite:state.invite||existing.invite||'',title:state.profile.otherName||friend?.display_name||'留言室',avatar:state.profile.otherAvatar||friend?.avatar_data||'',secure:state.secure,visited:Date.now(),preview:last?.content||last?.media_name||'写下第一句话吧',lastAt:last?.created_at||existing.lastAt};
+  persist('recent',[record,...recentRooms().filter(r=>r.room!==state.room)].slice(0,40));renderRecent();
 }
-
 function renderRecent() {
-  const records = recentRooms();
-  $("recentSection").hidden = !records.length;
-  $("roomList").replaceChildren();
-  for (const record of records) {
-    const button = node("button", "room-card");
-    button.type = "button";
-    button.append(
-      node("span", "mini-avatar", (record.title || "信").slice(0, 1)),
-    );
-    const details = node("div");
-    details.append(
-      node("strong", "", record.title || "留言室"),
-      node(
-        "small",
-        "",
-        (record.secure ? "邀请房间 · " : "旧版房间 · ") +
-          record.room.replace(/^v2_/, "").slice(0, 12),
-      ),
-    );
-    button.append(details, node("span", "", "›"));
-    button.addEventListener("click", () => openRoom(record));
-    $("roomList").append(button);
+  let records=recentRooms();const query=$('roomSearch').value.trim().toLowerCase();
+  const total=records.reduce((n,r)=>n+notifications.unread(r.room),0);$('totalUnread').hidden=!total;$('totalUnread').textContent=total>99?'99+':total;
+  records=records.filter(r=>(!query||[r.title,r.preview,r.room].join(' ').toLowerCase().includes(query))&&(state.roomFilter!=='pinned'||r.pinned)&&(state.roomFilter!=='unread'||notifications.unread(r.room)>0));
+  records.sort((a,b)=>Number(Boolean(b.pinned))-Number(Boolean(a.pinned))||(Date.parse(b.lastAt)||b.visited)-(Date.parse(a.lastAt)||a.visited));
+  $('recentSection').hidden=false;$('roomList').replaceChildren();$('recentEmpty').hidden=records.length>0;$('recentEmpty').textContent=recentRooms().length?'还没有符合筛选的房间。':'还没有留下的房间。点右上角的 ＋，从第一封信开始。';
+  for(const record of records){
+    const button=node('button','room-card'+(record.room===state.room?' selected':''));button.type='button';button.append(avatar(record.avatar,record.title));
+    const detail=node('div');detail.append(node('strong','',record.title||'留言室'),node('small','',record.preview||'从上次的话接着聊'));const tail=node('span','room-tail');
+    const date=new Date(record.lastAt||record.visited);tail.append(node('time','',Number.isFinite(date.getTime())?(localDate(date)===localDate()?date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}):`${date.getMonth()+1}/${date.getDate()}`):''));
+    const count=notifications.unread(record.room);if(count)tail.append(node('span','unread-count',count>99?'99+':String(count)));else if(record.pinned)tail.append(node('span','room-pin','置顶'));
+    button.append(detail,tail);button.onclick=()=>openRoom(record);$('roomList').append(button);
   }
 }
 
@@ -235,26 +196,25 @@ function loadDraft() {
 }
 
 function updateStatus() {
-  $("roomTitle").textContent = state.profile.otherName
-    ? `与 ${state.profile.otherName} 的留言室`
-    : "小小留言室";
+  const friend=state.members.find(m=>m.user_id!==state.userId);
+  $("roomTitle").textContent=state.profile.otherName||friend?.display_name||'留言室';
+  const portrait=$('roomInfoBtn').querySelector('.avatar');if(portrait)portrait.replaceWith(avatar(state.profile.otherAvatar||friend?.avatar_data,$('roomTitle').textContent));
   $("roomStatus").textContent =
-    (state.secure ? "邀请房间" : "旧版房间") +
-    " · " +
+
     (!state.ready
       ? "等待连接"
       : !navigator.onLine
         ? "网络已断开"
         : state.connected
-          ? "实时连接"
-          : "定期同步");
+          ? "信已连上 · 左滑看看我们的空间"
+          : "等一句你的话 · 左滑打开空间");
   $("sendBtn").disabled =
     !state.ready ||
     state.pending.has(state.room) ||
     !$("messageInput").value.trim();
   $("sendBtn").textContent = state.pending.has(state.room) ? "发送中" : "发送";
   $("dateBtn").classList.toggle("chosen", Boolean(state.date));
-  $("dateBtn").textContent = state.date ? "日" : "＋";
+  $("dateBtn").textContent = state.date ? `补录日期 · ${state.date}` : "补录显示日期";
   $("dateBtn").title = state.date ? `显示日期：${state.date}` : "设置显示日期";
 }
 
@@ -265,6 +225,8 @@ async function openRoom(target) {
     return;
   }
   saveDraft();
+  ui.drawer(false);
+  document.querySelector(".app-shell").classList.add("has-room");
   state.stop?.();
   state.stop = null;
   state.refreshPromise = null;
@@ -284,6 +246,8 @@ async function openRoom(target) {
     profile: readProfile(valid.room),
     view: "chat",
   });
+  features.roomChanged();
+  $("connectionNote").hidden=true;
   $("home").classList.remove("active");
   $("room").classList.add("active");
   document.querySelectorAll(".scrim").forEach((el) => {
@@ -330,8 +294,10 @@ async function openRoom(target) {
           state.messages = state.messages.filter(
             (m) => m.id !== String(payload.old?.id),
           );
-        else if (payload.new?.room_id === room)
+        else if (payload.new?.room_id === room) {
+          if(payload.eventType==="INSERT"&&state.ready)notifications.ingest(room,[payload.new]);
           state.messages = mergeMessages(state.messages, [payload.new]);
+        }
         render({ stick: true });
       },
       () => {
@@ -353,11 +319,14 @@ async function openRoom(target) {
     state.hasMore = page.hasMore;
     state.metadata = supported;
     state.ready = true;
+    notifications.prime(room,state.messages);
+    features.ready();
     if (!supported && (state.quotes.length || state.date))
       toast(
         "当前数据库不支持引用与显示日期，草稿保留；发送前请清除这些选项或先升级数据库。",
       );
     rememberRoom();
+    void notifications.watch();
     render({ bottom: true });
     updateStatus();
   } catch (error) {
@@ -368,6 +337,7 @@ async function openRoom(target) {
     const extra = state.secure
       ? " 请使用包含 #key= 的完整邀请链接；若尚未升级，请先完成数据库设置。"
       : "";
+    $("connectionNote").hidden=false;
     $("connectionNote").textContent = errorText(error) + extra;
     render();
     updateStatus();
@@ -415,6 +385,7 @@ async function refreshMessages(manual = false) {
       if (epoch !== state.epoch) return;
       incoming.push(...cursorPage.rows);
     }
+    notifications.ingest(state.room,incoming);
     state.messages = mergeMessages(state.messages, incoming);
     render({ stick: true });
     if (manual) toast("已刷新");
@@ -451,12 +422,15 @@ async function loadOlder() {
 
 function home() {
   saveDraft();
+  ui.drawer(false);
+  document.querySelector(".app-shell").classList.remove("has-room");
   ++state.epoch;
   state.stop?.();
   state.stop = null;
   state.room = "";
   state.ready = false;
   state.refreshPromise = null;
+  features.roomChanged();
   $("room").classList.remove("active");
   $("home").classList.add("active");
   document.querySelectorAll(".scrim").forEach((el) => {
@@ -516,11 +490,13 @@ function render({ bottom = false, stick = false } = {}) {
       ),
     );
   const byId = new Map(state.messages.map((m) => [m.id, m]));
-  let lastDay = "";
-  for (const message of projectMessages(state.messages, state.view)) {
+  let lastDay = '',container=fragment;
+  if(state.view==='wall')fragment.append(node('p','wall-intro','把值得留下的瞬间，慢慢贴在这里。'));
+  for (const message of projectMessages(state.messages, state.view).filter(m=>state.view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
     const day = displayDay(message, state.view);
     if (day !== lastDay) {
-      fragment.append(node("div", "day", day || "日期未知"));
+      if(state.view==='diary'){container=node('section','diary-page');fragment.append(container);}
+      if(state.view!=='wall')container.append(node('div','day',day||'日期未知'));
       lastDay = day;
     }
     const who = author(message);
@@ -531,16 +507,17 @@ function render({ bottom = false, stick = false } = {}) {
     const bubble = node("div", "bubble");
     for (const id of message.reply_to) {
       const reference = byId.get(id);
-      bubble.append(
+      const referenceButton=
         node(
-          "div",
+          "button",
           "quote-card",
           reference
             ? `${author(reference).name}：${reference.content.slice(0, 120)}`
-            : "引用了一条较早的留言 · 加载更早留言后可查看",
-        ),
-      );
+            : "较早的留言 · 点击追溯引用",
+        );
+      referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
+    features.renderMedia(message,bubble);
     bubble.append(node("div", "message-text", message.content));
     wrap.append(bubble);
     const meta = node("div", "meta");
@@ -582,11 +559,11 @@ function render({ bottom = false, stick = false } = {}) {
     }
     wrap.append(meta);
     const portrait = avatar(who.image, who.name);
-    if (who.mine) row.append(portrait, wrap);
-    else row.append(wrap, portrait);
-    fragment.append(row);
+    if(state.view==='wall')wrap.append(node('time','wall-date',displayDay(message,'wall')));
+    row.append(portrait,wrap);container.append(row);
   }
-  box.replaceChildren(fragment);
+  if(state.view==='wall')features.renderWall(fragment);
+  if(state.view==='wall'){const grid=node('div','wall-grid');grid.append(fragment);box.replaceChildren(grid);}else box.replaceChildren(fragment);
   $("olderBtn").hidden = !state.hasMore;
   $("historyCount").textContent = state.messages.length
     ? `${state.messages.length} 条${state.hasMore ? " · 还有更早留言" : ""}`
@@ -595,10 +572,13 @@ function render({ bottom = false, stick = false } = {}) {
   if (bottom || (stick && wasNearBottom && state.view === "chat"))
     box.scrollTop = box.scrollHeight;
   else box.scrollTop = oldTop;
+  if(state.ready&&state.view==='chat'&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
 }
 
 function setView(view) {
+  view=['chat','diary','wall'].includes(view)?view:'chat';
   state.view = view;
+  $('viewHeading').hidden=view==='chat';$('viewTitle').textContent=view==='diary'?'日记':'回忆墙';$('diaryFilters').hidden=view!=='diary';$('composer').hidden=view!=='chat';$('room').dataset.view=view;
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === view);
     button.setAttribute("aria-pressed", String(button.dataset.view === view));
@@ -608,7 +588,7 @@ function setView(view) {
 }
 
 function renderQuotes() {
-  $("quoteTray").hidden = !state.quotes.length;
+  $("quoteTray").hidden = !state.quotes.length||state.view!=="chat";
   $("quoteCount").textContent = `引用 ${state.quotes.length} 条`;
   $("quotePreview").textContent = state.quotes
     .map(
@@ -930,11 +910,6 @@ async function share() {
   }
 }
 
-$("themeBtn").onclick = toggleTheme;
-$("themeMenuBtn").onclick = () => {
-  toggleTheme();
-  closeSheet("menuScrim");
-};
 $("createBtn").onclick = create;
 $("joinToggle").onclick = () => {
   $("joinForm").hidden = !$("joinForm").hidden;
@@ -957,6 +932,7 @@ $("clearRecent").onclick = async () => {
   ) {
     persist("recent", []);
     renderRecent();
+    void notifications.watch();
   }
 };
 $("backBtn").onclick = home;
@@ -1000,6 +976,8 @@ $("messages").onclick = (event) => {
     date = event.target.closest("[data-date-id]");
   if (quote) toggleQuote(quote.dataset.quoteId);
   if (date) dateEditor(date.dataset.dateId);
+  const reference=event.target.closest('[data-reference-id]');
+  if(reference)void revealReference(reference.dataset.referenceId);
 };
 document.querySelectorAll("[data-view]").forEach((button) => {
   button.onclick = () => setView(button.dataset.view);
@@ -1015,7 +993,7 @@ document.querySelectorAll(".scrim").forEach((scrim) => {
   };
 });
 document.addEventListener("keydown", (event) => {
-  const sheet = [...document.querySelectorAll(".scrim")].find(
+  const sheet = !$('noticeScrim').hidden ? $('noticeScrim') : [...document.querySelectorAll(".scrim")].reverse().find(
     (el) => !el.hidden,
   );
   if (!sheet) return;
@@ -1025,7 +1003,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Tab") {
     const focusable = [
-      ...sheet.querySelectorAll("button,input,textarea"),
+      ...sheet.querySelectorAll("button,input,textarea,select,a[href]"),
     ].filter((el) => !el.disabled && !el.hidden && el.offsetWidth > 1);
     if (event.shiftKey && document.activeElement === focusable[0]) {
       event.preventDefault();
@@ -1091,10 +1069,22 @@ setInterval(() => {
   if (!document.hidden && state.ready) void refreshMessages();
 }, 30000);
 
-setTheme(storeGet("theme", "clean"));
-$("dailyCopy").textContent =
-  dailyCopies[Math.floor(Date.now() / 86400000) % dailyCopies.length];
+async function revealReference(id){
+  const epoch=state.epoch;let pages=0;
+  while(!state.messages.some(m=>m.id===id)&&state.hasMore&&pages++<30){await loadOlder();if(epoch!==state.epoch)return;}
+  if(!state.messages.some(m=>m.id===id)){toast('这条引用暂时不可见，请稍后再试。');return;}
+  setView('chat');const row=[...$('messages').querySelectorAll('[data-message-id]')].find(el=>el.dataset.messageId===id);row?.scrollIntoView({block:'center',behavior:'smooth'});row?.classList.add('quote-highlight');setTimeout(()=>row?.classList.remove('quote-highlight'),3000);
+}
+const notifications=initNotifications({$,state,toast,persist,recentRooms,renderRecent});
+const ui=initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home});
+const heading=$('roomInfoBtn'),label=node('span');label.append($('roomTitle'),$('roomStatus'));heading.replaceChildren(avatar('','友'),label);
+$('pinRoomBtn').onclick=()=>{const records=recentRooms();const row=records.find(r=>r.room===state.room);if(row){row.pinned=!row.pinned;persist('recent',records);renderRecent();toast(row.pinned?'这个房间已置顶。':'已取消置顶。');}closeSheet('menuScrim');};
+$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
+const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
+  onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
+});
 renderRecent();
+void notifications.watch();
 const initial = parseRoom(location.href);
 if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);

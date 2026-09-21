@@ -1,0 +1,3 @@
+[functions.mailbox-push]
+# The function validates sender JWTs with auth.getUser or the private webhook secret.
+verify_jwt = false

@@ -1,1 +1,214 @@
-<!doctype html><html lang="zh-CN" data-theme="clean"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content"/><meta name="theme-color" content="#f6f6f4"/><meta name="referrer" content="no-referrer"/><meta name="application-version" content="2.1.0-20260920"/><title>小小留言室</title><link rel="stylesheet" href="./styles.css?v=2.0.0-20260920"/><link rel="stylesheet" href="./ui-v2.css?v=2.1.0-20260920"/><script src="./vendor/supabase.js?v=2.57.4"></script></head><body><div class="app-shell"><section id="home" class="screen home active" aria-labelledby="homeTitle"><header class="home-head"><button class="round-btn" id="themeBtn" type="button" aria-label="切换主题">◐</button></header><main class="home-main"><div class="brand-mark" aria-hidden="true">✉</div><p class="eyebrow" id="dailyCopy">有些话，晚一点抵达也没关系。</p><h1 id="homeTitle">小小留言室</h1><p class="home-sub">把想说的话，留给重要的人。</p><div class="home-actions"><button class="btn primary" id="createBtn" type="button">＋ 新留言室</button><button class="btn ghost" id="joinToggle" type="button">加入已有房间</button></div><form class="join-box" id="joinForm" hidden><input id="roomInput" autocomplete="off" placeholder="粘贴房间链接或输入房间号" aria-label="房间链接或房间号"/><button class="btn primary" type="submit">进入</button></form><section class="recent" id="recentSection" hidden><div class="section-title"><span>最近的留言室</span><button id="clearRecent" type="button">整理</button></div><div class="room-list" id="roomList"></div></section></main></section><section id="room" class="screen room-screen" aria-label="留言房间"><header class="topbar"><button class="round-btn" id="backBtn" type="button" aria-label="返回">‹</button><button class="room-heading" id="roomInfoBtn" type="button" aria-label="查看房间资料"><strong id="roomTitle">留言室</strong><small id="roomStatus">正在连接</small></button><button class="round-btn" id="menuBtn" type="button" aria-label="更多">•••</button></header><nav class="view-tabs" aria-label="查看方式"><button class="active" data-view="chat" type="button">聊天</button><button data-view="diary" type="button">日记</button><button data-view="wall" type="button">回忆墙</button></nav><div class="connection-note" id="connectionNote" role="status"></div><div class="history-tools"><span id="historyCount"></span><button id="refreshBtn" type="button">刷新</button><button id="olderBtn" type="button" hidden>加载更早留言</button></div><main class="messages view-chat" id="messages" aria-label="留言列表"></main><aside class="quote-tray" id="quoteTray" hidden><div><strong id="quoteCount">引用 0 条</strong><span id="quotePreview"></span></div><button id="clearQuotes" type="button" aria-label="清除引用">×</button></aside><form class="composer" id="composer"><button class="composer-tool" id="dateBtn" type="button" aria-label="更多发送选项">＋</button><textarea id="messageInput" rows="1" maxlength="5000" placeholder="写点什么……" aria-label="留言内容"></textarea><button class="send-btn" id="sendBtn" type="submit">发送</button></form><button id="relationHandle" class="relation-handle" type="button" aria-label="打开我们的空间">‹</button><aside id="relationSpace" class="relation-space" aria-hidden="true"><div class="relation-head"><h2>我们的空间</h2><button id="relationClose" class="relation-close" type="button" aria-label="关闭">×</button></div><div class="relation-days"><strong>第 <span id="relationDays">1</span> 天</strong><span>从第一次在这里留下彼此开始</span></div><div class="relation-grid"><button class="relation-card" data-open-view="diary" type="button"><b>日记</b><small>按日期重读那些普通的小事</small></button><button class="relation-card" data-open-view="wall" type="button"><b>回忆墙</b><small>把值得留下的片段铺开</small></button><button class="relation-card" type="button"><b>纪念日</b><small>一些值得数着日子等的事情</small></button><button class="relation-card" type="button"><b>一起听</b><small>把一首歌留在同一个时刻</small></button><button class="relation-card wide" type="button"><b>私人回忆录</b><small>只属于你自己的那一页，不向房间另一边公开。</small></button></div><div class="theme-pills"><button data-theme-pick="clean" type="button">Ins · 日间</button><button data-theme-pick="ins-dark" type="button">Ins · 夜间</button><button data-theme-pick="warm-light" type="button">暖色 · 日间</button><button data-theme-pick="warm-dark" type="button">暖色 · 夜间</button></div><div class="notification-row"><button id="notifyBtn" type="button">开启新留言系统通知</button></div></aside></section></div><div class="scrim" id="menuScrim" hidden><section class="sheet menu-sheet" role="dialog" aria-modal="true" aria-label="房间菜单"><button id="shareBtn" type="button">复制房间链接</button><button id="profileBtn" type="button">双方昵称与头像</button><button id="themeMenuBtn" type="button">切换界面风格</button><button id="leaveBtn" type="button">返回首页</button><button class="sheet-cancel" data-close="menuScrim" type="button">取消</button></section></div><div class="scrim" id="profileScrim" hidden><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="profileTitle"><header class="sheet-head"><h2 id="profileTitle">房间里的我们</h2><button data-close="profileScrim" type="button">×</button></header><p class="sheet-note" id="profileNote"></p><div class="profile-grid"><div class="avatar-field"><label><span>我的头像</span><input id="myAvatar" accept="image/*" type="file"/><span class="avatar-picker" id="myAvatarPreview">我</span></label><button class="avatar-reset" id="clearMyAvatar" type="button">还原头像</button></div><label class="field"><span>我的昵称</span><input id="myName" maxlength="24" placeholder="我"/></label><div class="avatar-field"><label><span>对方头像</span><input id="otherAvatar" accept="image/*" type="file"/><span class="avatar-picker" id="otherAvatarPreview">友</span></label><button class="avatar-reset" id="clearOtherAvatar" type="button">还原头像</button></div><label class="field"><span>对方备注（仅本机）</span><input id="otherName" maxlength="24" placeholder="使用对方的昵称"/></label></div><button class="btn primary wide" id="saveProfile" type="button">保存</button></section></div><div class="scrim" id="dateScrim" hidden><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="dateTitle"><header class="sheet-head"><h2 id="dateTitle">这封信显示在哪一天？</h2><button data-close="dateScrim" type="button" aria-label="关闭日期设置">×</button></header><label class="field"><span>显示日期</span><input id="displayDate" type="date"/></label><p class="sheet-note">只改变日记与回忆墙里的展示日期，不会篡改真实发送时间。留空即使用发送当天。</p><button class="btn primary wide" id="saveDate" type="button">使用这个日期</button></section></div><div class="scrim" id="noticeScrim" hidden><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="noticeTitle"><header class="sheet-head"><h2 id="noticeTitle">提示</h2></header><p class="notice-body" id="noticeBody"></p><input id="noticeLink" readonly hidden aria-label="房间链接"/><div class="notice-actions"><button class="btn ghost" id="noticeCancel" type="button">取消</button><button class="btn primary" id="noticeConfirm" type="button">确定</button></div></section></div><div class="toast" id="toast" role="status"></div><noscript>留言室需要浏览器启用 JavaScript。</noscript><script type="module" src="./app.js?v=2.0.0-20260920"></script><script type="module" src="./ui-v2.js?v=2.1.0-20260920"></script></body></html>
+<!DOCTYPE html>
+
+<html data-theme="ins-light" lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" name="viewport"/>
+<meta content="#f7f7f5" name="theme-color"/>
+<meta content="no-referrer" name="referrer"/>
+<meta content="2.2.0" name="application-version"/>
+<title>小小留言室</title>
+
+
+<script src="./vendor/supabase.js?v=2.57.4"></script>
+<link href="./styles.css?v=2.2.0" rel="stylesheet"/><link href="./features.css?v=2.2.0" rel="stylesheet"/><link href="./ui-v2.css?v=2.2.0" rel="stylesheet"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/></head>
+<body>
+<div class="app-shell">
+<section aria-labelledby="homeTitle" class="screen home active" id="home">
+<header class="home-head"><div><span class="eyebrow">A LITTLE SPACE FOR US</span><h1 id="homeTitle">小小留言室</h1></div><button aria-label="选择主题" class="round-btn" id="themeBtn" type="button">◐</button></header>
+<main class="home-main"><div class="home-art"><p class="handwriting">Good things<br/>take their time.</p><p id="dailyCopy">今天也有一些小事，想慢慢讲给你听。</p></div>
+<div class="home-tools"><div aria-label="房间筛选" class="room-filters"><button class="active" data-room-filter="all">全部</button><button data-room-filter="pinned">置顶</button><button data-room-filter="unread">未读 <span hidden="" id="totalUnread"></span></button></div><button aria-label="创建或加入" class="round-btn add-room" id="addRoomBtn">＋</button></div>
+<label class="room-search"><span aria-hidden="true">⌕</span><input aria-label="搜索房间和邮箱" id="roomSearch" placeholder="找一封信、一个人" type="search"/></label>
+<section class="recent" id="recentSection"><div class="section-title"><span>最近联系</span><button id="clearRecent" type="button">整理</button></div><div class="room-list" id="roomList"></div><p class="home-empty" id="recentEmpty">还没有留下的房间。<br/>点右上角的 ＋，从第一封信开始。</p></section><div class="contact-list" id="contactList"></div><p class="home-footnote">一些人，一些话，<br/>在这里慢慢沉淀。</p></main>
+<footer class="home-footer"><span>把想说的话，悄悄留在这里。</span><button aria-label="通知与外观" class="round-btn" id="homeSettings">☷</button></footer></section>
+<section aria-label="留言房间" class="screen room-screen" id="room">
+<header class="topbar">
+<button aria-label="返回" class="round-btn" id="backBtn" type="button">
+            ‹
+          </button>
+<button aria-label="查看房间资料" class="room-heading" id="roomInfoBtn" type="button">
+<strong id="roomTitle">留言室</strong><small id="roomStatus">正在连接</small>
+</button>
+<button aria-label="更多" class="round-btn" id="menuBtn" type="button">
+<svg aria-hidden="true" fill="currentColor" height="24" viewbox="0 0 24 24" width="24">
+<circle cx="5" cy="12" r="1.7"></circle>
+<circle cx="12" cy="12" r="1.7"></circle>
+<circle cx="19" cy="12" r="1.7"></circle>
+</svg>
+</button>
+</header><div class="view-heading" hidden="" id="viewHeading"><button aria-label="回到聊天" class="round-btn" id="returnChat">‹</button><h2 id="viewTitle">日记</h2><button aria-label="写一条新留言" class="round-btn" id="writeFromView">＋</button></div><div class="diary-filters" hidden="" id="diaryFilters"><button class="active" data-diary-filter="all">全部</button><button data-diary-filter="mine">我的</button><button data-diary-filter="media">图文</button><label>日期 <input aria-label="筛选日记日期" id="diaryDate" type="date"/></label></div>
+
+
+<aside class="listen-mini" hidden="" id="listenMini">
+<button id="miniListenOpen" type="button"><span aria-hidden="true">♫</span> <span id="miniTrack">一起听</span></button>
+<button aria-label="播放或暂停音乐" id="miniListenToggle" type="button">播放</button>
+</aside>
+<div class="connection-note" hidden="" id="connectionNote" role="status"></div>
+
+<button class="older-btn" hidden="" id="olderBtn" type="button">翻看更早的信</button><span hidden="" id="historyCount"></span><main aria-label="留言列表" class="messages view-chat" id="messages"></main>
+<aside class="quote-tray" hidden="" id="quoteTray">
+<div>
+<strong id="quoteCount">引用 0 条</strong><span id="quotePreview"></span>
+</div>
+<button aria-label="清除引用" id="clearQuotes" type="button">
+            ×
+          </button>
+</aside>
+<form class="composer" id="composer">
+
+
+<button aria-label="更多发送选项" class="composer-tool" id="composeMore" type="button">＋</button><textarea aria-label="留言内容" id="messageInput" maxlength="5000" placeholder="写点什么……" rows="1"></textarea>
+<button aria-label="发送图片或附件" class="composer-tool picture-btn" id="attachBtn" type="button"><svg aria-hidden="true" fill="none" height="23" stroke="currentColor" stroke-width="1.5" viewbox="0 0 24 24" width="23"><rect height="18" rx="4" width="18" x="3" y="3"></rect><circle cx="8" cy="8" r="1.5"></circle><path d="m4 18 5-5 3 3 4-6 4 6"></path></svg></button><button class="send-btn" id="sendBtn" type="submit">发送</button>
+</form>
+<button aria-expanded="false" aria-label="打开我们的空间" class="relation-handle" id="relationHandle" type="button">‹</button>
+<button aria-label="收起我们的空间" class="relation-backdrop" hidden="" id="relationBackdrop"></button>
+<aside aria-hidden="true" aria-label="我们的空间" class="relation-space" id="relationSpace" inert=""><header class="relation-head"><div><p class="eyebrow">TOGETHER, EVERY DAY</p><h2>我们的空间</h2></div><button aria-label="关闭关系空间" class="round-btn" id="relationClose">×</button></header>
+<div class="relation-days"><span>我们已经认识</span><strong id="relationDays">—</strong><small id="relationCaption">记住每个普通日子</small></div>
+<div class="relation-grid"><button class="relation-card" data-open-view="diary"><span class="feature-symbol">▤</span><span><b>日记</b><small>记录此刻的心情</small></span><i>›</i></button><button class="relation-card" data-open-view="wall"><span class="feature-symbol">▧</span><span><b>回忆墙</b><small>收藏重要的瞬间</small></span><i>›</i></button><button class="relation-card" id="relationshipBtn"><span class="feature-symbol">▦</span><span><b>纪念日</b><small>一起走过的日子</small></span><i>›</i></button><button class="relation-card" id="listenBtn"><span class="feature-symbol">♫</span><span><b>一起听</b><small>那些共同的旋律</small></span><i>›</i></button><button class="relation-card" id="memoirBtn"><span class="feature-symbol">✎</span><span><b>私人回忆录</b><small>只属于你的一页</small></span><i>›</i></button></div>
+<blockquote class="paper-note">有些话，<br/>不需要马上说完。<br/>我们会一直在这里。</blockquote><button class="text-btn" id="spaceSettings">外观与新留言通知</button></aside></section>
+<section class="welcome-panel" id="welcomePanel"><div><span class="eyebrow">LET THE ORDINARY STAY</span><h2>让平凡的日子，<br/>有迹可循。</h2><p>打开一间留言室，接着上一次的话。</p><span class="handwriting">A little space for us.</span></div></section></div>
+<div class="scrim" hidden="" id="menuScrim">
+<section aria-label="房间菜单" aria-modal="true" class="sheet menu-sheet" role="dialog">
+<button id="shareBtn" type="button">复制房间链接</button><button id="profileBtn" type="button">双方昵称与头像</button><button id="themeMenuBtn" type="button">切换界面风格</button><button id="notifyMenuBtn" type="button">新留言通知与提示音</button><button id="refreshBtn" type="button">重新连接</button><button id="pinRoomBtn" type="button">置顶这个房间</button><button id="leaveBtn" type="button">返回首页</button><button class="sheet-cancel" data-close="menuScrim" type="button">
+          取消
+        </button>
+</section>
+</div>
+<div class="scrim" hidden="" id="profileScrim">
+<section aria-labelledby="profileTitle" aria-modal="true" class="sheet" role="dialog">
+<header class="sheet-head">
+<h2 id="profileTitle">房间里的我们</h2>
+<button data-close="profileScrim" type="button">×</button>
+</header>
+<p class="sheet-note" id="profileNote"></p>
+<div class="profile-grid">
+<div class="avatar-field">
+<label><span>我的头像</span><input accept="image/*" id="myAvatar" type="file"/><span class="avatar-picker" id="myAvatarPreview">我</span></label><button class="avatar-reset" id="clearMyAvatar" type="button">
+              还原头像
+            </button>
+</div>
+<label class="field"><span>我的昵称</span><input id="myName" maxlength="24" placeholder="我"/></label>
+<div class="avatar-field">
+<label><span>对方头像</span><input accept="image/*" id="otherAvatar" type="file"/><span class="avatar-picker" id="otherAvatarPreview">友</span></label><button class="avatar-reset" id="clearOtherAvatar" type="button">
+              还原头像
+            </button>
+</div>
+<label class="field"><span>对方备注（仅本机）</span><input id="otherName" maxlength="24" placeholder="使用对方的昵称"/></label>
+</div>
+<button class="btn primary wide" id="saveProfile" type="button">
+          保存
+        </button>
+</section>
+</div>
+<div class="scrim" hidden="" id="dateScrim">
+<section aria-labelledby="dateTitle" aria-modal="true" class="sheet" role="dialog">
+<header class="sheet-head">
+<h2 id="dateTitle">这封信显示在哪一天？</h2>
+<button aria-label="关闭日期设置" data-close="dateScrim" type="button">
+            ×
+          </button>
+</header>
+<label class="field"><span>显示日期</span><input id="displayDate" type="date"/></label>
+<p class="sheet-note">
+          只改变日记与回忆墙里的展示日期，不会篡改真实发送时间。留空即使用发送当天。
+        </p>
+<button class="btn primary wide" id="saveDate" type="button">
+          使用这个日期
+        </button>
+</section>
+</div>
+<div class="scrim" hidden="" id="noticeScrim">
+<section aria-labelledby="noticeTitle" aria-modal="true" class="sheet" role="dialog">
+<header class="sheet-head"><h2 id="noticeTitle">提示</h2></header>
+<p class="notice-body" id="noticeBody"></p>
+<input aria-label="房间链接" hidden="" id="noticeLink" readonly=""/>
+<div class="notice-actions">
+<button class="btn ghost" id="noticeCancel" type="button">取消</button><button class="btn primary" id="noticeConfirm" type="button">
+            确定
+          </button>
+</div>
+</section>
+</div>
+<div class="scrim" hidden="" id="attachmentScrim">
+<section aria-labelledby="attachmentTitle" aria-modal="true" class="sheet feature-sheet" role="dialog">
+<header class="sheet-head"><h2 id="attachmentTitle">给这封信加个附件</h2><button aria-label="关闭附件" data-close="attachmentScrim" type="button">×</button></header><div class="record-controls"><button class="btn ghost" id="recordStart" type="button">录一段语音</button><button class="btn ghost" hidden="" id="recordStop" type="button">结束录音并预览</button><span id="recordStatus" role="status"></span></div>
+<p class="sheet-note">图片、音视频、PDF、TXT、Office 或 ZIP，单个不超过 20 MB。附件仅供邀请房间成员访问。</p>
+<label class="file-picker">选择附件<input accept="image/jpeg,image/png,image/webp,image/gif,audio/*,video/mp4,video/webm,.pdf,.txt,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx" id="attachmentFile" type="file"/></label>
+<div class="attachment-preview" id="attachmentPreview"></div>
+<label class="field"><span>附言（可选）</span><textarea id="attachmentCaption" maxlength="5000" placeholder="也想告诉你……" rows="3"></textarea></label>
+<progress aria-label="附件上传进度" hidden="" id="attachmentProgress" max="100" value="0"></progress>
+<p class="sheet-note" id="attachmentStatus" role="status"></p>
+<div class="feature-actions"><button class="btn ghost" id="attachmentCancel" type="button">取消上传</button><button class="btn primary" id="attachmentSend" type="button">上传并发送</button></div>
+</section>
+</div>
+<div class="scrim" hidden="" id="relationshipScrim">
+<section aria-labelledby="relationshipTitle" aria-modal="true" class="sheet feature-sheet" role="dialog">
+<header class="sheet-head"><h2 id="relationshipTitle">我们的日子</h2><button aria-label="关闭关系页" data-close="relationshipScrim" type="button">×</button></header>
+<div class="days-card"><span>从那一天起</span><strong id="relationshipDays">—</strong><span id="relationshipCaption">慢慢积攒值得记住的小事</span></div>
+<p class="sheet-note" id="relationshipNote" role="status"></p>
+<button class="text-btn" id="legacyEventImport" type="button" hidden>找回本机旧版纪念日</button>
+<form class="inline-form" id="relationshipForm"><label class="field"><span>相识日期</span><input id="relationshipSince" required="" type="date"/></label><button class="btn ghost" type="submit">保存日期</button></form>
+<h3>纪念日与约定</h3><div class="feature-list" id="eventList"></div>
+<form class="event-form" id="eventForm">
+<label class="field"><span>这一天的名字</span><input id="eventTitle" maxlength="120" placeholder="第一次见面 / 一起出发" required=""/></label>
+<label class="field"><span>日期</span><input id="eventDate" required="" type="date"/></label>
+<label class="check-field"><input checked="" id="eventYearly" type="checkbox"/>每年纪念</label>
+<button class="btn primary" id="eventSave" type="submit">记下这一天</button>
+</form>
+</section>
+</div>
+<div class="scrim" hidden="" id="listenScrim">
+<section aria-labelledby="listenTitle" aria-modal="true" class="sheet feature-sheet" role="dialog">
+<header class="sheet-head"><h2 id="listenTitle">一起听一首歌</h2><button aria-label="收起音乐播放器" data-close="listenScrim" type="button">×</button></header>
+<p class="sheet-note">双方各自选择同一个音频文件，核对一致后同步播放。歌曲与歌词保留在这台设备；收起播放器后仍可聊天。</p>
+<div class="file-pair"><label class="file-picker">选择本机歌曲<input accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac" id="listenFile" type="file"/></label><label class="file-picker">导入 LRC 歌词<input accept=".lrc,.txt" id="lyricsFile" type="file"/></label></div>
+<h3 id="trackName">还没有选择歌曲</h3><p class="sheet-note" id="listenStatus" role="status"></p>
+<label class="check-field"><input id="listenSync" type="checkbox"/>跟随房间播放状态</label>
+<div class="player-controls"><button class="btn primary" disabled="" id="listenToggle" type="button">播放</button><button class="btn ghost" disabled="" id="listenShare" type="button">共享这首歌的进度</button></div>
+<input aria-label="歌曲播放位置" disabled="" id="listenSeek" max="1" min="0" step="0.1" type="range" value="0"/>
+<div class="player-times"><span id="listenTime">0:00</span><span id="listenDuration">0:00</span></div>
+<div aria-label="歌词" class="lyrics" id="lyrics"><p>可以导入带时间轴的 LRC 歌词。</p></div>
+<label class="field"><span>歌词 / 这首歌的备注（留在本机）</span><textarea id="listenNotes" maxlength="20000" rows="3" placeholder="也可以直接贴下歌词，或写一点听歌的心情。"></textarea></label>
+<button class="text-btn" id="listenStop" type="button">停止并收起歌曲</button>
+<audio id="listenAudio" preload="metadata"></audio>
+</section>
+</div>
+<div class="scrim" hidden="" id="importScrim">
+<section aria-labelledby="importTitle" aria-modal="true" class="sheet feature-sheet wide-sheet" role="dialog">
+<header class="sheet-head"><h2 id="importTitle">把截图里的话留下来</h2><button aria-label="关闭截图导入" data-close="importScrim" type="button">×</button></header>
+<p class="sheet-note">识别在本机完成，原图不会上传。首次需要下载识别模型；每段文字、来源和日期都请核对，确认后才会发送。</p>
+<label class="file-picker">选择聊天截图<input accept="image/jpeg,image/png,image/webp" id="ocrFile" type="file"/></label>
+<img alt="待识别的聊天截图" class="ocr-preview" hidden="" id="ocrPreview"/>
+<div class="field-pair"><label class="field"><span>截图左侧称呼</span><input id="ocrLeftName" maxlength="24" value="对方"/></label><label class="field"><span>截图右侧称呼</span><input id="ocrRightName" maxlength="24" value="我"/></label></div>
+<div class="feature-actions"><button class="btn ghost" id="ocrCancel" type="button">停止识别</button><button class="btn primary" id="ocrRecognize" type="button">识别截图</button></div>
+<p class="sheet-note" id="ocrStatus" role="status"></p>
+<label class="field"><span>也可粘贴已识别的文字（空行分段）</span><textarea id="ocrManual" maxlength="20000" placeholder="系统相册里的文字识别结果也可以粘贴到这里。" rows="3"></textarea></label>
+<button class="text-btn" id="ocrParse" type="button">将文字整理为预览</button>
+<div class="import-rows" id="importRows"></div>
+<p class="sheet-note">导入内容会标注为“截图摘录”，发送者仍是你；来源称呼不会冒充房间成员。</p>
+<div class="feature-actions"><button class="btn ghost" id="importClear" type="button">清空预览</button><button class="btn primary" id="importSend" type="button">确认并发送选中内容</button></div>
+</section>
+</div>
+<div class="scrim" hidden="" id="memoirScrim">
+<section aria-labelledby="memoirHeading" aria-modal="true" class="sheet feature-sheet wide-sheet" role="dialog">
+<header class="sheet-head"><h2 id="memoirHeading">只属于我的回忆录</h2><button aria-label="关闭回忆录" data-close="memoirScrim" type="button">×</button></header>
+<p class="sheet-note" id="memoirNote" role="status"></p>
+<div class="feature-list" id="memoirList"></div><button class="text-btn" id="memoirNew" type="button">新写一篇</button>
+<div class="field-pair"><label class="field"><span>开始日期</span><input id="memoirStart" type="date"/></label><label class="field"><span>结束日期</span><input id="memoirEnd" type="date"/></label></div>
+<button class="btn ghost wide" id="memoirGenerate" type="button">按日期整理留言原文</button>
+<p class="sheet-note" id="memoirProgress" role="status"></p>
+<label class="field"><span>标题</span><input id="memoirTitle" maxlength="120" placeholder="慢慢走过的日子"/></label>
+<label class="field"><span>正文（可以自由修改）</span><textarea class="memoir-body" id="memoirBody" maxlength="200000" placeholder="把记得的细节、当时没说的话，也写在这里。" rows="12"></textarea></label>
+<div class="feature-actions"><button class="btn ghost" id="memoirExport" type="button">导出 Markdown</button><button class="btn primary" id="memoirSave" type="button">保存回忆录</button></div>
+<button class="text-btn danger" hidden="" id="memoirDelete" type="button">删除这篇回忆录</button>
+</section>
+</div>
+
+<div class="scrim" hidden="" id="addRoomScrim"><section aria-labelledby="addRoomTitle" aria-modal="true" class="sheet feature-sheet" role="dialog"><header class="sheet-head"><h2 id="addRoomTitle">留一个联系的地方</h2><button aria-label="关闭" data-close="addRoomScrim">×</button></header><div class="home-actions"><button class="btn primary" id="createBtn" type="button">创建房间</button><button class="btn ghost" id="joinToggle" type="button">加入已有房间</button></div><form class="join-box" hidden="" id="joinForm"><input aria-label="房间链接或房间号" autocomplete="off" id="roomInput" placeholder="粘贴完整邀请链接或房间号"/><button class="btn primary" type="submit">进入</button></form><details class="save-contact"><summary>收藏链接 / 邮箱</summary><form id="contactForm"><label class="field"><span>备注名称</span><input id="contactName" maxlength="40" placeholder="这是谁的联系方式" required=""/></label><label class="field"><span>网址或邮箱</span><input id="contactAddress" maxlength="2000" placeholder="https://… 或 name@example.com" required=""/></label><button class="btn ghost wide">保存在联系列表</button></form><p class="sheet-note">收藏保存在当前浏览器。邮箱会打开你的邮件应用。</p></details></section></div>
+<div class="scrim" hidden="" id="composeScrim"><section aria-label="发送选项" aria-modal="true" class="sheet menu-sheet" role="dialog"><button id="dateBtn" type="button">补录显示日期</button><button id="importBtn" type="button">从聊天截图导入</button><button id="recordMenuBtn" type="button">语音 / 图片 / 视频 / 文件</button><button data-close="composeScrim" type="button">收起</button></section></div>
+<div class="scrim" hidden="" id="settingsScrim"><section aria-labelledby="settingsTitle" aria-modal="true" class="sheet feature-sheet" role="dialog"><header class="sheet-head"><h2 id="settingsTitle">让这里像你喜欢的样子</h2><button aria-label="关闭" data-close="settingsScrim">×</button></header><p class="section-label">四季之外，四种心情</p><div class="theme-pills"><button data-theme-pick="ins-light"><span></span><b>Ins Light</b><small>轻白 · 浅粉 · 日光</small></button><button data-theme-pick="ins-dark"><span></span><b>Ins Dark</b><small>炭灰 · 雾紫 · 月色</small></button><button data-theme-pick="warm-light"><span></span><b>Warm Light</b><small>奶油 · 浅杏 · 信纸</small></button><button data-theme-pick="warm-dark"><span></span><b>Warm Dark</b><small>可可 · 焦糖 · 夜灯</small></button></div><p class="section-label">新留言</p><label class="check-field"><input checked="" id="inAppNotify" type="checkbox"/>网页内提示与未读角标</label><label class="check-field"><input id="soundNotify" type="checkbox"/>播放一声轻提示音</label><button class="btn ghost wide" id="notifyBtn" type="button">开启浏览器系统通知</button><button class="btn primary wide" id="pushBtn" type="button">开启当前房间离线推送</button><button class="text-btn" hidden="" id="pushOffBtn" type="button">关闭当前房间离线推送</button><p class="sheet-note" id="notificationStatus" role="status">系统通知仅显示“你有一条新留言”，不显示正文。</p><p class="version-label">小小留言室 · 2.2</p></section></div>
+<div class="toast" id="toast" role="status"></div>
+<noscript>留言室需要浏览器启用 JavaScript。</noscript>
+<script src="./app.js?v=2.2.0" type="module"></script>
+</body>
+</html>
