@@ -1,4 +1,4 @@
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.2.0';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.3.0';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -29,9 +29,9 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   $('returnChat').onclick=()=>setView('chat');$('writeFromView').onclick=()=>{setView('chat');$('messageInput').focus();};
   $('backBtn').onclick=()=>state.view==='chat'?home():setView('chat');
   const pane=$('messages');
-  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.view!=='chat'||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
+  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.selecting||state.view!=='chat'||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
   pane.addEventListener('touchcancel',()=>start=null,{passive:true});
-  pane.addEventListener('touchend',event=>{const from=start;start=null;const end=event.changedTouches[0];if(!from||!end||window.getSelection()?.isCollapsed===false)return;if(end.clientX-from.x<-85&&Math.abs(end.clientY-from.y)<35&&Date.now()-from.t<600)drawer(true);},{passive:true});
+  pane.addEventListener('touchend',event=>{const from=start;start=null;const end=event.changedTouches[0];if(!from||!end||state.selecting||window.getSelection()?.isCollapsed===false)return;if(end.clientX-from.x<-85&&Math.abs(end.clientY-from.y)<35&&Date.now()-from.t<600)drawer(true);},{passive:true});
   document.addEventListener('keydown',event=>{
     if($('relationSpace').inert)return;
     if(event.key==='Escape'){drawer(false);return;}

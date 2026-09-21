@@ -1,3 +1,4 @@
+import {runInteractions} from './interactions.browser.mjs';
 import { chromium } from "playwright";
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
@@ -144,6 +145,7 @@ async function setup({
     readCalls: 0,
     events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
   };
+  await context.route('**/ocr.js?*',route=>route.fulfill({contentType:'text/javascript',body:`export async function recognizeScreenshot(file,{signal,onProgress}={}){window.ocrCalls=(window.ocrCalls||0)+1;if(window.ocrSlow)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,1200);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));},{once:true});});onProgress?.('测试识别');return {messages:[{text:'一起看晚霞',side:'left',date:'2026-09-18',dateSource:'聊天日期',time:'20:00',confidence:96,y:100}]};}` }));
   const errors = [];
   await context.routeWebSocket(/supabase\.co/, (ws) => {
     ws.close();
@@ -257,8 +259,8 @@ async function setup({
             await new Promise((resolve) =>
               setTimeout(resolve, control.delayMs),
             );
-          if (control.failNext) {
-            control.failNext = false;
+          if (control.failNext || control.failOnSend === control.sends.length) {
+            control.failNext = false; control.failOnSend = 0;
             return reply({ message: "temporary error", code: "XX000" }, 500);
           }
           if (
@@ -350,6 +352,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
+  if(!process.env.INTERACTIONS_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -421,8 +424,9 @@ try {
   await check(
     "multi-quote and display date share one persisted message across views",
     async () => {
-      await page.locator('[data-quote-id="1"]').click();
-      await page.locator('[data-quote-id="2"]').click();
+      await page.locator('[data-message-id="1"] .bubble').dispatchEvent('contextmenu');
+      await page.locator('[data-message-id="2"] .bubble').click();
+      await page.locator('#selectQuote').click();
       await page.locator("#composeMore").click();
       await page.locator("#dateBtn").click();
       await page.locator("#displayDate").fill("2024-09-04");
@@ -556,7 +560,7 @@ try {
   await check(
     "unmigrated database supports old sends and explicitly gates metadata",
     async () => {
-      await old.page.locator('[data-quote-id="1"]').click();
+      await old.page.locator('[data-message-id="1"] .bubble').dispatchEvent('contextmenu');await old.page.locator('#selectQuote').click();await old.page.locator('#selectionCancel').click();
       assert.equal(await old.page.locator("#quoteTray").isVisible(), false);
       await old.page.locator("#messageInput").fill("旧版继续聊");
       await old.page.locator("#sendBtn").click();
@@ -649,7 +653,7 @@ try {
         0,
       );
       const original = s.control.records[0].created_at;
-      await s.page.locator('[data-date-id="1"]').click();
+      await s.page.locator('[data-message-id="1"] .bubble').dispatchEvent('contextmenu');await s.page.locator('#selectDate').click();
       await s.page.locator("#displayDate").fill("2020-01-01");
       await s.page.locator("#saveDate").click();
       await s.page.waitForFunction(
@@ -710,8 +714,8 @@ try {
     const sends=s.control.sends.length;await s.page.locator('#attachBtn').click();await s.page.locator('#recordStart').click();await s.page.locator('#recordStop').waitFor();await s.page.waitForTimeout(160);await s.page.locator('#recordStop').click();await s.page.locator('#attachmentPreview audio').waitFor();assert.equal(s.control.sends.length,sends);await s.page.locator('[data-close=attachmentScrim]').click();await s.page.evaluate(()=>window.testAudio.close());
   });
   await check('OCR recognition produces editable drafts and sends only after explicit confirmation',async()=>{
-    await s.page.evaluate(()=>{window.Tesseract={createWorker:async()=>({recognize:async()=>({data:{blocks:[{paragraphs:[{text:'一起看晚霞',bbox:{x0:10,x1:100}}]}]}}),terminate:async()=>{}})};});
-    const count=s.control.sends.length;await s.page.locator('#composeMore').click();await s.page.locator('#importBtn').click();await s.page.locator('#ocrFile').setInputFiles({name:'chat.png',mimeType:'image/png',buffer:await readFile(resolve(root,'test-results/mobile-chat.png'))});await s.page.locator('#ocrRecognize').click();await s.page.locator('.import-row textarea').waitFor();assert.equal(s.control.sends.length,count);
+
+    const count=s.control.sends.length;await s.page.locator('#composeMore').click();await s.page.locator('#importBtn').click();await s.page.locator('#ocrFile').setInputFiles({name:'chat.png',mimeType:'image/png',buffer:await readFile(resolve(root,'test-results/mobile-chat.png'))});await s.page.waitForFunction(()=>!document.querySelector('#ocrRecognize').disabled&&document.querySelector('#ocrQueueCount').textContent.includes('1 张'));await s.page.locator('#ocrRecognize').click();await s.page.locator('.import-row textarea').waitFor();await s.page.waitForFunction(()=>!document.querySelector('#importSend').disabled);assert.equal(s.control.sends.length,count);
     await s.page.locator('.import-row textarea').fill('修改过的摘录');await s.page.locator('.import-row input[type=file]').setInputFiles({name:'supplement.txt',mimeType:'text/plain',buffer:Buffer.from('original supplement')});await s.page.waitForFunction(()=>document.querySelector('.import-row').textContent.includes('已就绪'));await s.page.locator('#importSend').click();assert.equal(s.control.sends.length,count);await s.page.locator('#noticeConfirm').click();await s.page.waitForFunction(()=>document.querySelector('.import-row').classList.contains('sent'));assert.equal(s.control.sends.at(-1).author_id,user);assert.equal(s.control.sends.at(-1).content,'修改过的摘录');assert.equal(s.control.sends.at(-1).media_name,'supplement.txt');assert.equal(s.control.sends.at(-1).message_type,'file');await s.page.locator('[data-close=importScrim]').click();
   });
   await check('private memoir generates a date projection, saves privately and does not send chat',async()=>{
@@ -797,6 +801,8 @@ try {
   );
   assert.deepEqual(p.errors, []);
   await p.context.close();
+  }
+  await runInteractions({setup,check,secureId,user,friend,fixture,root});
   console.log(
     `\n${checks} browser integration checks passed. All Supabase requests were intercepted; production was not contacted.`,
   );

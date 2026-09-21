@@ -1,17 +1,17 @@
-import {musicStore} from './local-music.js?v=2.2.0';
-import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.2.0';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText,ocrDrafts} from './feature-core.js?v=2.2.0';
-import * as api from './backend.js?v=2.2.0';
-import * as data from './feature-backend.js?v=2.2.0';
-import {recognizeScreenshot} from './ocr.js?v=2.2.0';
+import {musicStore} from './local-music.js?v=2.3.0';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.3.0';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText} from './feature-core.js?v=2.3.0';
+import * as api from './backend.js?v=2.3.0';
+import * as data from './feature-backend.js?v=2.3.0';
+import {initScreenshotImport} from './screenshot-import.js?v=2.3.0';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
   const audio=$('listenAudio');
+  const screenshots=initScreenshotImport(ctx);
   let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
   let calendar=[],calendarBusy=false,calendarEdit=null,eventNonce=randomId();
   let song=null,songRevision=0,listenSession=null,listenOffset=0,listenBusy=false,listenReading=false,lyrics=[],lyricIndex=-1;
-  let ocrController=null,ocrRevision=0,ocrUrl='',imports=[],importBusy=false,importStop=false,importUpload=null;const importFiles=new Map();
   let memoir=null,memoirEdits=0,memoirBusy=false;
   let recorder=null,recordStream=null,recordTimer=null,recordRevision=0;
 
@@ -249,67 +249,6 @@ export function initFeatures(ctx){
   function clearSong(){++songRevision;audio.pause();audio.removeAttribute('src');audio.load();if(song?.url)URL.revokeObjectURL(song.url);song=null;lyrics=[];paintLyrics();$('listenSync').checked=false;$('listenFile').value='';$('lyricsFile').value='';$('trackName').textContent='还没有选择歌曲';playerControls();}
   $('listenStop').onclick=async()=>{const s=snap();audio.pause();await publishListen();if(current(s)){clearSong();void musicStore(s.room,null).catch(()=>{});closeSheet('listenScrim');}};
 
-  // OCR always produces editable drafts. Sending is a separate, explicit action.
-  function persistImports(s=snap()){return persist(key('imports',s),imports);}
-  function importControls(){const locked=importBusy||Boolean(ocrController);for(const id of ['ocrRecognize','ocrFile','ocrParse','importClear','importSend'])$(id).disabled=locked;$('ocrCancel').disabled=!ocrController&&!importBusy;}
-  function renderImports(){
-    const box=$('importRows');box.replaceChildren();
-    for(const row of imports){
-      const item=node('div','import-row'+(row.sent?' sent':''));const choose=node('label','check-field'),check=node('input');check.type='checkbox';check.checked=row.selected!==false;check.disabled=Boolean(row.sent||row.attempted||importBusy);choose.append(check,node('span','',row.sent?'已发送的摘录':'选中这段摘录'));check.onchange=()=>{row.selected=check.checked;persistImports();};
-      const fields=node('div','field-pair');
-      for(const [field,label,type] of [['label','来源称呼','text'],['date','显示日期','date']]){const wrap=node('label','field'),input=node('input');input.type=type;input.value=row[field]||'';if(type==='text')input.maxLength=24;input.disabled=Boolean(row.sent||row.attempted||importBusy);input.oninput=()=>{row[field]=input.value;persistImports();};wrap.append(node('span','',label),input);fields.append(wrap);}
-      const text=node('textarea');text.value=row.text;text.rows=3;text.maxLength=5000;text.disabled=Boolean(row.sent||row.attempted||importBusy);text.setAttribute('aria-label','摘录正文');text.oninput=()=>{row.text=text.value;persistImports();};const content=node('label','field');content.append(node('span','','正文'),text);
-      const supplement=node('label','file-picker','补充图片 / 原媒体（可选）'),file=node('input');file.type='file';file.setAttribute('aria-label','为摘录补充媒体');file.disabled=Boolean(row.sent||importBusy||(row.attempted&&importFiles.has(row.nonce)));
-      file.onchange=async()=>{const selected=file.files[0],s=snap();if(!selected)return;if(!s.secure){toast('补充媒体需要邀请房间。');return;}
-        try{const info=fileInfo(selected),hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await selected.arrayBuffer()))].map(x=>x.toString(16).padStart(2,'0')).join('');if(!current(s))return;
-          if(row.attempted&&row.fileMeta?.hash!==hash){toast('重试必须选择之前的同一份文件。');return;}row.fileMeta={...info,hash};importFiles.set(row.nonce,selected);persistImports();renderImports();
-        }catch(e){fail(e);}
-      };supplement.append(file);if(row.fileMeta)supplement.append(node('small','',row.fileMeta.name+(importFiles.has(row.nonce)?' · 已就绪':' · 请重新选择原文件')));
-      if(!row.attempted&&row.fileMeta){const remove=node('button','text-btn','移除补充媒体');remove.type='button';remove.onclick=()=>{delete row.fileMeta;importFiles.delete(row.nonce);persistImports();renderImports();};supplement.append(remove);}
-      item.append(choose,fields,content,supplement,node('p','import-result',row.sent?'已经送达':row.attempted?'上次发送未获确认，保留原文与发送编号以便安全重试。':''));box.append(item);
-    }
-  }
-  function prepareImports(rows){importFiles.clear();imports=rows.map(row=>({...row,nonce:randomId(),date:'',selected:true,sent:false,attempted:false}));persistImports();renderImports();$('ocrStatus').textContent=`已整理 ${imports.length} 段。请核对文字、来源和日期，再确认发送。`;}
-  async function mayReplaceImports(){return !imports.some(row=>!row.sent)||(await notice('替换当前预览？','当前未发送的摘录会被新识别结果替换。','替换预览',true));}
-  $('importBtn').onclick=()=>{if(open('importScrim')){const saved=storeGet(key('imports'),[]);imports=Array.isArray(saved)?saved:[];renderImports();importControls();}};
-  $('ocrFile').onchange=()=>{if(ocrUrl)URL.revokeObjectURL(ocrUrl);const file=$('ocrFile').files[0];ocrUrl=file?URL.createObjectURL(file):'';$('ocrPreview').hidden=!ocrUrl;if(ocrUrl)$('ocrPreview').src=ocrUrl;else $('ocrPreview').removeAttribute('src');};
-  $('ocrCancel').onclick=()=>{ocrController?.abort();importUpload?.abort();importStop=true;};
-  $('ocrRecognize').onclick=async()=>{
-    if(ocrController||importBusy)return;const file=$('ocrFile').files[0];if(!file){toast('先选择一张截图。');return;}const s=snap();if(!(await mayReplaceImports())||!current(s))return;
-    const revision=++ocrRevision,controller=new AbortController();ocrController=controller;importControls();
-    const left=$('ocrLeftName').value.trim()||'对方',right=$('ocrRightName').value.trim()||'我';
-    try{const result=await recognizeScreenshot(file,{signal:controller.signal,onProgress:text=>{if(current(s)&&revision===ocrRevision)$('ocrStatus').textContent=text;}});if(!current(s)||revision!==ocrRevision)return;const rows=ocrDrafts(result.data,result.width,left,right);if(!rows.length)throw new Error('没有识别到文字，请换一张更清晰的截图或粘贴文字。');prepareImports(rows);}
-    catch(e){if(current(s)&&revision===ocrRevision)$('ocrStatus').textContent=e.name==='AbortError'?'识别已停止，原预览保留。':messageError(e);}
-    finally{if(current(s)&&revision===ocrRevision){ocrController=null;importControls();}}
-  };
-  $('ocrParse').onclick=async()=>{const s=snap();if(!(await mayReplaceImports())||!current(s))return;try{const rows=ocrDrafts({text:$('ocrManual').value},1);if(!rows.length)throw new Error('请先粘贴文字。');prepareImports(rows);}catch(e){fail(e);}};
-  $('importClear').onclick=async()=>{const s=snap();if(!(await notice('清空预览？','只清除本机导入预览，已经发出的留言不会删除。','清空',true))||!current(s))return;imports=[];persistImports();renderImports();$('ocrStatus').textContent='预览已清空。';};
-  $('importSend').onclick=async()=>{
-    if(importBusy||!requireRoom())return;const batch=imports,rows=batch.filter(row=>row.selected&&!row.sent),s=snap();if(!rows.length){toast('还没有选中未发送的摘录。');return;}
-    if(rows.some(row=>!row.text.trim()||row.text.length>5000||!row.label.trim()||row.label.length>24||(row.date&&!validDate(row.date)))){toast('请核对每段的来源、正文和有效日期。');return;}
-    if(rows.some(row=>row.fileMeta&&!importFiles.has(row.nonce))){toast('请为带媒体的摘录重新选择原文件，或移除尚未发送的媒体。');return;}
-    if(!state.metadata&&rows.some(row=>row.date)){toast('显示日期需要升级数据库，也可以先清空日期再导入。');return;}
-    if(!s.secure&&rows.some(row=>row.text.length+row.label.length+12>5000)){toast('旧版房间需要为摘录标签预留长度，请缩短正文。');return;}
-    if(!(await notice('确认发送这些摘录？',`将把选中的 ${rows.length} 段作为你导入的截图摘录发到当前房间，其他成员会看到。识别用的原截图不会上传；你另外选择的补充媒体会随摘录发送。`,'确认发送',true))||!current(s))return;
-    importBusy=true;importStop=false;importControls();renderImports();let sent=0;
-    try{
-      for(const row of rows){
-        if(importStop||!current(s))break;
-        row.attempted=true;persistImports(s);
-        const payload={room_id:s.room,sender:s.secure?s.userId:s.deviceId,sender_name:s.name,content:s.secure?row.text.trim():`[截图摘录 · ${row.label.trim()}]\n${row.text.trim()}`};
-        if(state.metadata)Object.assign(payload,{display_date:row.date||null,reply_to:[]});
-        if(s.secure)Object.assign(payload,{author_id:s.userId,client_nonce:row.nonce,message_type:'import',import_label:row.label.trim()});
-        if(row.fileMeta){const path=`${s.room}/${s.userId}/${row.nonce}`;importUpload=new AbortController();await api.uploadMedia(path,importFiles.get(row.nonce),row.fileMeta.mime,progress=>{if(current(s))$('ocrStatus').textContent=`补充媒体上传 ${Math.round(progress*100)}%`;},importUpload.signal);importUpload=null;if(importStop||!current(s))break;Object.assign(payload,{message_type:row.fileMeta.type,media_path:path,media_name:row.fileMeta.name,media_mime:row.fileMeta.mime,media_size:row.fileMeta.size});}
-        const message=await api.sendMessage(payload,s.secure);row.sent=true;sent++;importFiles.delete(row.nonce);
-        // Keep this batch snapshot when navigation happens during an in-flight send.
-        persist(key('imports',s),batch);
-        if(current(s)){onMessages([message]);$('ocrStatus').textContent=`已发送 ${sent} / ${rows.length} 段`;renderImports();}
-      }
-      if(current(s))$('ocrStatus').textContent=importStop?'已停止后续发送。已送达的段落会保留标记。':`已发送 ${sent} 段，原图未上传。`;
-    }catch(e){if(current(s))$('ocrStatus').textContent=messageError(e)+(s.secure?' 已送达的不再重发，未确认的可用原预览重试。':' 发送未获确认，请先刷新核对，避免重复发送。');}
-    finally{if(current(s)){importBusy=false;importControls();renderImports();}}
-  };
-
   // Memoirs are private projections, never inserted back into the conversation.
   function freshMemoir(){const end=new Date(),start=new Date();start.setDate(start.getDate()-30);return {id:randomId(),revision:0,title:'',body:'',range_start:localDate(start),range_end:localDate(end)};}
   function readMemoirFields(){return {...memoir,title:$('memoirTitle').value,body:$('memoirBody').value,range_start:$('memoirStart').value,range_end:$('memoirEnd').value};}
@@ -366,13 +305,12 @@ export function initFeatures(ctx){
     for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();
     calendar=[];calendarBusy=false;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
     clearSong();listenSession=null;listenOffset=0;listenBusy=false;listenReading=false;
-    importUpload?.abort();importUpload=null;importFiles.clear();ocrController?.abort();ocrController=null;++ocrRevision;importStop=true;importBusy=false;imports=[];
-    if(ocrUrl)URL.revokeObjectURL(ocrUrl);ocrUrl='';$('ocrPreview').hidden=true;$('ocrPreview').removeAttribute('src');$('ocrFile').value='';$('ocrManual').value='';$('ocrStatus').textContent='';
+    screenshots.reset();
     memoir=null;memoirEdits++;memoirBusy=false;$('memoirProgress').textContent='';$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();
   }
   function ready(){void refreshCalendar();void restoreSong();if(state.secure){const s=snap();stopSubscription=data.subscribeFeatures(s.room,()=>{if(current(s))void refreshCalendar();},()=>{if(current(s))void refreshListen();});}}
   document.addEventListener('mailbox:space-open',()=>void refreshCalendar());
-  document.addEventListener('mailbox:sheet-close',event=>{if(event.detail.id==='attachmentScrim')endRecording(true);if(event.detail.id==='attachmentScrim'&&mediaBusy)mediaController?.abort();if(event.detail.id==='importScrim'){ocrController?.abort();importUpload?.abort();importStop=true;}});
+  document.addEventListener('mailbox:sheet-close',event=>{if(event.detail.id==='attachmentScrim')endRecording(true);if(event.detail.id==='attachmentScrim'&&mediaBusy)mediaController?.abort();});
   setInterval(()=>{if(document.hidden||!state.ready)return;if($('listenSync').checked||!$('listenScrim').hidden)void refreshListen();if(!$('relationshipScrim').hidden)void refreshCalendar();},10000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ready&&$('listenSync').checked)void refreshListen();});
   async function restoreSong(){

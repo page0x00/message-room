@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fileInfo,MAX_FILE_SIZE,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText,ocrDrafts} from '../feature-core.js';
+import {fileInfo,MAX_FILE_SIZE,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText} from '../feature-core.js';
 test('attachment allowlist excludes executable previews and oversize files',()=>{
   assert.equal(fileInfo({name:'照片.PNG',type:'',size:12}).type,'image');
   for(const file of [{name:'x.svg',type:'image/svg+xml',size:12},{name:'x.html',type:'text/html',size:12},{name:'x.png',type:'image/png',size:MAX_FILE_SIZE+1},{name:'x.png',type:'image/png',size:0}])assert.throws(()=>fileInfo(file));
@@ -29,10 +29,4 @@ test('memoir includes display dates and source attribution without changing mess
   const messages=[{id:'1',content:'晚霞',created_at:'2026-09-20T10:00:00Z',display_date:'2026-09-04',import_label:'旧截图',media_name:'夕阳.png'},{id:'2',content:'排除',created_at:'2026-09-20T10:00:00Z'}];
   const original=JSON.stringify(messages),result=memoirText(messages,'2026-09-04','2026-09-04',()=> '我');
   assert.equal(result.count,1);assert.match(result.body,/旧截图/);assert.match(result.body,/夕阳.png/);assert.doesNotMatch(result.body,/排除/);assert.equal(JSON.stringify(messages),original);assert.throws(()=>memoirText(messages,'2026-09-30','2026-09-04',()=>''));
-});
-test('OCR drafts preserve recognized text and suggest editable source sides',()=>{
-  const data={blocks:[{paragraphs:[{bbox:{x0:0,x1:180},lines:[{text:'你好'},{text:'到啦'}]},{bbox:{x0:240,x1:400},text:'欢迎'}]}]};
-  assert.deepEqual(ocrDrafts(data,400,'朋友','我'),[{text:'你好\n到啦',label:'朋友'},{text:'欢迎',label:'我'}]);
-  assert.deepEqual(ocrDrafts({text:'一段\n\n二段'},400),[{text:'一段',label:'截图'},{text:'二段',label:'截图'}]);
-  assert.throws(()=>ocrDrafts({text:'x'.repeat(5001)},400));
 });

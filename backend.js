@@ -1,4 +1,4 @@
-import { missingSchema, normalizeMessage } from "./core.js?v=2.2.0";
+import { missingSchema, normalizeMessage } from "./core.js?v=2.3.0";
 
 // This is the project's public browser key, never a service-role secret.
 const URL = "https://yuzgbxeprpohlakxjcut.supabase.co";

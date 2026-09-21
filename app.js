@@ -14,11 +14,14 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.2.0";
-import * as api from "./backend.js?v=2.2.0";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.2.0";
-import { initNotifications } from "./notifications.js?v=2.2.0";
-import { initFeatures } from "./features.js?v=2.2.0";
+} from "./core.js?v=2.3.0";
+import * as api from "./backend.js?v=2.3.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.3.0";
+import { initNotifications } from "./notifications.js?v=2.3.0";
+import { initFeatures } from "./features.js?v=2.3.0";
+
+import {initMessageActions} from "./message-actions.js?v=2.3.0";
+let actions;
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -247,6 +250,7 @@ async function openRoom(target) {
     view: "chat",
   });
   features.roomChanged();
+  actions?.reset();
   $("connectionNote").hidden=true;
   $("home").classList.remove("active");
   $("room").classList.add("active");
@@ -321,6 +325,7 @@ async function openRoom(target) {
     state.ready = true;
     notifications.prime(room,state.messages);
     features.ready();
+    actions?.load();
     if (!supported && (state.quotes.length || state.date))
       toast(
         "当前数据库不支持引用与显示日期，草稿保留；发送前请清除这些选项或先升级数据库。",
@@ -431,6 +436,7 @@ function home() {
   state.ready = false;
   state.refreshPromise = null;
   features.roomChanged();
+  actions?.reset();
   $("room").classList.remove("active");
   $("home").classList.add("active");
   document.querySelectorAll(".scrim").forEach((el) => {
@@ -479,7 +485,7 @@ function render({ bottom = false, stick = false } = {}) {
   const oldTop = box.scrollTop;
   const fragment = document.createDocumentFragment();
   box.className = "messages view-" + state.view;
-  if (!state.messages.length)
+  if (!state.messages.some(m=>!actions?.hidden(m.id)))
     fragment.append(
       node(
         "p",
@@ -492,7 +498,7 @@ function render({ bottom = false, stick = false } = {}) {
   const byId = new Map(state.messages.map((m) => [m.id, m]));
   let lastDay = '',container=fragment;
   if(state.view==='wall')fragment.append(node('p','wall-intro','把值得留下的瞬间，慢慢贴在这里。'));
-  for (const message of projectMessages(state.messages, state.view).filter(m=>state.view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
+  for (const message of projectMessages(state.messages.filter(m=>!actions?.hidden(m.id)), state.view).filter(m=>state.view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
     const day = displayDay(message, state.view);
     if (day !== lastDay) {
       if(state.view==='diary'){container=node('section','diary-page');fragment.append(container);}
@@ -518,7 +524,7 @@ function render({ bottom = false, stick = false } = {}) {
       referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
     features.renderMedia(message,bubble);
-    bubble.append(node("div", "message-text", message.content));
+    if(/^【(?:合并转发|截图合并整理)】/.test(message.content)){const record=node('details','forward-record');record.append(node('summary','',message.content.startsWith('【合并转发】')?'合并转发 · 点击展开':'截图整理 · 点击展开'),node('div','message-text',message.content.replace(/^【[^】]+】\s*/,'')));bubble.append(record);}else bubble.append(node("div", "message-text", message.content));
     wrap.append(bubble);
     const meta = node("div", "meta");
     const stamp = new Date(message.created_at);
@@ -539,28 +545,10 @@ function render({ bottom = false, stick = false } = {}) {
       meta.append(
         node("span", "", " · 发送于 " + localDate(message.created_at)),
       );
-    const quote = node(
-      "button",
-      "message-action",
-      state.quotes.includes(message.id) ? "已引用" : "引用",
-    );
-    quote.type = "button";
-    quote.dataset.quoteId = message.id;
-    quote.setAttribute(
-      "aria-pressed",
-      String(state.quotes.includes(message.id)),
-    );
-    meta.append(quote);
-    if (who.mine && state.secure) {
-      const edit = node("button", "message-action", "日期");
-      edit.type = "button";
-      edit.dataset.dateId = message.id;
-      meta.append(edit);
-    }
     wrap.append(meta);
     const portrait = avatar(who.image, who.name);
     if(state.view==='wall')wrap.append(node('time','wall-date',displayDay(message,'wall')));
-    row.append(portrait,wrap);container.append(row);
+    row.append(portrait,wrap);actions?.decorate(row,message);container.append(row);
   }
   if(state.view==='wall')features.renderWall(fragment);
   if(state.view==='wall'){const grid=node('div','wall-grid');grid.append(fragment);box.replaceChildren(grid);}else box.replaceChildren(fragment);
@@ -569,6 +557,7 @@ function render({ bottom = false, stick = false } = {}) {
     ? `${state.messages.length} 条${state.hasMore ? " · 还有更早留言" : ""}`
     : "";
   renderQuotes();
+  actions?.rendered();
   if (bottom || (stick && wasNearBottom && state.view === "chat"))
     box.scrollTop = box.scrollHeight;
   else box.scrollTop = oldTop;
@@ -598,24 +587,6 @@ function renderQuotes() {
     )
     .join(" / ");
   resizeComposer();
-}
-
-function toggleQuote(id) {
-  if (!state.ready) return;
-  if (!state.metadata) {
-    toast("引用需要先执行数据库迁移，普通文字仍可发送。");
-    return;
-  }
-  if (state.quotes.includes(id))
-    state.quotes = state.quotes.filter((item) => item !== id);
-  else if (state.quotes.length < 8) state.quotes.push(id);
-  else {
-    toast("每次最多引用 8 条。");
-    return;
-  }
-  state.draftNonce = randomId();
-  saveDraft();
-  render();
 }
 
 function resizeComposer() {
@@ -972,10 +943,6 @@ $("clearQuotes").onclick = () => {
 $("refreshBtn").onclick = () => refreshMessages(true);
 $("olderBtn").onclick = loadOlder;
 $("messages").onclick = (event) => {
-  const quote = event.target.closest("[data-quote-id]"),
-    date = event.target.closest("[data-date-id]");
-  if (quote) toggleQuote(quote.dataset.quoteId);
-  if (date) dateEditor(date.dataset.dateId);
   const reference=event.target.closest('[data-reference-id]');
   if(reference)void revealReference(reference.dataset.referenceId);
 };
@@ -1083,6 +1050,7 @@ $('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.v
 const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
 });
+actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
 renderRecent();
 void notifications.watch();
 const initial = parseRoom(location.href);

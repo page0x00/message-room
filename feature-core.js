@@ -1,4 +1,4 @@
-import { validDate, localDate, displayDay, projectMessages } from './core.js?v=2.2.0';
+import { validDate, localDate, displayDay, projectMessages } from './core.js?v=2.3.0';
 
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','audio/mpeg','audio/mp4','audio/ogg','audio/wav','audio/x-wav','audio/webm','audio/flac','video/mp4','video/webm','application/pdf','text/plain','application/zip','application/x-zip-compressed','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation']);
@@ -67,16 +67,4 @@ export function memoirText(messages, start, end, authorName) {
   const body=output.join('\n');
   if(body.length>200000) throw new Error('内容超过 20 万字，请缩小日期范围。');
   return {body,count:rows.length};
-}
-export function ocrDrafts(data, width, leftName='对方', rightName='我') {
-  const paragraphs=(data.blocks||[]).flatMap(b=>b.paragraphs||[]);
-  const rows=paragraphs.map(p=>{
-    const text=(p.text || (p.lines||[]).map(l=>l.text||'').join('\n')).trim();
-    const center=((p.bbox?.x0||0)+(p.bbox?.x1||0))/2;
-    return {text,label:center>width/2?rightName:leftName};
-  }).filter(row=>row.text);
-  const result=rows.length?rows:String(data.text||'').trim().split(/\n\s*\n/).filter(Boolean).map(text=>({text,label:'截图'}));
-  // Never silently truncate recognized content: ask for a smaller screenshot instead.
-  if(result.length>40 || result.some(row=>row.text.length>5000)) throw new Error('识别内容太长，请裁成较短的截图后重试。');
-  return result;
 }

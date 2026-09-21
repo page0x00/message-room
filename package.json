@@ -1,14 +1,15 @@
 {
   "name": "little-message-room",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/core.test.mjs tests/features.test.mjs tests/notifications.test.mjs",
+    "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:db": "node tests/database.mjs",
-    "check": "node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js",
-    "build:sql": "node scripts/build-sql.mjs"
+    "check": "node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js && node --check screenshot-import.js && node --check ocr-layout.js && node --check import-core.js && node --check screenshot-store.js && node --check message-actions.js",
+    "build:sql": "node scripts/build-sql.mjs",
+    "test:ocr": "node tests/ocr-browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",

@@ -6,12 +6,12 @@
 <meta content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <meta content="no-referrer" name="referrer"/>
-<meta content="2.2.0" name="application-version"/>
+<meta content="2.3.0" name="application-version"/>
 <title>小小留言室</title>
 
 
 <script src="./vendor/supabase.js?v=2.57.4"></script>
-<link href="./styles.css?v=2.2.0" rel="stylesheet"/><link href="./features.css?v=2.2.0" rel="stylesheet"/><link href="./ui-v2.css?v=2.2.0" rel="stylesheet"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/></head>
+<link href="./styles.css?v=2.3.0" rel="stylesheet"/><link href="./features.css?v=2.3.0" rel="stylesheet"/><link href="./ui-v2.css?v=2.3.0" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.3.0"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/></head>
 <body>
 <div class="app-shell">
 <section aria-labelledby="homeTitle" class="screen home active" id="home">
@@ -45,8 +45,8 @@
 </aside>
 <div class="connection-note" hidden="" id="connectionNote" role="status"></div>
 
-<button class="older-btn" hidden="" id="olderBtn" type="button">翻看更早的信</button><span hidden="" id="historyCount"></span><main aria-label="留言列表" class="messages view-chat" id="messages"></main>
-<aside class="quote-tray" hidden="" id="quoteTray">
+<button class="older-btn" hidden="" id="olderBtn" type="button">翻看更早的信</button><span hidden="" id="historyCount"></span><div id="selectionHeader" class="selection-header" hidden><button id="selectionCancel" type="button">取消</button><strong id="selectionCount"></strong><button id="selectionAll" type="button">全选已载入</button><button id="selectionInvert" type="button">反选</button></div><main aria-label="留言列表" class="messages view-chat" id="messages"></main>
+<nav class="selection-bar" id="selectionBar" hidden aria-label="已选留言操作"><button id="selectQuote">引用</button><button id="selectMerge">合并转发</button><button id="selectForward">逐条转发</button><button id="selectFavorite">收藏</button><button id="selectCopy">复制</button><button id="selectDelete">删除</button><button id="selectDate" hidden>修改日期</button></nav><aside class="quote-tray" hidden="" id="quoteTray">
 <div>
 <strong id="quoteCount">引用 0 条</strong><span id="quotePreview"></span>
 </div>
@@ -69,7 +69,7 @@
 <section class="welcome-panel" id="welcomePanel"><div><span class="eyebrow">LET THE ORDINARY STAY</span><h2>让平凡的日子，<br/>有迹可循。</h2><p>打开一间留言室，接着上一次的话。</p><span class="handwriting">A little space for us.</span></div></section></div>
 <div class="scrim" hidden="" id="menuScrim">
 <section aria-label="房间菜单" aria-modal="true" class="sheet menu-sheet" role="dialog">
-<button id="shareBtn" type="button">复制房间链接</button><button id="profileBtn" type="button">双方昵称与头像</button><button id="themeMenuBtn" type="button">切换界面风格</button><button id="notifyMenuBtn" type="button">新留言通知与提示音</button><button id="refreshBtn" type="button">重新连接</button><button id="pinRoomBtn" type="button">置顶这个房间</button><button id="leaveBtn" type="button">返回首页</button><button class="sheet-cancel" data-close="menuScrim" type="button">
+<button id="selectMessagesBtn" type="button">选择留言</button><button id="favoritesBtn" type="button">我的收藏</button><button id="deletedBtn" type="button">最近删除</button><button id="shareBtn" type="button">复制房间链接</button><button id="profileBtn" type="button">双方昵称与头像</button><button id="themeMenuBtn" type="button">切换界面风格</button><button id="notifyMenuBtn" type="button">新留言通知与提示音</button><button id="refreshBtn" type="button">重新连接</button><button id="pinRoomBtn" type="button">置顶这个房间</button><button id="leaveBtn" type="button">返回首页</button><button class="sheet-cancel" data-close="menuScrim" type="button">
           取消
         </button>
 </section>
@@ -177,16 +177,22 @@
 <section aria-labelledby="importTitle" aria-modal="true" class="sheet feature-sheet wide-sheet" role="dialog">
 <header class="sheet-head"><h2 id="importTitle">把截图里的话留下来</h2><button aria-label="关闭截图导入" data-close="importScrim" type="button">×</button></header>
 <p class="sheet-note">识别在本机完成，原图不会上传。首次需要下载识别模型；每段文字、来源和日期都请核对，确认后才会发送。</p>
-<label class="file-picker">选择聊天截图<input accept="image/jpeg,image/png,image/webp" id="ocrFile" type="file"/></label>
-<img alt="待识别的聊天截图" class="ocr-preview" hidden="" id="ocrPreview"/>
+<div class="feature-actions"><button class="btn primary" id="ocrChoose" type="button">选择截图文件夹</button><button class="btn ghost" id="ocrChooseMany" type="button">多选截图文件</button></div>
+<input id="ocrFile" type="file" multiple hidden/><input id="ocrDirectory" type="file" webkitdirectory multiple hidden/>
+<p class="sheet-note">自动按文件名中的时间排序；没有时间的使用文件修改时间。目录不可用时自动切换多选，完整截图无需裁剪。</p>
+<div class="batch-toolbar"><strong id="ocrQueueCount"></strong><button class="text-btn" id="ocrAll">全选</button><button class="text-btn" id="ocrInvert">反选</button><button class="text-btn" id="ocrNewOnly">只选新截图</button></div>
+<label class="check-field"><input type="checkbox" id="ocrSkipProcessed" checked/>跳过已处理截图（按文件内容去重）</label>
+<div class="screenshot-queue" id="ocrQueue"></div><div class="batch-pages"><button id="queuePrev" type="button">上一页</button><span id="queuePage"></span><button id="queueNext" type="button">下一页</button></div>
+<img alt="待识别的完整聊天截图" class="ocr-preview" hidden id="ocrPreview"/>
 <div class="field-pair"><label class="field"><span>截图左侧称呼</span><input id="ocrLeftName" maxlength="24" value="对方"/></label><label class="field"><span>截图右侧称呼</span><input id="ocrRightName" maxlength="24" value="我"/></label></div>
-<div class="feature-actions"><button class="btn ghost" id="ocrCancel" type="button">停止识别</button><button class="btn primary" id="ocrRecognize" type="button">识别截图</button></div>
-<p class="sheet-note" id="ocrStatus" role="status"></p>
-<label class="field"><span>也可粘贴已识别的文字（空行分段）</span><textarea id="ocrManual" maxlength="20000" placeholder="系统相册里的文字识别结果也可以粘贴到这里。" rows="3"></textarea></label>
-<button class="text-btn" id="ocrParse" type="button">将文字整理为预览</button>
-<div class="import-rows" id="importRows"></div>
-<p class="sheet-note">导入内容会标注为“截图摘录”，发送者仍是你；来源称呼不会冒充房间成员。</p>
-<div class="feature-actions"><button class="btn ghost" id="importClear" type="button">清空预览</button><button class="btn primary" id="importSend" type="button">确认并发送选中内容</button></div>
+<div class="field-pair"><label class="field"><span>提取方向</span><select id="ocrSide"><option value="all">左右两侧</option><option value="left">只发送左侧</option><option value="right">只发送右侧</option></select></label><label class="field"><span>发送方式</span><select id="ocrMode"><option value="separate">逐条整理</option><option value="merged">按日期合并消息</option></select></label></div>
+<div class="feature-actions"><button class="btn ghost" id="ocrCancel" type="button">停止</button><button class="btn primary" id="ocrRecognize" type="button">识别选中截图</button></div>
+<p class="sheet-note" id="ocrStatus" role="status" aria-live="polite"></p>
+<details class="manual-import"><summary>直接粘贴文字</summary><label class="field"><span>空行分段，长段落自动拆分</span><textarea id="ocrManual" maxlength="200000" rows="3"></textarea></label><button class="text-btn" id="ocrParse" type="button">添加到预览</button></details>
+<div class="batch-toolbar"><strong id="ocrDraftCount"></strong><button class="text-btn" id="draftAll">全选预览</button><button class="text-btn" id="draftInvert">反选预览</button></div>
+<div class="import-rows" id="importRows"></div><div class="batch-pages"><button id="draftPrev" type="button">上一页</button><span id="draftPage"></span><button id="draftNext" type="button">下一页</button></div>
+<p class="sheet-note">日期优先来自聊天分隔行；没有聊天日期时标明“截图日期”。原图留在本机，确认后才发送摘录。</p>
+<div class="feature-actions import-footer"><button class="btn ghost" id="importClear" type="button">清空队列</button><button class="btn primary" id="importSend" type="button">确认并发送选中内容</button></div>
 </section>
 </div>
 <div class="scrim" hidden="" id="memoirScrim">
@@ -208,7 +214,9 @@
 <div class="scrim" hidden="" id="composeScrim"><section aria-label="发送选项" aria-modal="true" class="sheet menu-sheet" role="dialog"><button id="dateBtn" type="button">补录显示日期</button><button id="importBtn" type="button">从聊天截图导入</button><button id="recordMenuBtn" type="button">语音 / 图片 / 视频 / 文件</button><button data-close="composeScrim" type="button">收起</button></section></div>
 <div class="scrim" hidden="" id="settingsScrim"><section aria-labelledby="settingsTitle" aria-modal="true" class="sheet feature-sheet" role="dialog"><header class="sheet-head"><h2 id="settingsTitle">让这里像你喜欢的样子</h2><button aria-label="关闭" data-close="settingsScrim">×</button></header><p class="section-label">四季之外，四种心情</p><div class="theme-pills"><button data-theme-pick="ins-light"><span></span><b>Ins Light</b><small>轻白 · 浅粉 · 日光</small></button><button data-theme-pick="ins-dark"><span></span><b>Ins Dark</b><small>炭灰 · 雾紫 · 月色</small></button><button data-theme-pick="warm-light"><span></span><b>Warm Light</b><small>奶油 · 浅杏 · 信纸</small></button><button data-theme-pick="warm-dark"><span></span><b>Warm Dark</b><small>可可 · 焦糖 · 夜灯</small></button></div><p class="section-label">新留言</p><label class="check-field"><input checked="" id="inAppNotify" type="checkbox"/>网页内提示与未读角标</label><label class="check-field"><input id="soundNotify" type="checkbox"/>播放一声轻提示音</label><button class="btn ghost wide" id="notifyBtn" type="button">开启浏览器系统通知</button><button class="btn primary wide" id="pushBtn" type="button">开启当前房间离线推送</button><button class="text-btn" hidden="" id="pushOffBtn" type="button">关闭当前房间离线推送</button><p class="sheet-note" id="notificationStatus" role="status">系统通知仅显示“你有一条新留言”，不显示正文。</p><p class="version-label">小小留言室 · 2.2</p></section></div>
 <div class="toast" id="toast" role="status"></div>
+<div class="scrim" id="collectionScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="collectionTitle"><header class="sheet-head"><h2 id="collectionTitle">我的收藏</h2><button data-close="collectionScrim" aria-label="关闭" type="button">×</button></header><p class="sheet-note">仅保存在这台设备和当前身份下。</p><div id="collectionRows"></div></section></div>
+<div class="scrim" id="forwardScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="forwardTitle"><header class="sheet-head"><h2 id="forwardTitle">转发留言</h2><button data-close="forwardScrim" aria-label="关闭" type="button">×</button></header><label class="field"><span>发送到</span><select id="forwardTarget"></select></label><p class="sheet-note" id="forwardNote" role="status"></p><div id="forwardPreview" class="forward-preview"></div><button class="btn primary wide" id="forwardSend" type="button">确认转发</button></section></div>
 <noscript>留言室需要浏览器启用 JavaScript。</noscript>
-<script src="./app.js?v=2.2.0" type="module"></script>
+<script src="./app.js?v=2.3.0" type="module"></script>
 </body>
 </html>
