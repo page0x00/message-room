@@ -4,7 +4,7 @@ export function newRows(rows,cursor,identity){return rows.map(normalizeMessage).
 export function initNotifications({$,state,toast,persist,recentRooms,renderRecent}){
   let channels=[],generation=0,identity='',audioContext,registration,pollBusy=false;
   const preferences={inApp:true,sound:false,system:false,...storeGet('notifications',{})};
-  const record=room=>storeGet('notice.'+room,{cursor:null,unread:0});
+  const record=room=>storeGet('notice.'+(state.userId||identity||'signed-out')+'.'+room,{cursor:null,unread:0});
   const unread=room=>Number(record(room).unread)||0;
   const active=room=>room===state.room&&state.ready&&state.view==='chat'&&!document.hidden&&$('messages').scrollHeight-$('messages').scrollTop-$('messages').clientHeight<100&&$('relationSpace').inert;
   const status=text=>$('notificationStatus').textContent=text;
@@ -19,11 +19,11 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
     if(navigator.setAppBadge){const task=total?navigator.setAppBadge(total):navigator.clearAppBadge();task?.catch(()=>{});}
     renderRecent();
   }
-  function read(room){if(!room)return;const saved=record(room);if(!saved.unread)return;saved.unread=0;storeSet('notice.'+room,saved);badge();}
+  function read(room){if(!room)return;const saved=record(room);if(!saved.unread)return;saved.unread=0;storeSet('notice.'+(state.userId||identity||'signed-out')+'.'+room,saved);badge();}
   function prime(room,rows){
     const newest=[...rows].sort(compareCreated).at(-1);const saved=record(room);
     if(newest&&(!saved.cursor||compareCreated(newest,saved.cursor)>0))saved.cursor={id:String(newest.id),created_at:newest.created_at};
-    saved.unread=0;storeSet('notice.'+room,saved);badge();
+    saved.unread=0;storeSet('notice.'+(state.userId||identity||'signed-out')+'.'+room,saved);badge();
   }
   function beep(){
     if(!preferences.sound||!audioContext||audioContext.state!=='running')return;
@@ -39,10 +39,10 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
   function ingest(room,rows,{silent=false}={}){
     if(!rows.length)return;
     const saved=record(room),sorted=rows.map(normalizeMessage).sort(compareCreated),newest=sorted.at(-1);
-    const incoming=newRows(sorted,saved.cursor,{userId:state.userId||identity,deviceId:state.deviceId});
+    const incoming=newRows(sorted,saved.cursor,{userId:state.userId||identity});
     if(!saved.cursor||compareCreated(newest,saved.cursor)>0)saved.cursor={id:newest.id,created_at:newest.created_at};
     if(incoming.length&&!active(room))saved.unread=Math.min(9999,(saved.unread||0)+incoming.length);
-    storeSet('notice.'+room,saved);
+    storeSet('notice.'+(state.userId||identity||'signed-out')+'.'+room,saved);
     const records=recentRooms(),recent=records.find(r=>r.room===room);
     if(recent&&(!recent.lastAt||Date.parse(newest.created_at)>=Date.parse(recent.lastAt))){recent.lastAt=newest.created_at;recent.preview=newest.content||newest.media_name||'新留言';persist('recent',records);}
     badge();

@@ -1,7 +1,6 @@
 import {
   parseRoom,
   roomLink,
-  legacyRoom,
   randomId,
   localDate,
   validDate,
@@ -20,6 +19,7 @@ import { initInterface, setTheme } from "./ui-v2.js?v=2.3.0";
 import { initNotifications } from "./notifications.js?v=2.3.0";
 import { initFeatures } from "./features.js?v=2.3.0";
 
+import {initAccount} from "./account.js?v=2.3.0";
 import {initMessageActions} from "./message-actions.js?v=2.3.0";
 let actions;
 
@@ -49,21 +49,6 @@ const state = {
   avatarRevision: 0,
   refreshPromise: null,
 };
-let deviceId;
-try {
-  deviceId = localStorage.getItem("device_id");
-} catch {
-  /* Storage unavailable. */
-}
-if (!deviceId) {
-  deviceId = "u_" + randomId();
-  try {
-    localStorage.setItem("device_id", deviceId);
-  } catch {
-    /* Keep identity for this tab. */
-  }
-}
-state.deviceId = deviceId;
 let toastTimer, noticeResolve, focusBeforeSheet;
 const dailyCopies = [
   "有些话，晚一点抵达也没关系。",
@@ -88,6 +73,7 @@ function toast(text) {
 }
 
 function persist(key, value) {
+  if(key === "recent") key += "." + (state.userId || "signed-out");
   const saved = storeSet(key, value);
   if (!saved) toast("本机存储空间不足或不可用，请先复制保存未发送内容。");
   return saved;
@@ -135,7 +121,7 @@ function defaultName() {
 }
 
 function readProfile(room) {
-  const saved = storeGet("profile." + room, {});
+  const saved = storeGet("profile." + state.userId + "." + room, {});
   return {
     myName: String(saved?.myName || defaultName()).slice(0, 24),
     myAvatar: safeAvatar(saved?.myAvatar),
@@ -145,7 +131,7 @@ function readProfile(room) {
 }
 
 function recentRooms() {
-  const records = storeGet("recent", []);
+  const records = storeGet("recent." + (state.userId || "signed-out"), []);
   return Array.isArray(records)
     ? records.filter((r) => r && parseRoom(r.room)).slice(0, 40)
     : [];
@@ -174,7 +160,7 @@ function renderRecent() {
 
 function saveDraft() {
   if (!state.room) return;
-  persist("draft." + state.room, {
+  persist("draft." + state.userId + "." + state.room, {
     text: $("messageInput").value,
     quotes: state.quotes,
     date: state.date,
@@ -183,7 +169,7 @@ function saveDraft() {
 }
 
 function loadDraft() {
-  const draft = storeGet("draft." + state.room, {});
+  const draft = storeGet("draft." + state.userId + "." + state.room, {});
   $("messageInput").value =
     typeof draft?.text === "string" ? draft.text.slice(0, 5000) : "";
   state.quotes = Array.isArray(draft?.quotes)
@@ -212,7 +198,7 @@ function updateStatus() {
           ? "信已连上 · 左滑看看我们的空间"
           : "等一句你的话 · 左滑打开空间");
   $("sendBtn").disabled =
-    !state.ready ||
+    !state.ready || !state.userId || !state.metadata ||
     state.pending.has(state.room) ||
     !$("messageInput").value.trim();
   $("sendBtn").textContent = state.pending.has(state.room) ? "发送中" : "发送";
@@ -238,7 +224,7 @@ async function openRoom(target) {
     room: valid.room,
     secure: valid.secure,
     invite: target.invite || "",
-    userId: "",
+    userId: state.userId,
     ready: false,
     connected: false,
     messages: [],
@@ -265,11 +251,15 @@ async function openRoom(target) {
   $("connectionNote").textContent = state.secure
     ? "正在验证邀请及成员身份……"
     : "旧版兼容模式：保留原有公开权限，请勿存放私密内容。";
-  loadDraft();
   render();
   setView("chat");
   updateStatus();
   try {
+    const uid = await api.authenticate();
+    if (epoch !== state.epoch) return;
+    state.userId = uid;
+    state.profile = readProfile(state.room);
+    loadDraft();
     if (state.secure) {
       const identity = await api.joinRoom(state.room, state.invite);
       if (epoch !== state.epoch) return;
@@ -285,7 +275,7 @@ async function openRoom(target) {
           myAvatar: safeAvatar(me.avatar_data),
         };
       $("connectionNote").textContent =
-        "凭完整邀请链接加入。匿名身份保存在此浏览器，请勿清除网站数据。";
+        "身份由账号 UUID 确认。绑定邮箱后，可在其他设备登录同一个账号。";
     }
     const room = state.room,
       secure = state.secure;
@@ -339,6 +329,7 @@ async function openRoom(target) {
     state.stop?.();
     state.stop = null;
     state.ready = false;
+    if(error.code === "AUTH_REQUIRED") account.open();
     const extra = state.secure
       ? " 请使用包含 #key= 的完整邀请链接；若尚未升级，请先完成数据库设置。"
       : "";
@@ -469,8 +460,8 @@ function author(message) {
     name: mine
       ? state.profile.myName
       : state.profile.otherName ||
-        member?.display_name ||
-        message.sender_name ||
+        (member?.display_name === "我" ? "朋友" : member?.display_name) ||
+        (message.sender_name === "我" ? (message.author_id ? "朋友" : "历史成员") : message.sender_name) ||
         "朋友",
     image: mine
       ? state.profile.myAvatar
@@ -598,7 +589,7 @@ function resizeComposer() {
 async function send(event) {
   event.preventDefault();
   const content = $("messageInput").value.trim();
-  if (!content || !state.ready || state.pending.has(state.room)) return;
+  if (!content || !state.ready || !state.userId || !state.metadata || state.pending.has(state.room)) return;
   if (!navigator.onLine) {
     toast("网络已断开，草稿已保留。");
     return;
@@ -610,13 +601,14 @@ async function send(event) {
   const snapshot = {
     room: state.room,
     secure: state.secure,
+    userId: state.userId,
     nonce: state.draftNonce,
     text: $("messageInput").value,
   };
   const row = {
     room_id: state.room,
     content,
-    sender: state.secure ? state.userId : state.deviceId,
+    sender: state.userId,
     sender_name: state.profile.myName,
   };
   if (state.metadata)
@@ -624,8 +616,7 @@ async function send(event) {
       display_date: state.date || null,
       reply_to: [...state.quotes],
     });
-  if (state.secure)
-    Object.assign(row, {
+  Object.assign(row, {
       author_id: state.userId,
       client_nonce: snapshot.nonce,
     });
@@ -635,9 +626,9 @@ async function send(event) {
   try {
     const message = await api.sendMessage(row, snapshot.secure);
     // Only clear the exact draft sent. Typing or switching rooms during a request is safe.
-    const saved = storeGet("draft." + snapshot.room, {});
-    if (saved.nonce === snapshot.nonce) persist("draft." + snapshot.room, {});
-    if (state.room === snapshot.room) {
+    const saved = storeGet("draft." + snapshot.userId + "." + snapshot.room, {});
+    if (saved.nonce === snapshot.nonce) persist("draft." + snapshot.userId + "." + snapshot.room, {});
+    if (state.room === snapshot.room && state.userId === snapshot.userId) {
       state.messages = mergeMessages(state.messages, [message]);
       if (
         state.draftNonce === snapshot.nonce &&
@@ -653,7 +644,7 @@ async function send(event) {
       resizeComposer();
     } else toast("上一间房的留言已发送。");
   } catch (error) {
-    if (state.room === snapshot.room)
+    if (state.room === snapshot.room && state.userId === snapshot.userId)
       toast(
         snapshot.secure
           ? errorText(error) + " 草稿保留，可用原草稿重试。"
@@ -676,17 +667,11 @@ async function create() {
     if (state.ready)
       void notice(
         "房间已创建",
-        "从菜单复制完整邀请链接发给朋友。链接持有者可以加入并查看留言，请勿公开发布。匿名身份只保存在当前浏览器；清除网站数据或换设备会成为新的成员。",
+        "从菜单复制完整邀请链接发给朋友。链接持有者可以加入并查看留言，请勿公开发布。请在账号页绑定邮箱，换设备后登录同一邮箱即可找回身份与房间。",
       );
   } catch (error) {
-    const allowLegacy = await notice(
-      "暂时无法创建邀请房间",
-      errorText(error) +
-        "\n你仍可创建旧版房间继续留言，它沿用旧的公开权限，不适合私密内容。",
-      "创建旧版房间",
-      true,
-    );
-    if (allowLegacy) await openRoom({ room: legacyRoom() });
+    if(error.code === 'AUTH_REQUIRED') account.open();
+    else toast(errorText(error));
   } finally {
     state.busy = false;
     $("createBtn").disabled = false;
@@ -785,7 +770,7 @@ async function saveProfile() {
   try {
     if (state.secure) await api.saveMember(room, state.userId, profile);
     if (epoch !== state.epoch) return;
-    if (!persist("profile." + room, profile)) return;
+    if (!persist("profile." + state.userId + "." + room, profile)) return;
     state.profile = profile;
     try {
       localStorage.setItem("nickname", profile.myName);
@@ -1054,6 +1039,17 @@ actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,noti
 renderRecent();
 void notifications.watch();
 const initial = parseRoom(location.href);
+const account=initAccount({$,state,node,toast,showSheet,closeSheet,
+  async onIdentity(user,previous){
+    const target=state.room?{room:state.room,invite:state.invite}:null;
+    if(previous && previous!==user?.id){home();state.messages=[];state.members=[];state.profile={};}
+    state.userId=user?.id||'';
+    renderRecent();void notifications.watch();
+    if(target&&user&&previous!==user.id)await openRoom(target);
+  },
+  onRooms(rows){const local=recentRooms();if(!storeGet('rooms-imported.'+state.userId,false)){for(const r of storeGet('recent',[]))if(parseRoom(r.room)&&!local.some(x=>x.room===r.room))local.push(r);persist('rooms-imported.'+state.userId,true);}for(const row of rows)if(!local.some(r=>r.room===row.room_id))local.push({room:row.room_id,secure:true,title:'留言室',visited:Date.parse(row.joined_at)});persist('recent',local);renderRecent();}
+});
+await account.ready;
 if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);
   void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" });

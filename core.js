@@ -1,4 +1,4 @@
-// Pure view/model helpers. Legacy device identifiers never authorize database access.
+// Ownership is exclusively the authenticated UUID. Legacy rows remain readable.
 export const ROOM_PATTERN = /^[A-Za-z0-9_-]{4,100}$/;
 export const SECURE_PREFIX = "v2_";
 
@@ -58,8 +58,7 @@ export function displayDay(message, view) {
 }
 
 export function isMine(message, identity) {
-  if (message.author_id) return message.author_id === identity.userId;
-  return Boolean(identity.deviceId && message.sender === identity.deviceId);
+  return Boolean(identity.userId && message.author_id === identity.userId);
 }
 
 export function normalizeMessage(row) {
@@ -129,6 +128,7 @@ export function missingSchema(error) {
 }
 
 export function errorText(error) {
+  if(error?.code === "AUTH_REQUIRED") return "请先登录同一个邮箱账号，再进入房间。";
   if (error?.code === "42501")
     return "没有访问权限。请检查邀请链接及数据库权限。";
   if (missingSchema(error)) return "数据库尚未升级，请按 SETUP.md 执行迁移。";

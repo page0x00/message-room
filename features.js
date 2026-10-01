@@ -15,9 +15,9 @@ export function initFeatures(ctx){
   let memoir=null,memoirEdits=0,memoirBusy=false;
   let recorder=null,recordStream=null,recordTimer=null,recordRevision=0;
 
-  const snap=()=>({room:state.room,secure:state.secure,userId:state.userId,deviceId:state.deviceId,epoch:state.epoch,name:state.profile.myName});
+  const snap=()=>({room:state.room,secure:state.secure,userId:state.userId,epoch:state.epoch,name:state.profile.myName});
   const current=s=>state.room===s.room&&state.epoch===s.epoch;
-  const key=(kind,s=snap())=>`${kind}.${s.room}.${s.userId||s.deviceId}`;
+  const key=(kind,s=snap())=>`${kind}.${s.room}.${s.userId}`;
   // The immediately preceding release stored these utilities under raw room keys.
   // Recover to editable local fields; never publish old private values automatically.
   const oldLocal=kind=>{try{return localStorage.getItem(kind+'.'+state.room)||'';}catch{return '';}};
@@ -165,7 +165,7 @@ export function initFeatures(ctx){
   $('eventForm').onsubmit=async event=>{
     event.preventDefault();if($('eventSave').disabled)return;
     const s=snap(),title=$('eventTitle').value.trim(),date=$('eventDate').value;if(!title||!validDate(date))return;
-    const row={id:calendarEdit||eventNonce,room_id:s.room,owner_user_id:s.userId||s.deviceId,title,event_date:date,repeat_yearly:$('eventYearly').checked};
+    const row={id:calendarEdit||eventNonce,room_id:s.room,owner_user_id:s.userId,title,event_date:date,repeat_yearly:$('eventYearly').checked};
     const edit=calendarEdit;$('eventSave').disabled=true;
     try{
       let saved=row;

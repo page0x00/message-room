@@ -15,7 +15,7 @@ export function forwardUnits(rows,mode,name){
 }
 export function initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages}){
   let selected=new Set(),active=false,hold=null,pressed=null,suppressId='',forwardBusy=false,job=null,removed={},favorites={};
-  const key=kind=>`${kind}.${state.room}.${state.userId||state.deviceId}`;
+  const key=kind=>`${kind}.${state.room}.${state.userId}`;
   const list=()=>state.messages.filter(row=>selected.has(row.id));
   const storage=kind=>{const value=storeGet(key(kind),{});return value&&typeof value==='object'&&!Array.isArray(value)?value:{};};
   const clearHold=()=>{clearTimeout(hold);hold=null;pressed=null;};
@@ -77,13 +77,13 @@ export function initMessageActions({$,state,node,toast,persist,showSheet,closeSh
     if(task.units.some(unit=>unit.uncertain)&&!target.secure){$('forwardNote').textContent='旧版房间的发送未获确认，请先在目标房间核对，避免重复发送。';return;}
     forwardBusy=true;$('forwardSend').disabled=true;$('forwardTarget').disabled=true;
     try{
-      const userId=target.secure?(await api.joinRoom(target.room,target.invite)).userId:null;
+      const userId=target.secure?(await api.joinRoom(target.room,target.invite)).userId:await api.authenticate();
       task.target={...target};if(!persist(storageKey,task))return;
       for(const unit of task.units){
         if(unit.sent)continue;if(state.room!==roomAtStart||state.epoch!==epoch)break;
         unit.uncertain=true;if(!persist(storageKey,task))break;
-        const row={room_id:target.room,content:unit.content,sender:target.secure?userId:state.deviceId,sender_name:state.profile.myName};
-        if(target.secure)Object.assign(row,{author_id:userId,client_nonce:unit.nonce,message_type:'text',reply_to:[],display_date:null});
+        const row={room_id:target.room,content:unit.content,sender:userId,sender_name:state.profile.myName};
+        Object.assign(row,{author_id:userId,client_nonce:unit.nonce,message_type:'text',reply_to:[],display_date:null});
         if(unit.source){const blob=await mediaBlob(task.sourceRoom,unit.source.media_path),path=`${target.room}/${userId}/${unit.nonce}`;await api.uploadMedia(path,blob,unit.source.media_mime,n=>{$('forwardNote').textContent=`转发附件 ${Math.round(n*100)}%`;});Object.assign(row,{message_type:unit.source.message_type==='import'?'file':unit.source.message_type,media_path:path,media_name:unit.source.media_name,media_size:blob.size,media_mime:unit.source.media_mime});}
         const message=await api.sendMessage(row,target.secure);unit.sent=true;unit.uncertain=false;persist(storageKey,task);if(target.room===state.room)onMessages([message]);$('forwardNote').textContent=`已转发 ${task.units.filter(u=>u.sent).length} / ${task.units.length} 条`;
       }

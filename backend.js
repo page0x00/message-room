@@ -36,10 +36,13 @@ export async function authenticate() {
   const session = await sb.auth.getSession();
   if (session.error) throw session.error;
   if (session.data.session) return session.data.session.user.id;
-  const result = await sb.auth.signInAnonymously();
+  throw Object.assign(new Error("请先登录同一个邮箱账号，再进入房间。"), {code:"AUTH_REQUIRED"});
+}
+
+export async function joinedRooms() {
+  const result = await client(true).from('room_members').select('room_id,joined_at').eq('user_id',await authenticate());
   if (result.error) throw result.error;
-  if (!result.data.user) throw new Error("No authenticated identity");
-  return result.data.user.id;
+  return result.data || [];
 }
 
 export async function createRoom(name) {
@@ -93,7 +96,7 @@ export async function metadataSupported(room, secure) {
   if (secure) return true;
   const result = await client(false)
     .from("messages")
-    .select("display_date,reply_to")
+    .select("display_date,reply_to,author_id,client_nonce")
     .eq("room_id", room)
     .limit(0);
   if (result.error && !missingSchema(result.error)) throw result.error;
@@ -131,7 +134,10 @@ export async function loadMessages(room, secure, before) {
 }
 
 export async function sendMessage(row, secure) {
-  const sb = client(secure);
+  const sb = client(true);
+  const userId = await authenticate();
+  if (row.author_id !== userId || row.sender !== userId)
+    throw Object.assign(new Error('Invalid message author'), {code:'42501'});
   const result = await sb.from("messages").insert(row).select().single();
   if (!result.error) {
     if(secure)void dispatchPush(result.data.id);
@@ -139,7 +145,7 @@ export async function sendMessage(row, secure) {
   }
   // A response can be lost after INSERT committed. Retry with the same nonce;
   // the unique index prevents a second message, then we retrieve the first.
-  if (secure && result.error.code === "23505") {
+  if (result.error.code === "23505") {
     const existing = await sb
       .from("messages")
       .select("*")

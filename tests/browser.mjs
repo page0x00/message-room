@@ -106,27 +106,31 @@ async function setup({
   notificationFixture = false,
 } = {}) {
   const context = await browser.newContext({ viewport, serviceWorkers:"block" });
-  await context.addInitScript(() => {
+  await context.addInitScript(({user}) => {
     localStorage.setItem("device_id", "test-device");
     localStorage.setItem("nickname", "小辞");
-  });
+    const expiry=Math.floor(Date.now()/1000)+3600;
+    const token=btoa(JSON.stringify({alg:'HS256'}))+'.'+btoa(JSON.stringify({sub:user,exp:expiry,role:'authenticated'}))+'.mock';
+    if(!sessionStorage.getItem('fixture-initialized'))localStorage.setItem('sb-yuzgbxeprpohlakxjcut-auth-token',JSON.stringify({access_token:token,refresh_token:'mock-refresh',expires_at:expiry,expires_in:3600,token_type:'bearer',user:{id:user,is_anonymous:false,email:'account@example.test',aud:'authenticated'}}));
+    sessionStorage.setItem('fixture-initialized','1');
+  },{user});
   if(notificationFixture)await context.addInitScript(()=>{
     window.noticeFixture={requests:0,shown:[]};class TestNotification{static permission='default';static async requestPermission(){window.noticeFixture.requests++;return this.permission='granted';}}
     window.Notification=TestNotification;const reg={showNotification:async(title,options)=>window.noticeFixture.shown.push({title,...options})};Object.defineProperty(navigator,'serviceWorker',{value:{register:async()=>reg,ready:Promise.resolve(reg),addEventListener:()=>{}}});
   });
   const records = rows || [
     fixture(1, "OldRoom1", "你到宿舍了吗？\n一路辛苦了。", "friend-device"),
-    fixture(2, "OldRoom1", "到啦。窗外有很好看的晚霞。", "test-device"),
+    fixture(2, "OldRoom1", "到啦。窗外有很好看的晚霞。", "test-device", {author_id:user}),
   ];
   const memberRows = [
     {
-      user_id: user,
+      user_id: user,room_id:secureId,
       display_name: "小辞",
       avatar_data: null,
       joined_at: "2026-09-19T00:00:00Z",
     },
     {
-      user_id: friend,
+      user_id: friend,room_id:secureId,
       display_name: "朋友",
       avatar_data: null,
       joined_at: "2026-09-19T00:00:00Z",
@@ -224,6 +228,7 @@ async function setup({
         return reply(null);
       }
       if (path.endsWith("/room_members")) {
+        if(url.searchParams.get("select") === "room_id,joined_at") return reply(secure?[memberRows[0]]:[]);
         if (method === "PATCH") {
           Object.assign(memberRows[0], json);
           return reply({ user_id: user });
@@ -293,7 +298,7 @@ async function setup({
           await new Promise((resolve) => setTimeout(resolve, 350));
         if (
           !metadata &&
-          url.searchParams.get("select") === "display_date,reply_to"
+          url.searchParams.get("select") === "display_date,reply_to,author_id,client_nonce"
         )
           return reply(
             { code: "PGRST204", message: "Column does not exist" },
@@ -375,7 +380,7 @@ try {
   );
   await t.join();
   await check(
-    "old room opens without Auth, own messages right / friend left",
+    "legacy history preserved; authenticated UUID places only own messages right",
     async () => {
       assert.equal(control.authCalls, 0);
       assert.equal(await page.locator(".msg").count(), 2);
@@ -476,7 +481,7 @@ try {
       await page.locator("#saveProfile").click();
       assert.ok(await page.locator(".mine .avatar img").count());
       const profile = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem("mailbox.profile.OldRoom1")),
+        JSON.parse(localStorage.getItem("mailbox.profile.00000000-0000-4000-a000-000000000001.OldRoom1")),
       );
       assert.match(profile.myAvatar, /^data:image\/jpeg;base64,/);
       assert.ok(profile.myAvatar.length < 60000);
@@ -558,17 +563,13 @@ try {
   const old = await setup({ metadata: false });
   await old.join();
   await check(
-    "unmigrated database supports old sends and explicitly gates metadata",
+    "unmigrated database stays readable but will not send without a stable author",
     async () => {
       await old.page.locator('[data-message-id="1"] .bubble').dispatchEvent('contextmenu');await old.page.locator('#selectQuote').click();await old.page.locator('#selectionCancel').click();
-      assert.equal(await old.page.locator("#quoteTray").isVisible(), false);
-      await old.page.locator("#messageInput").fill("旧版继续聊");
-      await old.page.locator("#sendBtn").click();
-      await old.page.waitForFunction(
-        () => !document.querySelector("#messageInput").value,
-      );
-      assert.equal(Object.hasOwn(old.control.sends[0], "reply_to"), false);
-      assert.equal(Object.hasOwn(old.control.sends[0], "author_id"), false);
+      assert.equal(await old.page.locator('#quoteTray').isVisible(),false);
+      await old.page.locator('#messageInput').fill('升级后再发送');
+      assert.equal(await old.page.locator('#sendBtn').isDisabled(),true);
+      assert.equal(old.control.sends.length,0);
     },
   );
   await check('previous release local utilities and theme are recovered without publishing',async()=>{
@@ -580,21 +581,12 @@ try {
     await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('[data-close=listenScrim]').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
   });
   await old.page.locator("#backBtn").click();
-  old.control.failAuth = true;
-  await check(
-    "legacy room creation requires explicit privacy acknowledgment",
-    async () => {
-      await old.page.locator("#addRoomBtn").click();
-      await old.page.locator("#createBtn").click();
-      await old.page.locator("#noticeScrim").waitFor({ state: "visible" });
-      assert.match(
-        await old.page.locator("#noticeBody").textContent(),
-        /公开权限/,
-      );
-      await old.page.locator("#noticeCancel").click();
-      assert.equal(await old.page.locator("#home").isVisible(), true);
-    },
-  );
+  await check('signed-out room entry requests login instead of inventing a device identity',async()=>{
+    await old.page.evaluate(()=>{localStorage.removeItem('sb-yuzgbxeprpohlakxjcut-auth-token');});
+    await old.page.reload();await old.page.locator('#addRoomBtn').click();await old.page.locator('#createBtn').click();
+    await old.page.locator('#accountScrim').waitFor({state:'visible'});
+    assert.equal(await old.page.locator('#accountEmail').isVisible(),true);
+  });
   assert.deepEqual(old.errors, []);
   await old.context.close();
 
@@ -608,9 +600,9 @@ try {
     rows: secureRows,
   });
   await check(
-    "secure room uses anonymous Auth and exposes protected profile workflow",
+    "secure room reuses signed-in UUID and exposes protected profile workflow",
     async () => {
-      assert.ok(s.control.authCalls >= 1);
+      assert.equal(await s.page.locator(".mine").count(), 1);
       assert.equal(await s.page.locator(".msg").count(), 2);
       await s.page.locator("#roomInfoBtn").click();
       assert.match(
@@ -621,6 +613,17 @@ try {
       await s.page.locator("#saveProfile").click();
     },
   );
+  await check('second browser restores the same account; matching nickname and device never claim legacy rows',async()=>{
+    const second=await setup({secure:true,rows:[...secureRows,fixture(88,secureId,'未确认的历史','test-device',{sender_name:'我'})]});
+    await second.page.evaluate(()=>{localStorage.setItem('device_id','different-device');localStorage.setItem('nickname','朋友');});
+    await second.page.reload();await second.page.locator('.msg').first().waitFor();
+    assert.equal(await second.page.locator('.msg.mine').count(),1);
+    assert.equal(await second.page.locator('[data-message-id="1"]').evaluate(el=>el.classList.contains('mine')),true);
+    assert.equal(await second.page.locator('[data-message-id="88"]').evaluate(el=>el.classList.contains('mine')),false);
+    assert.ok(!(await second.page.locator('[data-message-id="88"]').innerText()).startsWith('我'));
+    assert.deepEqual(second.errors,[]);await second.context.close();
+  });
+  if(process.env.TEST_STAGE==='identity'){await s.context.close();await browser.close();server.close();console.log('PASS identity stage: second isolated browser verified');process.exit(0);}
   await check(
     "secure sends have authenticated authors and nonce; ambiguous retry deduplicates",
     async () => {

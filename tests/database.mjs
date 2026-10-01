@@ -417,6 +417,16 @@ try {
   await check('Push claims deduplicate client and webhook requests, retry failures, stop delivered retries',async()=>{assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),true);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),false);await db.query("update mailbox_push_deliveries set status='failed',lease_until=now()-interval '2 minutes' where subscription_id=$1",[subId]);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),true);await db.query("update mailbox_push_deliveries set status='sent',lease_until=now()-interval '2 minutes' where subscription_id=$1",[subId]);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),false);});
   await db.exec('reset role');
   await check('single INSTALL.sql transaction reapplies without losing messages or private drafts',async()=>{await db.exec(await readFile(new URL('../supabase/INSTALL.sql',import.meta.url),'utf8'));assert.equal(await scalar("select count(*) from messages where room_id='OLDroom'"),3);assert.equal(await scalar('select body from memoirs where id=$1',[memoirId]),'revised');});
+  await check('UUID-only identity migration preserves unknown historical authors',async()=>{
+    const identity=await readFile(new URL('../supabase/migrations/20261001_identity.sql',import.meta.url),'utf8');
+    await db.exec(identity);await db.exec(identity);
+    assert.equal(await scalar("select author_id from messages where content='legacy sentinel'"),null);
+    await as();await denied("insert into messages(room_id,content,sender) values('OLDroom','spoof','device-id')");
+    await as(a);await insert('OLDroom',a,crypto.randomUUID(),'stable on all devices');
+    await denied("insert into messages(room_id,content,sender,author_id,client_nonce) values('OLDroom','forged',$1,$2,gen_random_uuid())",[a,b]);
+    await denied("update messages set author_id=$1 where content='legacy sentinel'",[a]);
+    await db.exec('reset role');
+  });
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );

@@ -8,8 +8,8 @@ import * as api from './backend.js?v=2.3.0';
 
 export function initScreenshotImport({$,state,node,toast,showSheet,closeSheet,notice,onMessages}){
   let queue=[],drafts=[],plan=null,files=new Map(),supplements=new Map(),controller=null,upload=null,busy=false,collecting=false,revision=0,loadedScope='',page=0,queuePage=0,saveTimer,previewUrl='';
-  const scope=()=>`${state.room}.${state.userId||state.deviceId}`;
-  const snap=()=>({room:state.room,epoch:state.epoch,scope:scope(),secure:state.secure,metadata:state.metadata,user:state.userId,device:state.deviceId,name:state.profile.myName});
+  const scope=()=>`${state.room}.${state.userId}`;
+  const snap=()=>({room:state.room,epoch:state.epoch,scope:scope(),secure:state.secure,metadata:state.metadata,user:state.userId,name:state.profile.myName});
   const current=s=>s.room===state.room&&s.epoch===state.epoch;
   const status=text=>$('ocrStatus').textContent=text;
   const locked=()=>busy||collecting||Boolean(controller);
@@ -122,8 +122,8 @@ export function initScreenshotImport({$,state,node,toast,showSheet,closeSheet,no
     if(!await notice('确认发送整理结果？',`将发送 ${plan.filter(unit=>!unit.sent).length} 条${$('ocrMode').value==='merged'?'合并整理记录（附件单独发送）':'截图摘录'}到当前房间。原截图不会上传，来源称呼保留。`,'确认发送',true)||!current(s))return;
     busy=true;const task=snapshot(),rev=revision;controls();renderDrafts();
     try{for(const unit of task.plan){if(unit.sent)continue;if(!current(s)||rev!==revision)break;if(!s.secure&&unit.attempted)throw new Error('旧版房间无法确认上次是否送达，请先在聊天中核对，避免重复导入。');unit.attempted=true;for(const id of unit.rows){const row=task.drafts.find(d=>d.nonce===id);if(row)row.attempted=true;}if(!await save(s,task))break;
-      const text=(!s.metadata&&unit.date?`[${unit.date}]\n`:'')+unit.text,payload={room_id:s.room,sender:s.secure?s.user:s.device,sender_name:s.name,content:s.secure?text:`[截图摘录 · ${unit.label}]\n${text}`};
-      if(s.metadata)Object.assign(payload,{display_date:unit.date||null,reply_to:[]});if(s.secure)Object.assign(payload,{author_id:s.user,client_nonce:unit.nonce,message_type:'import',import_label:unit.label});
+      const text=(!s.metadata&&unit.date?`[${unit.date}]\n`:'')+unit.text,payload={room_id:s.room,sender:s.user,sender_name:s.name,content:s.secure?text:`[截图摘录 · ${unit.label}]\n${text}`};
+      if(s.metadata)Object.assign(payload,{display_date:unit.date||null,reply_to:[]});Object.assign(payload,{author_id:s.user,client_nonce:unit.nonce,message_type:'import',import_label:unit.label});
       if(unit.fileMeta){upload=new AbortController();const path=`${s.room}/${s.user}/${unit.nonce}`;await api.uploadMedia(path,supplements.get(unit.fileRow),unit.fileMeta.mime,n=>{if(current(s))status(`补充媒体上传 ${Math.round(n*100)}%`);},upload.signal);upload=null;if(!current(s)||rev!==revision)break;Object.assign(payload,{message_type:unit.fileMeta.type,media_path:path,media_name:unit.fileMeta.name,media_mime:unit.fileMeta.mime,media_size:unit.fileMeta.size});}
       const message=await api.sendMessage(payload,s.secure);unit.sent=true;
       for(const id of unit.rows){const row=task.drafts.find(d=>d.nonce===id);if(row)row.sent=task.plan.filter(u=>u.rows.includes(id)).every(u=>u.sent);}

@@ -64,7 +64,9 @@ test("ownership prefers authenticated author; device/name cannot spoof it", () =
     isMine({ author_id: "auth2", sender: "local1" }, identity),
     false,
   );
-  assert.ok(isMine({ sender: "local1" }, identity));
+  assert.equal(isMine({ sender: "local1" }, identity), false);
+  assert.equal(isMine({author_id:null}, {userId:null}),false);
+  assert.equal(isMine({sender_name:"我",sender:"auth1"},identity),false);
   assert.equal(isMine({ sender: "nickname" }, identity), false);
 });
 const row = (id, date, content = "内容") => ({
