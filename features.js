@@ -1,3 +1,4 @@
+import {imageHash} from './screenshot-store.js?v=2.3.0';
 import {musicStore} from './local-music.js?v=2.3.0';
 import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.3.0';
 import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText} from './feature-core.js?v=2.3.0';
@@ -9,6 +10,7 @@ export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
   const audio=$('listenAudio');
   const screenshots=initScreenshotImport(ctx);
+  let mediaQueue=[];
   let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
   let calendar=[],calendarBusy=false,calendarEdit=null,eventNonce=randomId();
   let song=null,songRevision=0,listenSession=null,listenOffset=0,listenBusy=false,listenReading=false,lyrics=[],lyricIndex=-1;
@@ -30,7 +32,7 @@ export function initFeatures(ctx){
 
   // Attachment transactions keep the same nonce, file and caption across retries.
   function mediaControls(){
-    $('attachmentSend').disabled=!media||mediaBusy||!state.secure;
+    $('attachmentSend').disabled=!mediaQueue.some(x=>x.selected&&!x.sent)||mediaBusy||!state.secure;
     $('attachmentSend').textContent=media?.attempted?'重试上传并发送':'上传并发送';
     $('attachmentFile').disabled=mediaBusy;
     $('attachmentCaption').disabled=mediaBusy||Boolean(media?.attempted);
@@ -46,20 +48,40 @@ export function initFeatures(ctx){
     if(mediaBusy||!selected)return;const s=snap();
     try{
       const info=fileInfo(selected);
-      if(media?.attempted && !(await notice('更换附件？','上次发送未获确认时，请先刷新留言核对。更换会建立一条新的发送记录。','更换',true)))return;
       if(!current(s))return;
-      if(media?.url)URL.revokeObjectURL(media.url);
+      if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);
       const nonce=randomId();media={file:selected,info,nonce,path:`${state.room}/${state.userId}/${nonce}`,url:URL.createObjectURL(selected),attempted:false,caption:''};
-      $('attachmentCaption').value='';$('attachmentPreview').replaceChildren(node('p','',info.name+' · '+bytesLabel(info.size)));
-      if(['image','audio','video'].includes(info.type)){
-        const element=node(info.type==='image'?'img':info.type);element.src=media.url;
-        if(info.type==='image')element.alt='附件预览';else{element.controls=true;element.preload='metadata';}
-        $('attachmentPreview').append(element);
-      }
-      $('attachmentProgress').hidden=true;$('attachmentStatus').textContent='准备好了，点击“上传并发送”。';mediaControls();
+      paintAttachment();
     }catch(e){fail(e);}
   }
-  $('attachmentFile').onchange=()=>chooseAttachment($('attachmentFile').files[0]);
+  function paintAttachment(){
+    if(!media)return;const {info}=media;
+    $('attachmentCaption').value=media.caption||'';
+    $('attachmentPreview').replaceChildren(node('p','',info.name+' · '+bytesLabel(info.size)));
+    if(['image','audio','video'].includes(info.type)){
+      media.url ||= URL.createObjectURL(media.file);
+      const element=node(info.type==='image'?'img':info.type);element.src=media.url;
+      if(info.type==='image')element.alt='附件预览';else{element.controls=true;element.preload='metadata';}
+      $('attachmentPreview').append(element);
+    }
+    $('attachmentProgress').hidden=true;mediaControls();
+  }
+  const processedKey=()=>`files-processed.${state.room}.${state.userId}`;
+  function queueRender(){
+    $('attachmentQueue').replaceChildren();
+    for(const item of mediaQueue){const row=node('div','attachment-queue-row'),label=node('label'),check=node('input');check.type='checkbox';check.checked=item.selected;check.disabled=mediaBusy||item.sent;check.onchange=()=>{item.selected=check.checked;mediaControls();};label.append(check,node('span','',item.file.name));row.append(label,node('small','',item.sent?'已发送':item.processed?'已导入过':bytesLabel(item.file.size)));const preview=node('button','text-btn','预览');preview.disabled=mediaBusy;preview.onclick=()=>void previewItem(item);row.append(preview);$('attachmentQueue').append(row);}
+    $('attachmentCount').textContent=`${mediaQueue.filter(x=>x.selected&&!x.sent).length} / ${mediaQueue.length} 个待发送`;mediaControls();
+  }
+  async function previewItem(item){if(mediaBusy)return;if(media&&!media.attempted)media.caption=$('attachmentCaption').value;if(!item.pending){await chooseAttachment(item.file);item.pending=media;}else{media=item.pending;paintAttachment();}}
+  async function addAttachmentFiles(source){if(mediaBusy)return;const s=snap(),known=storeGet(processedKey(),{});$('attachmentStatus').textContent='扫描文件…';
+    try{for await(const item of source){const file=item.file||item;try{fileInfo(file);}catch(e){toast(e.message);continue;}const hash=await imageHash(file);if(!current(s))return;if(mediaQueue.some(x=>x.hash===hash))continue;mediaQueue.push({file,hash,selected:!known[hash],processed:!!known[hash],sent:false});}
+      queueRender();const first=mediaQueue.find(x=>x.selected&&!x.sent);if(first)await previewItem(first);$('attachmentStatus').textContent='扫描完成。勾选文件并确认后才上传。';
+    }catch(e){fail(e);}}
+  $('attachmentFile').onchange=()=>void addAttachmentFiles([...$('attachmentFile').files]);
+  async function* walkFiles(handle){for await(const entry of handle.values()){if(entry.kind==='directory')yield* walkFiles(entry);else yield await entry.getFile();}}
+  $('attachmentFolder').onclick=async()=>{if(window.showDirectoryPicker){try{await addAttachmentFiles(walkFiles(await window.showDirectoryPicker({mode:'read'})));}catch(e){if(e.name!=='AbortError')$('attachmentFile').click();}}else if('webkitdirectory' in $('attachmentDirectory')&&!/Android/i.test(navigator.userAgent)){$('attachmentDirectory').value='';$('attachmentDirectory').click();}else{toast('当前浏览器不支持目录，已打开多文件选择。');$('attachmentFile').click();}};
+  $('attachmentDirectory').onchange=()=>void addAttachmentFiles([...$('attachmentDirectory').files]);
+  for(const [id,fn] of [['attachmentAll',()=>true],['attachmentInvert',x=>!x.selected],['attachmentNew',x=>!x.processed]])$(id).onclick=()=>{for(const x of mediaQueue)if(!x.sent)x.selected=fn(x);queueRender();};
   function endRecording(discard=false){
     if(discard)recordRevision++;
     clearTimeout(recordTimer);recordTimer=null;
@@ -77,7 +99,7 @@ export function initFeatures(ctx){
       recordStream=stream;const mime=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'].find(type=>MediaRecorder.isTypeSupported(type));
       recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);const chunks=[];let size=0;
       recorder.ondataavailable=event=>{if(event.data.size){chunks.push(event.data);size+=event.data.size;if(size>19*1024*1024)endRecording();}};
-      recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());if(revision!==recordRevision||!current(s))return;const type=(recorder.mimeType||mime||'audio/webm').split(';')[0];const file=new File(chunks,`语音-${Date.now()}.${type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm'}`,{type});void chooseAttachment(file);$('recordStatus').textContent='语音已录好，试听后再发送。';};
+      recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());if(revision!==recordRevision||!current(s))return;const type=(recorder.mimeType||mime||'audio/webm').split(';')[0];const file=new File(chunks,`语音-${Date.now()}.${type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm'}`,{type});void addAttachmentFiles([file]);$('recordStatus').textContent='语音已录好，试听后再发送。';};
       recorder.onerror=()=>{endRecording(true);$('recordStatus').textContent='录音中断，请重新录制或选择已有音频。';};
       recorder.start(1000);$('recordStop').hidden=false;$('recordStatus').textContent='正在录音，最长 3 分钟。结束后可以试听。';recordTimer=setTimeout(()=>endRecording(),180000);
     }catch(e){endRecording(true);$('recordStatus').textContent=e.name==='NotAllowedError'?'没有获得麦克风权限，可以在网站设置中开启。':'录音未能开始，请检查麦克风。';}
@@ -85,20 +107,23 @@ export function initFeatures(ctx){
   $('recordStop').onclick=()=>endRecording();
   $('attachmentCancel').onclick=()=>mediaController?.abort();
   $('attachmentSend').onclick=async()=>{
-    if(!media||mediaBusy||!state.secure||!requireRoom())return;
-    const s=snap(),pending=media,controller=new AbortController();mediaController=controller;mediaBusy=true;
-    if(!pending.attempted){pending.caption=$('attachmentCaption').value.trim();pending.date=state.date||null;pending.quotes=[...state.quotes];}pending.attempted=true;mediaControls();
-    $('attachmentProgress').hidden=false;$('attachmentProgress').value=0;$('attachmentStatus').textContent='正在上传……';
-    try{
-      await api.uploadMedia(pending.path,pending.file,pending.info.mime,progress=>{if(current(s)){$('attachmentProgress').value=Math.round(progress*100);$('attachmentStatus').textContent=`上传 ${Math.round(progress*100)}%`; }},controller.signal);
+    const selected=mediaQueue.filter(x=>x.selected&&!x.sent);
+    if(!selected.length||mediaBusy||!state.secure||!requireRoom())return;
+    const s=snap(),controller=new AbortController(),caption=$('attachmentCaption').value.trim();mediaController=controller;mediaBusy=true;mediaControls();
+    $('attachmentProgress').hidden=false;$('attachmentProgress').value=0;
+    try{for(const item of selected){
       if(!current(s)||controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
-      $('attachmentStatus').textContent='文件已上传，正在确认留言……';
+      if(!item.pending){const nonce=randomId();item.pending={file:item.file,info:fileInfo(item.file),nonce,path:`${s.room}/${s.userId}/${nonce}`,caption,date:state.date||null,quotes:[...state.quotes]};}
+      const pending=item.pending;media=pending;if(!pending.attempted){pending.caption=caption;pending.date=state.date||null;pending.quotes=[...state.quotes];}pending.attempted=true;
+      await api.uploadMedia(pending.path,pending.file,pending.info.mime,progress=>{if(current(s)){$('attachmentProgress').value=Math.round(progress*100);$('attachmentStatus').textContent=`${item.file.name} · ${Math.round(progress*100)}%`; }},controller.signal);
+      if(!current(s)||controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
       const message=await api.sendMessage({room_id:s.room,sender:s.userId,author_id:s.userId,sender_name:s.name,client_nonce:pending.nonce,content:pending.caption,message_type:pending.info.type,media_path:pending.path,media_name:pending.info.name,media_mime:pending.info.mime,media_size:pending.info.size,display_date:pending.date,reply_to:pending.quotes},true);
-      if(current(s)){
-        onMessages([message]);URL.revokeObjectURL(pending.url);media=null;$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();$('attachmentStatus').textContent='已发送';closeSheet('attachmentScrim');toast('附件已发送。');
-      }
-    }catch(e){if(current(s))$('attachmentStatus').textContent=e.name==='AbortError'?'已停止。若文件已传完，可用原附件重试；不会重复生成留言。':messageError(e)+' 文件和附言已保留，点击重试。';}
-    finally{if(current(s)){mediaBusy=false;mediaController=null;mediaControls();}}
+      item.sent=true;item.selected=false;const known=storeGet(processedKey(),{});known[item.hash]=Date.now();persist(processedKey(),known);
+      if(current(s))onMessages([message]);if(pending.url){URL.revokeObjectURL(pending.url);pending.url='';}
+    }
+    if(current(s)){media=null;$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();$('attachmentStatus').textContent='已发送';closeSheet('attachmentScrim');toast(`已发送 ${selected.length} 个附件。`);}
+    }catch(e){if(current(s))$('attachmentStatus').textContent=e.name==='AbortError'?'已停止，已完成的文件不会重发。':messageError(e)+' 未完成的文件和附言已保留，可重试。';}
+    finally{if(current(s)){mediaBusy=false;mediaController=null;queueRender();}}
   };
   function renderMedia(message,bubble){
     if(message.import_label)bubble.append(node('div','import-label',`截图摘录 · ${message.import_label}（由留言者导入）`));
@@ -298,10 +323,10 @@ export function initFeatures(ctx){
     try{if(s.secure)await data.deleteMemoir(s.room,value.id,value.revision);else if(!persist(key('memoirs',s),storeGet(key('memoirs',s),[]).filter(row=>row.id!==value.id)))return;if(current(s)){fillMemoir(freshMemoir());await listMemoirs();toast('回忆录已删除。');}}catch(e){if(current(s))fail(e);}
   };
 
-  function roomChanged(){
+  function roomChanged(){for(const x of mediaQueue)if(x.pending?.url)URL.revokeObjectURL(x.pending.url);mediaQueue=[];
     endRecording(true);mediaObserver.disconnect();daysCard('');
     stopSubscription?.();stopSubscription=null;mediaController?.abort();mediaController=null;mediaBusy=false;
-    if(media?.url)URL.revokeObjectURL(media.url);media=null;
+    if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);media=null;
     for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();
     calendar=[];calendarBusy=false;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
     clearSong();listenSession=null;listenOffset=0;listenBusy=false;listenReading=false;

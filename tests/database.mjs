@@ -427,6 +427,27 @@ try {
     await denied("update messages set author_id=$1 where content='legacy sentinel'",[a]);
     await db.exec('reset role');
   });
+  await check('structured cards validate media scope, preserve order and enforce author/revision edits',async()=>{
+    const migration=await readFile(new URL('../supabase/migrations/20261002_message_cards.sql',import.meta.url),'utf8');await db.exec(migration);await db.exec(migration);
+    await as(a);const payload={version:1,kind:'screenshot',entries:[{id:'a',text:'first',label:'对方',side:'left',date:'2026-09-20',time:'10:02'},{id:'b',text:'second',label:'我',side:'right',date:'2026-09-20',time:'10:03'}],originals:[]};
+    const card=(await db.query("insert into messages(room_id,sender,author_id,client_nonce,content,message_type,message_payload) values($1,$2::text,$2::uuid,gen_random_uuid(),'first','screenshot',$3) returning *",[room.room_id,a,JSON.stringify(payload)])).rows[0];
+    payload.entries[0].text='corrected';const edited=await scalar('select mailbox_edit_card($1,$2,1,$3)',[room.room_id,String(card.id),JSON.stringify(payload)]);assert.equal(edited.card_revision,2);assert.equal(new Date(edited.created_at).getTime(),new Date(card.created_at).getTime());assert.equal(edited.message_payload.entries[1].text,'second');
+    await denied('select mailbox_edit_card($1,$2,1,$3)',[room.room_id,String(card.id),JSON.stringify(payload)],'40001');
+    payload.originals=[{path:'v2_other/'+a+'/'+crypto.randomUUID(),size:10,mime:'image/png'}];await denied('select mailbox_edit_card($1,$2,2,$3)',[room.room_id,String(card.id),JSON.stringify(payload)],'22023');
+    await as(b);await denied('select mailbox_edit_card($1,$2,2,$3)',[room.room_id,String(card.id),JSON.stringify(payload)]);
+    await db.exec('reset role');
+  });
+  await check('card originals are private before publishing, shared only with members and protected from replacement',async()=>{
+    await as(a);const path=`${room.room_id}/${a}/${crypto.randomUUID()}`;
+    await db.query("insert into storage.objects(bucket_id,name,metadata) values('message-media',$1,$2)",[path,JSON.stringify({size:18,mimetype:'image/png'})]);
+    await as(b);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);
+    await as(a);const payload={version:1,kind:'screenshot',entries:[{id:'photo-source',text:'saved screenshot',side:'left'}],originals:[{path,size:18,mime:'image/png'}]};
+    await db.query("insert into messages(room_id,sender,author_id,client_nonce,content,message_type,message_payload) values($1,$2::text,$2::uuid,gen_random_uuid(),'saved screenshot','screenshot',$3)",[room.room_id,a,JSON.stringify(payload)]);
+    assert.equal((await db.query('delete from storage.objects where name=$1 returning id',[path])).rows.length,0);
+    await as(b);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),1);
+    await as(c);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);
+    await as();assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);await db.exec('reset role');
+  });
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );

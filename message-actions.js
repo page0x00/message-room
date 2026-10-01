@@ -1,16 +1,17 @@
+import {cardData,cardPreview} from './message-cards.js?v=2.3.0';
 import {storeGet,isMine,randomId,displayDay,compareCreated} from './core.js?v=2.3.0';
 import {splitText} from './ocr-layout.js?v=2.3.0';
 import * as api from './backend.js?v=2.3.0';
 import {mediaBlob} from './feature-backend.js?v=2.3.0';
 
 export function forwardUnits(rows,mode,name){
-  const units=[];let merged=null;
-  for(const row of [...rows].sort(compareCreated)){
-    const label=`${name(row)} · ${displayDay(row,'diary')}`;
-    if(mode==='merged'&&!row.media_path){for(const text of splitText(`${label}\n${row.content}`,4500)){
-      if(!merged||merged.content.length+text.length+2>4900){merged={nonce:randomId(),content:'【合并转发】',sent:false};units.push(merged);}merged.content+='\n\n'+text;
-    }}else{merged=null;const parts=splitText(`[转发 · ${label}]\n${row.content||row.media_name||'附件'}`,4900);for(let index=0;index<parts.length;index++)units.push({nonce:randomId(),content:parts[index],source:row.media_path&&index===0?row:null,sent:false});}
-  }
+  const sorted=[...rows].sort(compareCreated),units=[];
+  const entry=row=>({id:randomId(),source_id:String(row.id),author_id:row.author_id||null,label:name(row),date:displayDay(row,'diary'),time:new Date(row.created_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),created_at:row.created_at,side:row.side||'unknown',text:row.content||'',message_type:row.message_type||'text',media_path:row.media_path||null,media_name:row.media_name||null,media_size:row.media_size||null,media_mime:row.media_mime||null});
+  if(mode==='merged'){
+    const entries=sorted.flatMap(row=>cardData(row)?.entries||[entry(row)]);
+    for(let i=0;i<entries.length;i+=80){const payload={version:1,kind:'forward',entries:entries.slice(i,i+80).map(e=>({...e,id:randomId()})),originals:[]};units.push({nonce:randomId(),content:cardPreview(payload),payload,sent:false});}
+  }else for(const row of sorted){const data=cardData(row);if(data){const payload={...structuredClone(data),kind:'forward',legacy:undefined};units.push({nonce:randomId(),content:cardPreview(payload),payload,sent:false});}else units.push({nonce:randomId(),content:row.content||'',source:row.media_path?row:null,sent:false});}
+  for(const unit of units)if(unit.payload)unit.copies=[...unit.payload.entries.map((e,index)=>e.media_path?{kind:'entry',index,path:e.media_path,mime:e.media_mime,nonce:randomId()}:null),...(unit.payload.originals||[]).map((e,index)=>({kind:'original',index,path:e.path,mime:e.mime,nonce:randomId()}))].filter(Boolean);
   return units;
 }
 export function initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages}){
@@ -33,7 +34,7 @@ export function initMessageActions({$,state,node,toast,persist,showSheet,closeSh
   function exit(){active=false;selected.clear();paint();}
   const pane=$('messages');
   pane.addEventListener('pointerdown',event=>{
-    if(event.button!==0||event.target.closest('button,a,input,textarea,select,audio,video,summary'))return;
+    if(event.button!==0||(event.target.closest('button,a,input,textarea,select,audio,video,summary')&&!event.target.closest('.message-record-card')))return;
     const row=event.target.closest('[data-message-id]');if(!row)return;clearHold();pressed={id:row.dataset.messageId,x:event.clientX,y:event.clientY};
     suppressId='';hold=setTimeout(()=>{if(!pressed)return;const id=pressed.id;clearHold();suppressId=id;enter(id);},450);
   },{passive:true});
@@ -73,7 +74,7 @@ export function initMessageActions({$,state,node,toast,persist,showSheet,closeSh
   $('forwardSend').onclick=async()=>{
     if(forwardBusy||!job)return;const task=job,roomAtStart=state.room,epoch=state.epoch,storageKey=key('forward');
     const target=task.target||recentRooms().find(row=>row.room===$('forwardTarget').value);if(!target){toast('请选择一个已加入的房间。');return;}
-    if(!target.secure&&task.units.some(unit=>unit.source)){toast('带附件的转发请选择邀请房间。');return;}
+    if(!target.secure&&task.units.some(unit=>unit.source||unit.payload)){toast('带附件的转发请选择邀请房间。');return;}
     if(task.units.some(unit=>unit.uncertain)&&!target.secure){$('forwardNote').textContent='旧版房间的发送未获确认，请先在目标房间核对，避免重复发送。';return;}
     forwardBusy=true;$('forwardSend').disabled=true;$('forwardTarget').disabled=true;
     try{
@@ -84,6 +85,12 @@ export function initMessageActions({$,state,node,toast,persist,showSheet,closeSh
         unit.uncertain=true;if(!persist(storageKey,task))break;
         const row={room_id:target.room,content:unit.content,sender:userId,sender_name:state.profile.myName};
         Object.assign(row,{author_id:userId,client_nonce:unit.nonce,message_type:'text',reply_to:[],display_date:null});
+        if(unit.payload){
+          for(const asset of unit.copies||[]){if(asset.copied)continue;const blob=await mediaBlob(task.sourceRoom,asset.path),path=`${target.room}/${userId}/${asset.nonce}`;await api.uploadMedia(path,blob,asset.mime||'application/octet-stream',n=>{$('forwardNote').textContent=`复制附件 ${Math.round(n*100)}%`;});
+            if(asset.kind==='entry')unit.payload.entries[asset.index].media_path=path;else unit.payload.originals[asset.index].path=path;asset.copied=true;persist(storageKey,task);
+          }
+          Object.assign(row,{message_type:'forward',message_payload:unit.payload,content:cardPreview(unit.payload)||'聊天记录'});
+        }
         if(unit.source){const blob=await mediaBlob(task.sourceRoom,unit.source.media_path),path=`${target.room}/${userId}/${unit.nonce}`;await api.uploadMedia(path,blob,unit.source.media_mime,n=>{$('forwardNote').textContent=`转发附件 ${Math.round(n*100)}%`;});Object.assign(row,{message_type:unit.source.message_type==='import'?'file':unit.source.message_type,media_path:path,media_name:unit.source.media_name,media_size:blob.size,media_mime:unit.source.media_mime});}
         const message=await api.sendMessage(row,target.secure);unit.sent=true;unit.uncertain=false;persist(storageKey,task);if(target.room===state.room)onMessages([message]);$('forwardNote').textContent=`已转发 ${task.units.filter(u=>u.sent).length} / ${task.units.length} 条`;
       }

@@ -1,13 +1,13 @@
 import { validDate, localDate, displayDay, projectMessages } from './core.js?v=2.3.0';
 
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','audio/mpeg','audio/mp4','audio/ogg','audio/wav','audio/x-wav','audio/webm','audio/flac','video/mp4','video/webm','application/pdf','text/plain','application/zip','application/x-zip-compressed','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation']);
+const allowed = new Set(['application/octet-stream','video/quicktime','audio/aac','image/jpeg','image/png','image/webp','image/gif','audio/mpeg','audio/mp4','audio/ogg','audio/wav','audio/x-wav','audio/webm','audio/flac','video/mp4','video/webm','application/pdf','text/plain','application/zip','application/x-zip-compressed','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation']);
 const byExtension = {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',mp3:'audio/mpeg',m4a:'audio/mp4',ogg:'audio/ogg',wav:'audio/wav',flac:'audio/flac',mp4:'video/mp4',webm:'video/webm',pdf:'application/pdf',txt:'text/plain',zip:'application/zip',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation'};
 export function fileInfo(file) {
   if (!file || !file.size || file.size > MAX_FILE_SIZE) throw new Error('请选择不超过 20 MB 的非空文件。');
   const ext = String(file.name).split('.').pop().toLowerCase();
   const type=String(file.type||'').split(';')[0];
-  const mime = allowed.has(type) ? type : (!type || type === 'application/octet-stream') ? byExtension[ext] : '';
+  const mime = allowed.has(type) && type !== 'application/octet-stream' ? type : byExtension[ext] || 'application/octet-stream';
   if (!mime || !allowed.has(mime)) throw new Error('支持常见图片、音视频、PDF、TXT、Office 和 ZIP 文件。');
   return {name: String(file.name).replace(/[\x00-\x1f\\/]/g,'_').slice(0,180) || '附件',mime,size:file.size,type:mime.startsWith('image/')?'image':mime.startsWith('audio/')?'audio':mime.startsWith('video/')?'video':'file'};
 }

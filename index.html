@@ -133,7 +133,7 @@
 <section aria-labelledby="attachmentTitle" aria-modal="true" class="sheet feature-sheet" role="dialog">
 <header class="sheet-head"><h2 id="attachmentTitle">给这封信加个附件</h2><button aria-label="关闭附件" data-close="attachmentScrim" type="button">×</button></header><div class="record-controls"><button class="btn ghost" id="recordStart" type="button">录一段语音</button><button class="btn ghost" hidden="" id="recordStop" type="button">结束录音并预览</button><span id="recordStatus" role="status"></span></div>
 <p class="sheet-note">图片、音视频、PDF、TXT、Office 或 ZIP，单个不超过 20 MB。附件仅供邀请房间成员访问。</p>
-<label class="file-picker">选择附件<input accept="image/jpeg,image/png,image/webp,image/gif,audio/*,video/mp4,video/webm,.pdf,.txt,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx" id="attachmentFile" type="file"/></label>
+<div class="feature-actions"><label class="file-picker">选择文件<input id="attachmentFile" type="file" multiple/></label><button class="btn ghost" id="attachmentFolder" type="button">导入文件夹</button></div><input id="attachmentDirectory" type="file" webkitdirectory multiple hidden/><div class="batch-toolbar"><button class="text-btn" id="attachmentAll">全选</button><button class="text-btn" id="attachmentInvert">反选</button><button class="text-btn" id="attachmentNew">仅新文件</button><span id="attachmentCount"></span></div><div id="attachmentQueue" class="attachment-queue"></div>
 <div class="attachment-preview" id="attachmentPreview"></div>
 <label class="field"><span>附言（可选）</span><textarea id="attachmentCaption" maxlength="5000" placeholder="也想告诉你……" rows="3"></textarea></label>
 <progress aria-label="附件上传进度" hidden="" id="attachmentProgress" max="100" value="0"></progress>
@@ -176,22 +176,22 @@
 <div class="scrim" hidden="" id="importScrim">
 <section aria-labelledby="importTitle" aria-modal="true" class="sheet feature-sheet wide-sheet" role="dialog">
 <header class="sheet-head"><h2 id="importTitle">把截图里的话留下来</h2><button aria-label="关闭截图导入" data-close="importScrim" type="button">×</button></header>
-<p class="sheet-note">识别在本机完成，原图不会上传。首次需要下载识别模型；每段文字、来源和日期都请核对，确认后才会发送。</p>
-<div class="feature-actions"><button class="btn primary" id="ocrChoose" type="button">选择截图文件夹</button><button class="btn ghost" id="ocrChooseMany" type="button">多选截图文件</button></div>
-<input id="ocrFile" type="file" multiple hidden/><input id="ocrDirectory" type="file" webkitdirectory multiple hidden/>
+<p class="sheet-note">识别在本机完成。先核对文字、左右双方、日期与时间，确认后才将摘录卡片和原截图发送到当前邀请房间。</p>
+<div class="feature-actions"><button class="btn primary" id="ocrChoose" type="button">导入截图文件夹</button><button class="btn ghost" id="ocrChooseMany" type="button">选择截图（多选）</button></div>
+<input id="ocrFile" type="file" accept="image/*" multiple hidden/><input id="ocrDirectory" type="file" webkitdirectory multiple hidden/>
 <p class="sheet-note">自动按文件名中的时间排序；没有时间的使用文件修改时间。目录不可用时自动切换多选，完整截图无需裁剪。</p>
 <div class="batch-toolbar"><strong id="ocrQueueCount"></strong><button class="text-btn" id="ocrAll">全选</button><button class="text-btn" id="ocrInvert">反选</button><button class="text-btn" id="ocrNewOnly">只选新截图</button></div>
 <label class="check-field"><input type="checkbox" id="ocrSkipProcessed" checked/>跳过已处理截图（按文件内容去重）</label>
 <div class="screenshot-queue" id="ocrQueue"></div><div class="batch-pages"><button id="queuePrev" type="button">上一页</button><span id="queuePage"></span><button id="queueNext" type="button">下一页</button></div>
 <img alt="待识别的完整聊天截图" class="ocr-preview" hidden id="ocrPreview"/>
 <div class="field-pair"><label class="field"><span>截图左侧称呼</span><input id="ocrLeftName" maxlength="24" value="对方"/></label><label class="field"><span>截图右侧称呼</span><input id="ocrRightName" maxlength="24" value="我"/></label></div>
-<div class="field-pair"><label class="field"><span>提取方向</span><select id="ocrSide"><option value="all">左右两侧</option><option value="left">只发送左侧</option><option value="right">只发送右侧</option></select></label><label class="field"><span>发送方式</span><select id="ocrMode"><option value="separate">逐条整理</option><option value="merged">按日期合并消息</option></select></label></div>
+<div class="field-pair"><label class="field"><span>提取方向</span><select id="ocrSide"><option value="all">左右两侧</option><option value="left">只发送左侧</option><option value="right">只发送右侧</option></select></label><label class="field"><span>发送方式</span><select id="ocrMode"><option value="merged">整理成一张摘录卡片</option><option value="separate">每条独立摘录卡片</option></select></label></div>
 <div class="feature-actions"><button class="btn ghost" id="ocrCancel" type="button">停止</button><button class="btn primary" id="ocrRecognize" type="button">识别选中截图</button></div>
 <p class="sheet-note" id="ocrStatus" role="status" aria-live="polite"></p>
 <details class="manual-import"><summary>直接粘贴文字</summary><label class="field"><span>空行分段，长段落自动拆分</span><textarea id="ocrManual" maxlength="200000" rows="3"></textarea></label><button class="text-btn" id="ocrParse" type="button">添加到预览</button></details>
 <div class="batch-toolbar"><strong id="ocrDraftCount"></strong><button class="text-btn" id="draftAll">全选预览</button><button class="text-btn" id="draftInvert">反选预览</button></div>
 <div class="import-rows" id="importRows"></div><div class="batch-pages"><button id="draftPrev" type="button">上一页</button><span id="draftPage"></span><button id="draftNext" type="button">下一页</button></div>
-<p class="sheet-note">日期优先来自聊天分隔行；没有聊天日期时标明“截图日期”。原图留在本机，确认后才发送摘录。</p>
+<p class="sheet-note">日期优先来自聊天分隔行；没有聊天日期时标明“截图日期”。确认后原图作为私有附件随卡片发送，房间成员可在详情查看。</p>
 <div class="feature-actions import-footer"><button class="btn ghost" id="importClear" type="button">清空队列</button><button class="btn primary" id="importSend" type="button">确认并发送选中内容</button></div>
 </section>
 </div>

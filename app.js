@@ -19,6 +19,7 @@ import { initInterface, setTheme } from "./ui-v2.js?v=2.3.0";
 import { initNotifications } from "./notifications.js?v=2.3.0";
 import { initFeatures } from "./features.js?v=2.3.0";
 
+import {initMessageCards} from "./message-cards.js?v=2.3.0";
 import {initAccount} from "./account.js?v=2.3.0";
 import {initMessageActions} from "./message-actions.js?v=2.3.0";
 let actions;
@@ -514,8 +515,7 @@ function render({ bottom = false, stick = false } = {}) {
         );
       referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
-    features.renderMedia(message,bubble);
-    if(/^【(?:合并转发|截图合并整理)】/.test(message.content)){const record=node('details','forward-record');record.append(node('summary','',message.content.startsWith('【合并转发】')?'合并转发 · 点击展开':'截图整理 · 点击展开'),node('div','message-text',message.content.replace(/^【[^】]+】\s*/,'')));bubble.append(record);}else bubble.append(node("div", "message-text", message.content));
+    if(!cards.render(message,bubble)){features.renderMedia(message,bubble);bubble.append(node("div","message-text",message.content));}
     wrap.append(bubble);
     const meta = node("div", "meta");
     const stamp = new Date(message.created_at);
@@ -1032,6 +1032,7 @@ const ui=initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,
 const heading=$('roomInfoBtn'),label=node('span');label.append($('roomTitle'),$('roomStatus'));heading.replaceChildren(avatar('','友'),label);
 $('pinRoomBtn').onclick=()=>{const records=recentRooms();const row=records.find(r=>r.room===state.room);if(row){row.pinned=!row.pinned;persist('recent',records);renderRecent();toast(row.pinned?'这个房间已置顶。':'已取消置顶。');}closeSheet('menuScrim');};
 $('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
+const cards=initMessageCards({$,state,node,toast,showSheet,closeSheet,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render();}});
 const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
 });
