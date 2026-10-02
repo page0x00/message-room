@@ -1,3 +1,4 @@
+import {initDailySpace} from './daily-space.js?v=2.3.0';
 import {
   parseRoom,
   roomLink,
@@ -239,6 +240,7 @@ async function openRoom(target) {
     view: "chat",
   });
   features.roomChanged();
+  daily.reset();
   actions?.reset();
   $("connectionNote").hidden=true;
   $("home").classList.remove("active");
@@ -318,6 +320,7 @@ async function openRoom(target) {
     state.ready = true;
     notifications.prime(room,state.messages);
     features.ready();
+    daily.ready();
     actions?.load();
     if (!supported && (state.quotes.length || state.date))
       toast(
@@ -430,6 +433,7 @@ function home() {
   state.ready = false;
   state.refreshPromise = null;
   features.roomChanged();
+  daily.reset();
   actions?.reset();
   $("room").classList.remove("active");
   $("home").classList.add("active");
@@ -1039,6 +1043,7 @@ const cards=initMessageCards({$,state,node,toast,showSheet,closeSheet,onMessages
 const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
 });
+const daily=initDailySpace({$,state,node,toast,notice,ui});
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
 renderRecent();
 void notifications.watch();

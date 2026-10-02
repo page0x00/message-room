@@ -1,3 +1,4 @@
+import {runDaily} from './daily.browser.mjs';
 import {runSpace} from './space.browser.mjs';
 import {runInteractions} from './interactions.browser.mjs';
 import { chromium } from "playwright";
@@ -148,7 +149,7 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
-    events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
+    daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
   };
   await context.route('**/ocr.js?*',route=>route.fulfill({contentType:'text/javascript',body:`export async function recognizeScreenshot(file,{signal,onProgress}={}){window.ocrCalls=(window.ocrCalls||0)+1;if(window.ocrSlow)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,1200);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));},{once:true});});onProgress?.('测试识别');return {messages:[{text:'一起看晚霞',side:'left',date:'2026-09-18',dateSource:'聊天日期',time:'20:00',confidence:96,y:100}]};}` }));
   const errors = [];
@@ -237,6 +238,15 @@ async function setup({
         return reply(memberRows);
       }
       if(path.endsWith('/mailbox_rooms'))return reply({room_id:secureId,created_at:'2026-09-01T00:00:00Z',relationship_since:json?.relationship_since||'2026-09-03'});
+      if(['/space_entries','/pockets','/pocket_entries','/pocket_leaves'].some(t=>path.endsWith(t))){const table=path.split('/').at(-1),id=url.searchParams.get('id')?.slice(3);let rows=control.daily[table];
+        if(method==='GET')return reply(id?rows.find(r=>r.id===id):rows.filter(r=>r.room_id===url.searchParams.get('room_id')?.slice(3)));
+        if(method==='POST'){if(rows.some(r=>r.id===json.id))return reply({code:'23505'},409);const row={...json,revision:1,created_at:new Date().toISOString()};rows.push(row);return reply(row);}
+        if(method==='PATCH'){const row=rows.find(r=>r.id===id&&String(r.revision)===url.searchParams.get('revision')?.slice(3));if(!row)return reply(null);Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){control.daily[table]=rows.filter(r=>r.id!==id);return reply([{id}]);}}
+      if(path.endsWith('/rpc/mailbox_space_clock'))return reply({server_now:new Date().toISOString()});
+      if(path.endsWith('/rpc/mailbox_create_pocket')){const row={id:json.p_id,room_id:json.p_room,owner_user_id:user,title:json.p_title,target_cents:json.p_target,daily_cents:json.p_daily,mode:json.p_mode,qr_path:json.p_qr,cover_path:json.p_cover,due_date:json.p_due,note:json.p_note,created_at:new Date().toISOString()};control.daily.pockets.push(row);return reply(row);}
+      if(path.endsWith('/rpc/mailbox_pocket_action')){control.pocketRequests=(control.pocketRequests||[]).concat([json]);if(control.pocketFailBefore){control.pocketFailBefore=false;return reply({message:'temporary offline',code:'XX000'},500);}let row=control.daily.pocket_entries.find(r=>r.id===json.p_id);if(row){if(json.p_action==='confirm'&&new Date(row.available_at)>new Date())return reply({code:'22023',message:'Cooling period or balance'},400);if(json.p_action==='cancel')row.status='cancelled';if(json.p_action==='confirm')row.status='settled';return reply(row);}row={id:json.p_id,pocket_id:json.p_pocket,room_id:secureId,owner_user_id:user,kind:json.p_action,cents:json.p_cents,reason:json.p_reason,status:json.p_action==='deposit'||json.p_emergency?'settled':'pending',available_at:new Date(Date.now()+json.p_hours*3600000).toISOString(),created_at:new Date().toISOString()};control.daily.pocket_entries.push(row);if(control.pocketAmbiguous){control.pocketAmbiguous=false;return reply({message:'lost response',code:'XX000'},500);}return reply(row);}
+      if(path.endsWith('/rpc/mailbox_pocket_leave')){const row={id:json.p_id,pocket_id:json.p_pocket,room_id:secureId,owner_user_id:user,date_start:json.p_start,date_end:json.p_end,reason:json.p_reason,created_at:new Date().toISOString()};control.daily.pocket_leaves.push(row);return reply(row);}
       if(path.endsWith('/anniversaries')){
         if(method==='GET')return reply(control.events);
         if(method==='POST'){control.events.push(json);return reply(json);}
@@ -359,7 +369,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY){
+  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -696,8 +706,8 @@ try {
   });
   await check('relationship calendar adds shared anniversaries and paints memory wall nodes',async()=>{
     await s.page.locator('#relationHandle').click();await s.page.locator('#relationshipBtn').click();
-    await s.page.locator('#relationshipSince').fill('2024-09-04');await s.page.locator('#relationshipForm button').click();
-    await s.page.locator('#eventTitle').fill('第一次听同一首歌');await s.page.locator('#eventDate').fill('2026-09-20');await s.page.locator('#eventSave').click();
+    await s.page.locator('#relationshipEditor summary').click();await s.page.locator('#relationshipSince').fill('2024-09-04');await s.page.locator('#relationshipForm button').click();
+    await s.page.locator('#eventEditor summary').click();await s.page.locator('#eventTitle').fill('第一次听同一首歌');await s.page.locator('#eventDate').fill('2026-09-20');await s.page.locator('#eventSave').click();
     await s.page.locator('.event-card').waitFor();assert.equal(s.control.events[0].owner_user_id,user);
     await s.page.locator('#relationClose').click();
     await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=wall]').click();
@@ -816,7 +826,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.SPACE_ONLY)await runSpace({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.DAILY_ONLY)await runDaily({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.SPACE_ONLY)await runSpace({setup,check,secureId,user,friend,fixture,root});
   else await runInteractions({setup,check,secureId,user,friend,fixture,root});
   console.log(
     `\n${checks} browser integration checks passed. All Supabase requests were intercepted; production was not contacted.`,

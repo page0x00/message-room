@@ -11,7 +11,7 @@ export async function saveEvent(row){
   return take({data,error});
 }
 export async function deleteEvent(room,id){return take(await client(true).from('anniversaries').delete().eq('room_id',room).eq('id',id).select('id'));}
-export async function updateEvent(row){return take(await client(true).from('anniversaries').update({title:row.title,event_date:row.event_date,repeat_yearly:row.repeat_yearly}).eq('room_id',row.room_id).eq('id',row.id).select().single());}
+export async function updateEvent(row){return take(await client(true).from('anniversaries').update({title:row.title,event_date:row.event_date,repeat_yearly:row.repeat_yearly,note:row.note||'',remind:row.remind!==false}).eq('room_id',row.room_id).eq('id',row.id).select().single());}
 export async function listMemoirs(room){return take(await client(true).from('memoirs').select('id,title,range_start,range_end,updated_at,revision').eq('room_id',room).order('updated_at',{ascending:false}).limit(100))||[];}
 export async function loadMemoir(room,id){return take(await client(true).from('memoirs').select('*').eq('room_id',room).eq('id',id).single());}
 export async function saveMemoir(row){

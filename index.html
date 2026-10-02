@@ -12,7 +12,7 @@
 
 <script src="./vendor/supabase.js?v=2.57.4"></script>
 <link href="./styles.css?v=2.3.0" rel="stylesheet"/><link href="./features.css?v=2.3.0" rel="stylesheet"/><link href="./ui-v2.css?v=2.3.0" rel="stylesheet"/>
-<link href="./space.css?v=2.3.0" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.3.0"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/></head>
+<link href="./daily-space.css?v=2.3.0" rel="stylesheet"/><link href="./space.css?v=2.3.0" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.3.0"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/></head>
 <body>
 <div class="app-shell">
 <section aria-labelledby="homeTitle" class="screen home active" id="home">
@@ -37,7 +37,7 @@
 <circle cx="19" cy="12" r="1.7"></circle>
 </svg>
 </button>
-</header><div class="view-heading" hidden="" id="viewHeading"><button aria-label="回到聊天" class="round-btn" id="returnChat">‹</button><h2 id="viewTitle">日记</h2><button aria-label="写下这一刻" class="round-btn" id="writeFromView">＋</button></div><div class="diary-filters" hidden="" id="diaryFilters"><button class="active" data-diary-filter="all">全部</button><button data-diary-filter="mine">我的</button><button data-diary-filter="media">图文</button><label>日期 <input aria-label="筛选日记日期" id="diaryDate" type="date"/></label></div>
+</header><div class="view-heading" hidden="" id="viewHeading"><button aria-label="回到聊天" class="round-btn" id="returnChat">‹</button><h2 id="viewTitle">日记</h2><button aria-label="写下这一刻" class="round-btn" id="writeFromView">＋</button></div><div class="diary-filters" hidden="" id="diaryFilters"><button class="active" data-diary-filter="all">全部</button><button data-diary-filter="mood">心情</button><button data-diary-filter="daily">日常</button><button data-diary-filter="essay">随笔</button><label>日期 <input aria-label="筛选日记日期" id="diaryDate" type="date"/></label></div>
 
 
 <aside class="listen-mini" hidden="" id="listenMini">
@@ -148,14 +148,14 @@
 <div class="days-card"><span>从那一天起</span><strong id="relationshipDays">—</strong><span id="relationshipCaption">慢慢积攒值得记住的小事</span></div>
 <p class="sheet-note" id="relationshipNote" role="status"></p>
 <button class="text-btn" id="legacyEventImport" type="button" hidden>找回本机旧版纪念日</button>
-<form class="inline-form" id="relationshipForm"><label class="field"><span>相识日期</span><input id="relationshipSince" required="" type="date"/></label><button class="btn ghost" type="submit">保存日期</button></form>
-<h3>纪念日与约定</h3><div class="feature-list" id="eventList"></div>
-<form class="event-form" id="eventForm">
+<details id="relationshipEditor"><summary>修改相识日期</summary><form class="inline-form" id="relationshipForm"><label class="field"><span>相识日期</span><input id="relationshipSince" required="" type="date"/></label><button class="btn ghost" type="submit">保存日期</button></form>
+</details><h3>纪念日与约定</h3><div class="feature-list" id="eventList"></div>
+<details id="eventEditor"><summary>＋ 记下新的一天</summary><form class="event-form" id="eventForm">
 <label class="field"><span>这一天的名字</span><input id="eventTitle" maxlength="120" placeholder="第一次见面 / 一起出发" required=""/></label>
 <label class="field"><span>日期</span><input id="eventDate" required="" type="date"/></label>
 <label class="check-field"><input checked="" id="eventYearly" type="checkbox"/>每年纪念</label>
-<button class="btn primary" id="eventSave" type="submit">记下这一天</button>
-</form>
+<label class="field"><span>备注</span><textarea id="eventNote" maxlength="1000" rows="2"></textarea></label><label class="check-field"><input id="eventRemind" type="checkbox" checked/>当天提醒</label><button class="btn primary" id="eventSave" type="submit">记下这一天</button>
+</form></details>
 </section>
 </div>
 <div class="scrim" hidden="" id="listenScrim">

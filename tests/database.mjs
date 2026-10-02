@@ -1,3 +1,4 @@
+import {runDailyDatabase} from './daily.database.mjs';
 // Executes the REAL migrations in an isolated PostgreSQL WASM instance.
 // Supabase's auth/storage roles and schemas are represented here; no live data is touched.
 import { PGlite } from "@electric-sql/pglite";
@@ -448,6 +449,9 @@ try {
     await as(c);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);
     await as();assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);await db.exec('reset role');
   });
+  const dailySql=await readFile(new URL('../supabase/migrations/20261003_daily_space.sql',import.meta.url),'utf8');
+  await db.exec(dailySql);await db.exec(dailySql);
+  await runDailyDatabase({db,check,as,denied,scalar,a,b,c,room});
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );

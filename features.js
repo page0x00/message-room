@@ -9,6 +9,7 @@ import {initScreenshotImport} from './screenshot-import.js?v=2.3.0';
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
   const audio=$('listenAudio');
+  const eventHome=node('div','space-event-preview');document.querySelector('.relation-days').after(eventHome);
   const screenshots=initScreenshotImport(ctx);
   let mediaQueue=[];
   let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
@@ -152,15 +153,16 @@ export function initFeatures(ctx){
 
   // Shared dates, with an explicitly local mode for legacy rooms.
   function renderCalendar(){
-    const box=$('eventList');box.replaceChildren();
+    const box=$('eventList');box.replaceChildren();eventHome.replaceChildren();
     const legacy=oldEvent();$('legacyEventImport').hidden=!legacy||calendar.some(row=>row.event_date===legacy.date&&row.title===(legacy.name||'纪念日'));
     if(!calendar.length)box.append(node('p','sheet-note','还没有纪念日，先记下一件小事吧。'));
     const rows=calendar.map(event=>({...event,next:eventCountdown(event)})).sort((a,b)=>(a.next?.days??0)-(b.next?.days??0));
+    for(const event of rows.slice(0,3)){const item=node('button','text-btn',`${event.title} · ${event.event_date}`);item.onclick=()=>{$('relationshipBtn').click();};eventHome.append(item);}
     for(const event of rows){
-      const card=node('article','event-card'),detail=node('div');detail.append(node('strong','',event.title),node('small','',event.event_date+(event.repeat_yearly?' · 每年纪念':'')));card.append(detail);
+      const card=node('article','event-card'),detail=node('div');detail.append(node('strong','',event.title),node('small','',event.event_date+(event.repeat_yearly?' · 每年纪念':'')));if(event.note)detail.append(node('small','',event.note));card.append(detail);
       const days=event.next?.days;card.append(node('span','countdown',days===0?'就是今天':days>0?`还有 ${days} 天`:`已过 ${Math.abs(days||0)} 天`));
       if(!state.secure||event.owner_user_id===state.userId){
-        const edit=node('button','','修改');edit.type='button';edit.onclick=()=>{calendarEdit=event.id;$('eventTitle').value=event.title;$('eventDate').value=event.event_date;$('eventYearly').checked=event.repeat_yearly;$('eventSave').textContent='保存修改';$('eventTitle').focus();};
+        const edit=node('button','','修改');edit.type='button';edit.onclick=()=>{$('eventEditor').open=true;$('eventNote').value=event.note||'';$('eventRemind').checked=event.remind!==false;calendarEdit=event.id;$('eventTitle').value=event.title;$('eventDate').value=event.event_date;$('eventYearly').checked=event.repeat_yearly;$('eventSave').textContent='保存修改';$('eventTitle').focus();};
         const remove=node('button','','删除');remove.type='button';remove.onclick=async()=>{
           const s=snap();if(!(await notice('删除这一天？',`“${event.title}”将从纪念日列表移除，留言不受影响。`,'删除',true))||!current(s))return;
           try{if(s.secure)await data.deleteEvent(s.room,event.id);if(!current(s))return;calendar=calendar.filter(row=>row.id!==event.id);if(!s.secure)persist(key('events',s),calendar);renderCalendar();}catch(e){fail(e);}
@@ -182,16 +184,16 @@ export function initFeatures(ctx){
     finally{if(current(s))calendarBusy=false;}
   }
   $('relationshipBtn').onclick=()=>{if(open('relationshipScrim'))void refreshCalendar(true);};
-  $('legacyEventImport').onclick=()=>{const saved=oldEvent();if(!saved)return;calendarEdit=null;$('eventTitle').value=(saved.name||'纪念日').slice(0,120);$('eventDate').value=saved.date;$('eventYearly').checked=false;$('eventSave').textContent='记下这一天';$('eventTitle').focus();toast('已找回到编辑区，确认保存后才加入纪念日列表。');};
+  $('legacyEventImport').onclick=()=>{const saved=oldEvent();if(!saved)return;$('eventEditor').open=true;calendarEdit=null;$('eventTitle').value=(saved.name||'纪念日').slice(0,120);$('eventDate').value=saved.date;$('eventYearly').checked=false;$('eventSave').textContent='记下这一天';$('eventTitle').focus();toast('已找回到编辑区，确认保存后才加入纪念日列表。');};
   $('relationshipForm').onsubmit=async event=>{
     event.preventDefault();const value=$('relationshipSince').value;if(!validDate(value)){toast('请选择有效日期。');return;}const s=snap(),button=event.submitter;button.disabled=true;
-    try{if(s.secure)await data.setRelationship(s.room,value);else if(!persist(key('relationship',s),value))return;if(current(s)){daysCard(value);toast('相识日期已保存。');}}
+    try{if(s.secure)await data.setRelationship(s.room,value);else if(!persist(key('relationship',s),value))return;if(current(s)){daysCard(value);$('relationshipEditor').open=false;toast('相识日期已保存。');}}
     catch(e){if(current(s))fail(e);}finally{button.disabled=false;}
   };
   $('eventForm').onsubmit=async event=>{
     event.preventDefault();if($('eventSave').disabled)return;
     const s=snap(),title=$('eventTitle').value.trim(),date=$('eventDate').value;if(!title||!validDate(date))return;
-    const row={id:calendarEdit||eventNonce,room_id:s.room,owner_user_id:s.userId,title,event_date:date,repeat_yearly:$('eventYearly').checked};
+    const row={id:calendarEdit||eventNonce,room_id:s.room,owner_user_id:s.userId,title,event_date:date,repeat_yearly:$('eventYearly').checked,note:$('eventNote').value,remind:$('eventRemind').checked};
     const edit=calendarEdit;$('eventSave').disabled=true;
     try{
       let saved=row;
@@ -199,7 +201,7 @@ export function initFeatures(ctx){
       if(!current(s))return;
       const next=[...calendar.filter(item=>item.id!==row.id),saved];
       if(!s.secure&&!persist(key('events',s),next))return;
-      calendar=next;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').textContent='记下这一天';renderCalendar();toast('这一天已经记下了。');
+      calendar=next;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').textContent='记下这一天';$('eventEditor').open=false;renderCalendar();toast('这一天已经记下了。');
     }catch(e){if(current(s))fail(e);}finally{$('eventSave').disabled=false;}
   };
   // Local audio persists in IndexedDB. Only its identity and transport state sync.
@@ -325,7 +327,7 @@ export function initFeatures(ctx){
   };
 
   function roomChanged(){for(const x of mediaQueue)if(x.pending?.url)URL.revokeObjectURL(x.pending.url);mediaQueue=[];
-    endRecording(true);mediaObserver.disconnect();daysCard('');
+    endRecording(true);mediaObserver.disconnect();daysCard('');eventHome.replaceChildren();
     stopSubscription?.();stopSubscription=null;mediaController?.abort();mediaController=null;mediaBusy=false;
     if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);media=null;
     for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();

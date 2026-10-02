@@ -43,14 +43,14 @@ SQL 一并配置私有 `message-media` bucket（20 MB）、成员/附件/纪念�
 
 ## 权限和数据边界
 
-- 原 `messages` 表及真实 `created_at` 保留。日记/回忆墙只做展示投影；`display_date` 只改变回忆日期。
-- `v2_` 房间凭完整 `#key=` 邀请加入，密钥只以哈希保存在数据库；成员 Auth 身份控制访问。随机 device ID 仅用于旧消息左右显示。
+- 原 `messages` 表及真实 `created_at` 保留。聊天记录仍可投影到日记/回忆墙；独立日记存入 `space_entries`，不混入聊天。`display_date` 只改变回忆日期。
+- `v2_` 房间凭完整 `#key=` 邀请加入，密钥只以哈希保存在数据库；成员 Auth 身份控制访问。消息归属只使用 `author_id === auth.uid()`；没有可信作者 UUID 的旧消息不自动认领。
 - 旧房间沿用原权限，不会被自动升级成私密房间。资料编辑和创建旧房间确认仍说明这个边界；聊天主界面不常驻开发提示。
 - 附件是 `房间/身份/发送nonce` 路径，已发表对象不可覆盖；私有短时签名下载，本机 Blob 预览。允许图片、音视频、PDF/TXT/ZIP、Office 文件；不内嵌执行 HTML/SVG。
 - 纪念日由创建者修改；相识日期由成员共享。私人回忆录只有作者身份能读写，同房间对方也无权读取；数据库管理员仍有管理权限，未提供端到端加密。
 - 原图 OCR 在浏览器完成。首次从固定 Tesseract CDN 下载 WASM 与中英文模型，模型下载失败可粘贴系统相册识别文字。支持目录优先批量导入、完整长图自动分片、正文/日期/左右方向编辑与逐条或合并确认发送；媒体占位可手动补充，不能自动恢复截图中的原图/语音/视频文件。
 - 本地歌曲和 LRC 留在 IndexedDB，不上传；双方导入相同文件，SHA-256 匹配后同步播放/暂停/进度。播放器可收起，歌曲下次打开可恢复。浏览器可能要求双方分别点击一次播放。
-- 最近房间、完整邀请链接、邮箱/网址收藏、草稿、未读游标和偏好保存在这台浏览器；更换设备不会自动同步这些本机列表。匿名 Auth 也不能在清除网站数据后恢复到原身份。邮箱收藏不是邮箱账号绑定。
+- 已加入邀请房间可从账号成员关系找回。完整邀请链接、邮箱/网址收藏、草稿、未读游标和偏好仍是按 UUID 隔离的本机数据。使用账号页绑定邮箱后，新设备登录同一邮箱即可保持 UUID；未绑定的访客在清除网站数据后无法恢复。邮箱收藏与绑定登录邮箱是两个功能。
 - 系统通知固定显示“你有一条新留言”，不包含正文、昵称、完整邀请链接。订阅 endpoint 仅本人可见。
 
 ## 验证与发布
@@ -72,3 +72,15 @@ GitHub Pages 部署 **main / 根目录**，必须保留整个仓库静态文件�
 若需要回退，恢复前端 Git 提交即可，不反向删除数据表、不清空消息、不关闭 RLS。独立 SQL 文件按顺序升级；不要在已升级功能的线上单独重跑旧的 Auth migration 而不接着执行功能 migration。
 
 依据：[Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks)、[Edge Function Secrets](https://supabase.com/docs/guides/functions/secrets)、[MDN PushManager.subscribe](https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe)。
+
+
+## 本轮更新分支：账号与日常空间
+
+此轮源码位于 `update/relationship-space-20261001`，不会自动合并 main 或替换正式 GitHub Pages。将前端与数据库都部署后才能进行真实双设备验收。
+
+1. SQL Editor 执行本分支完整 `supabase/INSTALL.sql`。已完成 2.3 配置的项目也可以依次执行 `20261001_identity.sql`、`20261002_message_cards.sql`、`20261003_daily_space.sql`，不要遗漏中间文件。脚本增量添加字段、表、权限和 RPC，保留旧消息。
+2. Auth 开启 Email；保留访客时同时保留 Anonymous Sign-Ins 与 Manual Linking。设置站点和测试预览 Redirect URLs。在原设备先绑定邮箱，再在新设备登录相同邮箱。详见 `docs/UPDATE_20261001.md`。
+3. 新增记录表 `space_entries`、`pockets`、`pocket_entries`、`pocket_leaves` 已在 migration 设置 RLS 与 Realtime；私有图片仍用现有 `message-media`，读权限随记录的私人/共享属性变化。
+4. 荷包 RPC 是记账操作，不接支付平台或托管资金。冷静期与余额检查只允许服务端更新，浏览器不得直接修改交易表。应用内提醒已接通；后台打卡/纪念日/荷包提醒和一起听邀请仍待后续通知阶段。
+
+新增本地检查：`npm run test:space`、`npm run test:daily`。跨设备身份、原生文件选择器、邮箱回链、实时订阅、实际 Storage 及系统权限仍应在真实环境验收。
