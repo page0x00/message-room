@@ -1,20 +1,19 @@
+import {initMusicSpace} from './music-space.js?v=2.3.0';
 import {imageHash} from './screenshot-store.js?v=2.3.0';
-import {musicStore} from './local-music.js?v=2.3.0';
 import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.3.0';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText} from './feature-core.js?v=2.3.0';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.3.0';
 import * as api from './backend.js?v=2.3.0';
 import * as data from './feature-backend.js?v=2.3.0';
 import {initScreenshotImport} from './screenshot-import.js?v=2.3.0';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
-  const audio=$('listenAudio');
+  const music=initMusicSpace(ctx);
   const eventHome=node('div','space-event-preview');document.querySelector('.relation-days').after(eventHome);
   const screenshots=initScreenshotImport(ctx);
   let mediaQueue=[];
   let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
   let calendar=[],calendarBusy=false,calendarEdit=null,eventNonce=randomId();
-  let song=null,songRevision=0,listenSession=null,listenOffset=0,listenBusy=false,listenReading=false,lyrics=[],lyricIndex=-1;
   let memoir=null,memoirEdits=0,memoirBusy=false;
   let recorder=null,recordStream=null,recordTimer=null,recordRevision=0;
 
@@ -205,78 +204,6 @@ export function initFeatures(ctx){
     }catch(e){if(current(s))fail(e);}finally{$('eventSave').disabled=false;}
   };
   // Local audio persists in IndexedDB. Only its identity and transport state sync.
-  function clock(seconds){const n=Math.max(0,Math.floor(seconds||0));return `${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;}
-  function playerControls(){
-    const available=Boolean(song&&Number.isFinite(audio.duration));
-    $('listenToggle').disabled=!available||listenBusy;$('miniListenToggle').disabled=!available||listenBusy;
-    $('listenShare').disabled=!available||!state.secure||listenBusy;$('listenSeek').disabled=!available||listenBusy;
-    const text=audio.paused?'播放':'暂停';$('listenToggle').textContent=text;$('miniListenToggle').textContent=text;
-    $('listenMini').hidden=!song;$('miniTrack').textContent=song?.name||'一起听';
-    $('listenSync').disabled=!state.secure;
-  }
-  function paintLyrics(){lyricIndex=-1;$('lyrics').replaceChildren(...(lyrics.length?lyrics.map(line=>node('p','',line.text||'♪')):[node('p','','可以导入带时间轴的 LRC 歌词。')]));}
-  function playerTime(){
-    $('listenSeek').value=audio.currentTime||0;$('listenTime').textContent=clock(audio.currentTime);$('listenDuration').textContent=clock(audio.duration);
-    const index=activeLyric(lyrics,audio.currentTime||0);
-    if(index!==lyricIndex){$('lyrics').children[lyricIndex]?.classList.remove('active');const line=$('lyrics').children[index];line?.classList.add('active');lyricIndex=index;if(line&&!$('listenScrim').hidden)$('lyrics').scrollTop=line.offsetTop-$('lyrics').offsetTop-$('lyrics').clientHeight/2;}
-    playerControls();
-  }
-  async function applyListen(){
-    if(!$('listenSync').checked||!song||!listenSession)return;
-    if(song.hash!==listenSession.track_key){audio.pause();$('listenStatus').textContent=`房间正在听“${listenSession.track_name}”。文件不一致，已暂停；选择同一个文件后再同步。`;playerControls();return;}
-    if(!Number.isFinite(audio.duration))return;
-    const target=playbackPosition(listenSession,Date.now()+listenOffset,audio.duration);
-    if(Math.abs(audio.currentTime-target)>1.2)audio.currentTime=target;
-    if(listenSession.is_playing&&target<audio.duration){try{await audio.play();}catch{$('listenStatus').textContent='浏览器需要你点击一次“播放”才能加入同步。';return;}}else audio.pause();
-    $('listenStatus').textContent='同一音频已核对 · 正在同步播放进度';playerTime();
-  }
-  async function refreshListen(){
-    if(!state.ready||!state.secure||listenReading||listenBusy)return;
-    const s=snap();listenReading=true;
-    try{const result=await data.readListen(s.room);if(!current(s))return;listenOffset=result.offset;if(!listenSession||(result.session?.revision||0)>=listenSession.revision)listenSession=result.session;
-      if(!$('listenSync').checked)$('listenStatus').textContent=listenSession?`房间歌曲：${listenSession.track_name}。选择同一文件后勾选跟随。`:'房间还没有共享歌曲。';
-      await applyListen();
-    }catch(e){if(current(s)&&!$('listenScrim').hidden)$('listenStatus').textContent=messageError(e);}finally{if(current(s))listenReading=false;}
-  }
-  async function publishListen(force=false){
-    if(!song||!state.secure||listenBusy)return;
-    if(!force&&(!$('listenSync').checked||song.hash!==listenSession?.track_key))return;
-    const s=snap(),track=song;listenBusy=true;playerControls();
-    try{
-      const result=await data.setListen(s.room,{p_key:track.hash,p_name:track.name,p_playing:!audio.paused,p_position:audio.currentTime||0,p_revision:listenSession?.revision||0});
-      if(!current(s)||song!==track)return;listenSession=result.session;listenOffset=result.offset;$('listenSync').checked=true;$('listenStatus').textContent='播放进度已同步，朋友需选择同一个文件。';
-    }catch(e){if(current(s)){audio.pause();$('listenStatus').textContent=messageError(e);}}
-    finally{if(current(s)){listenBusy=false;playerControls();}}
-  }
-  function listenOpen(){if(open('listenScrim')){$('listenNotes').value=storeGet(key('listenNotes'),oldLocal('lyrics'));playerControls();if(state.secure)void refreshListen();else $('listenStatus').textContent='旧版房间支持本机播放器。跨设备同步需要邀请房间。';}}
-  $('listenNotes').oninput=()=>persist(key('listenNotes'),$('listenNotes').value);
-  $('listenBtn').onclick=listenOpen;$('miniListenOpen').onclick=listenOpen;
-  $('listenFile').onchange=async()=>{
-    const file=$('listenFile').files[0];if(!file)return;const s=snap(),revision=++songRevision;
-    if(file.size>80*1024*1024||!file.size||(!file.type.startsWith('audio/')&&!/\.(mp3|m4a|wav|ogg|flac)$/i.test(file.name))){toast('请选择不超过 80 MB 的音频文件。');return;}
-    audio.pause();$('listenStatus').textContent='正在核对音频指纹……';
-    try{
-      const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());if(!current(s)||revision!==songRevision)return;
-      if(song?.url)URL.revokeObjectURL(song.url);
-      song={name:file.name.slice(0,180),hash:[...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join(''),url:URL.createObjectURL(file)};
-      lyrics=[];paintLyrics();audio.src=song.url;audio.load();$('trackName').textContent=song.name;$('listenStatus').textContent='歌曲留在本机，可以收起播放器继续聊天。';playerControls();void musicStore(s.room,{file,name:song.name,hash:song.hash,lyrics:[]}).catch(()=>{if(current(s))toast('本机空间不足，歌曲仅在本次打开期间保留。');});await refreshListen();
-    }catch(e){if(current(s))fail(e);}
-  };
-  $('lyricsFile').onchange=async()=>{
-    const file=$('lyricsFile').files[0];if(!file)return;const s=snap(),revision=songRevision;
-    if(file.size>200000){toast('歌词文件请小于 200 KB。');return;}
-    try{const text=await file.text();if(!current(s)||revision!==songRevision)return;lyrics=parseLyrics(text);if(song){void musicStore(s.room).then(saved=>{if(saved?.hash===song?.hash)return musicStore(s.room,{...saved,lyrics});}).catch(()=>{});}paintLyrics();if(!lyrics.length)toast('没有找到 LRC 时间轴，请检查文件格式。');playerTime();}catch(e){fail(e);}
-  };
-  async function toggleListen(){if(!song||listenBusy)return;try{if(audio.paused)await audio.play();else audio.pause();playerControls();await publishListen();}catch{$('listenStatus').textContent='这个音频暂时无法播放，请换成浏览器支持的 MP3 或 M4A。';}}
-  $('listenToggle').onclick=toggleListen;$('miniListenToggle').onclick=toggleListen;
-  $('listenShare').onclick=async()=>{if(!song||listenBusy)return;const s=snap();if(listenSession&&listenSession.track_key!==song.hash&&!(await notice('切换房间歌曲？',`将房间歌曲改为“${song.name}”。朋友需要在自己的设备选择同一个文件。`,'切换歌曲',true)))return;if(current(s))await publishListen(true);};
-  $('listenSync').onchange=async()=>{if($('listenSync').checked)await refreshListen();else $('listenStatus').textContent='已停止跟随，只在本机播放。';};
-  $('listenSeek').onchange=async()=>{if(!song||listenBusy)return;audio.currentTime=Number($('listenSeek').value);await publishListen();};
-  audio.onloadedmetadata=()=>{$('listenSeek').max=Number.isFinite(audio.duration)?audio.duration:1;playerTime();void applyListen();};
-  audio.ontimeupdate=playerTime;audio.onended=()=>{playerControls();void publishListen();};audio.onerror=()=>{if(song)$('listenStatus').textContent='无法解码这首歌，请换成 MP3、M4A 等受支持的格式。';};
-  function clearSong(){++songRevision;audio.pause();audio.removeAttribute('src');audio.load();if(song?.url)URL.revokeObjectURL(song.url);song=null;lyrics=[];paintLyrics();$('listenSync').checked=false;$('listenFile').value='';$('lyricsFile').value='';$('trackName').textContent='还没有选择歌曲';playerControls();}
-  $('listenStop').onclick=async()=>{const s=snap();audio.pause();await publishListen();if(current(s)){clearSong();void musicStore(s.room,null).catch(()=>{});closeSheet('listenScrim');}};
-
   // Memoirs are private projections, never inserted back into the conversation.
   function freshMemoir(){const end=new Date(),start=new Date();start.setDate(start.getDate()-30);return {id:randomId(),revision:0,title:'',body:'',range_start:localDate(start),range_end:localDate(end)};}
   function readMemoirFields(){return {...memoir,title:$('memoirTitle').value,body:$('memoirBody').value,range_start:$('memoirStart').value,range_end:$('memoirEnd').value};}
@@ -332,22 +259,18 @@ export function initFeatures(ctx){
     if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);media=null;
     for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();
     calendar=[];calendarBusy=false;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
-    clearSong();listenSession=null;listenOffset=0;listenBusy=false;listenReading=false;
+    music.reset();
     screenshots.reset();
     memoir=null;memoirEdits++;memoirBusy=false;$('memoirProgress').textContent='';$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();
   }
-  function ready(){void refreshCalendar();void restoreSong();if(state.secure){const s=snap();stopSubscription=data.subscribeFeatures(s.room,()=>{if(current(s))void refreshCalendar();},()=>{if(current(s))void refreshListen();});}}
+  function ready(){void refreshCalendar();void music.ready();if(state.secure){const s=snap();stopSubscription=data.subscribeFeatures(s.room,()=>{if(current(s))void refreshCalendar();},()=>{if(current(s))void music.refresh();});}}
   document.addEventListener('mailbox:space-open',()=>void refreshCalendar());
   document.addEventListener('mailbox:sheet-close',event=>{if(event.detail.id==='attachmentScrim')endRecording(true);if(event.detail.id==='attachmentScrim'&&mediaBusy)mediaController?.abort();});
-  setInterval(()=>{if(document.hidden||!state.ready)return;if($('listenSync').checked||!$('listenScrim').hidden)void refreshListen();if(!$('relationshipScrim').hidden)void refreshCalendar();},10000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ready&&$('listenSync').checked)void refreshListen();});
-  async function restoreSong(){
-    const s=snap(),revision=songRevision;
-    try{const saved=await musicStore(s.room);if(!saved?.file||!current(s)||revision!==songRevision||song)return;song={name:saved.name,hash:saved.hash,url:URL.createObjectURL(saved.file)};lyrics=saved.lyrics||[];paintLyrics();audio.src=song.url;audio.load();$('trackName').textContent=song.name;$('listenStatus').textContent='已找回这台设备上次导入的歌曲，点击播放。';playerControls();}catch{/* Local audio import remains available without IndexedDB. */}
-  }
+  setInterval(()=>{if(document.hidden||!state.ready)return;if($('listenSync').checked||!$('listenScrim').hidden)void music.refresh();if(!$('relationshipScrim').hidden)void refreshCalendar();},10000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ready&&$('listenSync').checked)void music.refresh();});
   function renderWall(container){
     for(const event of calendar){const card=node('article','msg wall-event'),bubble=node('div','bubble');bubble.append(node('small','','纪念的一天'),node('strong','',event.title),node('time','wall-date',event.event_date));card.append(bubble);container.append(card);}
-    if(song||listenSession){const card=node('article','msg wall-event'),bubble=node('div','bubble');bubble.append(node('small','','一起听过的歌'),node('strong','',song?.name||listenSession.track_name));card.append(bubble);container.append(card);}
+    if(music.song){const card=node('article','msg wall-event'),bubble=node('div','bubble');bubble.append(node('small','','一起听过的歌'),node('strong','',music.song.name));card.append(bubble);container.append(card);}
   }
   return {roomChanged,ready,renderMedia,renderWall};
 }
