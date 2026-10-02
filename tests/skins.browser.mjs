@@ -15,7 +15,7 @@ export async function runSkins({setup,check,secureId,user,friend,fixture,root}){
  s.control.daily.pockets.push({id:'skin-pocket',room_id:secureId,owner_user_id:user,title:'我们的旅行基金',target_cents:100000,daily_cents:1000,mode:'daily',qr_path:path,cover_path:null,note:'一点一点，去看更远的风景。',created_at:'2026-09-01T00:00:00Z'});
  s.control.daily.pocket_entries.push({id:'skin-deposit',pocket_id:'skin-pocket',room_id:secureId,owner_user_id:user,kind:'deposit',cents:35800,status:'settled',reason:'把今天的期待存起来。',created_at:new Date().toISOString()});
  await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.4.1')).setTheme(t),value);
+ const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.4.2')).setTheme(t),value);
  const shot=async name=>{await p.waitForTimeout(280);await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/skin-'+name+'.png'});};
  await check('each skin loads its photograph and the real handwritten Chinese font',async()=>{
   await p.locator('#relationHandle').click();await p.locator('#listenBtn').click();
@@ -36,7 +36,10 @@ export async function runSkins({setup,check,secureId,user,friend,fixture,root}){
  await check('landscape docks operate the existing player and live todo, and hide alongside feature panels',async()=>{
   await p.setViewportSize({width:1440,height:960});await theme('moon-glass');await p.locator('#sceneTodoList .scene-todo').waitFor();await shot('moon-desktop');
   await p.locator('#scenePlay').click();await p.waitForFunction(()=>!document.querySelector('#listenAudio').paused);await p.locator('#scenePlay').click();assert.equal(await p.locator('#listenAudio').evaluate(e=>e.paused),true);
-  await p.locator('#sceneTodoList .scene-todo').click();await p.waitForFunction(()=>!document.querySelector('#sceneTodoList .scene-todo'));assert.equal(s.control.daily.space_entries.find(e=>e.id==='skin-todo').data.done,true);
+  await p.locator('#sceneSeek').evaluate(e=>e.value='12');await p.locator('#sceneSeek').dispatchEvent('change');await p.waitForFunction(()=>Math.abs(document.querySelector('#listenAudio').currentTime-12)<.5);
+  await p.locator('#sceneLike').click();await p.waitForFunction(()=>document.querySelector('#musicLike').getAttribute('aria-pressed')==='false');await p.locator('#sceneLike').click();await p.waitForFunction(()=>document.querySelector('#musicLike').getAttribute('aria-pressed')==='true');
+  await p.locator('#sceneMode').click();assert.equal(await p.locator('#sceneMode').getAttribute('aria-label'),await p.locator('#musicMode').textContent());
+  await p.locator('#sceneTodoList .scene-todo').click();await p.waitForFunction(()=>document.querySelector('#sceneTodoList .scene-todo')?.getAttribute('aria-checked')==='true');assert.equal(s.control.daily.space_entries.find(e=>e.id==='skin-todo').data.done,true);
   await p.locator('#sceneMusicOpen').click();await p.locator('#listenScrim').waitFor({state:'visible'});assert.equal(await p.locator('#listenScrim').isVisible(),true);assert.equal(await p.locator('.scene-dock').isVisible(),false);await p.locator('#relationClose').click();
   await p.locator('.scene-shortcuts [data-scene-target=wall]').click();await p.locator('#wallSpace').waitFor({state:'visible'});assert.equal(await p.locator('#messages .msg').count(),4);await p.locator('#relationClose').click();
   await theme('rain-night');await shot('rain-desktop');

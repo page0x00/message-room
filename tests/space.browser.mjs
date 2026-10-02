@@ -19,7 +19,7 @@ export async function runSpace({setup,check,secureId,user,friend,fixture,root}){
   for(const [device,width,height] of [['phone',390,844],['phone-wide',844,390],['tablet-tall',820,1180],['tablet-wide',1180,820],['pc',1440,900]]){
    await p.setViewportSize({width,height});
    for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){
-    await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.4.1')).setTheme(theme),theme);
+    await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.4.2')).setTheme(theme),theme);
     await p.locator('#relationHandle').click();await p.locator('#relationSpace').waitFor({state:'visible'});
     await p.waitForTimeout(260);
     assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme}: page overflow`);
@@ -27,7 +27,7 @@ export async function runSpace({setup,check,secureId,user,friend,fixture,root}){
     assert.ok(side.width<=width&&side.height<=height);
     if(width>=700&&height>500){assert.ok(chat.width>=300,`${device}: chat too narrow`);assert.ok(chat.x+chat.width<=side.x+1,`${device}: sidebar covers chat`);}
     else assert.ok(side.width>=width-2,`${device}: phone panel must fill screen`);
-    if(device==='tablet-wide')assert.ok(await p.locator('#home').isVisible());
+    if(device==='tablet-wide')assert.ok(await p.locator('#sceneSidebar').isVisible());
     if(device==='phone'&&theme==='warm-light'||device==='tablet-wide'&&theme==='moon-glass'||device==='pc'&&theme==='rain-night')await p.screenshot({path:`${root}/test-results/space-${device}-${theme}.png`});
     await p.locator('[data-open-view=diary]').click();assert.equal(await p.locator('#diaryEntries .msg').count(),2);
     assert.ok(await p.locator('#diarySpace').evaluate(el=>el.scrollWidth<=el.clientWidth+1));

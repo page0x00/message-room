@@ -1,4 +1,4 @@
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.4.1';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.4.2';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -53,7 +53,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   document.querySelectorAll('[data-theme-pick]').forEach(button=>button.onclick=()=>setTheme(button.dataset.themePick));
   $('relationHandle').onclick=()=>drawer(true);$('relationClose').onclick=()=>drawer(false);$('relationBackdrop').onclick=()=>drawer(false);
   document.querySelectorAll('[data-open-view]').forEach(button=>button.onclick=()=>setView(button.dataset.openView));
-  $('returnChat').onclick=()=>setView('chat');$('writeFromView').onclick=()=>{drawer(false);$('messageInput').focus();};
+  $('returnChat').onclick=()=>setView('chat');$('writeFromView').onclick=()=>{drawer(false);document.dispatchEvent(new Event('mailbox:show-chat'));$('messageInput').focus();};
   $('backBtn').onclick=()=>state.view==='chat'?home():setView('chat');
   const pane=$('messages');
   pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.selecting||state.view!=='chat'||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});

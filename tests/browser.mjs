@@ -1,3 +1,4 @@
+import {runScene} from './scene.browser.mjs';
 import {runSkins} from './skins.browser.mjs';
 import {runCompanions} from './companions.browser.mjs';
 import {runFilms} from './films.browser.mjs';
@@ -113,6 +114,7 @@ async function setup({
   viewport = { width: 390, height: 844 },
   rows = null,
   notificationFixture = false,
+  startView = "chat",
   uploads = [],
 } = {}) {
   const context = await browser.newContext({ viewport, serviceWorkers:"block" });
@@ -385,6 +387,10 @@ async function setup({
     { waitUntil: "networkidle" },
   );
   assert.equal(navigation.status(), 200);
+  if(startView === "chat"){
+    if(secure){await page.waitForFunction(()=>document.querySelector("#roomStatus").textContent.includes("左滑"));await page.locator("#sceneNavChat").click();}
+    else await page.locator("#sceneNavMail").click();
+  }
   async function join(id = "OldRoom1") {
     await page.locator("#addRoomBtn").click();
     await page.locator("#joinToggle").click();
@@ -395,10 +401,11 @@ async function setup({
         document.querySelector("#roomStatus").textContent.includes("左滑"),
     );
   }
-  return { page, context, control, errors, join };
+  const joinRoom=join;
+  return { page, context, control, errors, join:async(id)=>{await joinRoom(id);if(startView === "chat")await page.locator("#sceneNavChat").click();} };
 }
 try {
-  if(!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -407,12 +414,12 @@ try {
       assert.equal(await page.locator(".scrim:visible").count(), 0);
       assert.equal(await page.locator("#joinForm").isVisible(), false);
       await page.locator("#themeBtn").click();
-      await page.locator("[data-theme-pick=warm-light]").click();
+      await page.locator("#settingsScrim [data-theme-pick=warm-light]").click();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
         "warm-light",
       );
-      await page.reload();
+      await page.reload();await page.locator('#sceneNavChat').click();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
         "warm-light",
@@ -540,7 +547,7 @@ try {
       assert.equal(await page.locator(".room-card").count(), 1);
       assert.ok(!new URL(page.url()).search);
       await page.locator(".room-card").click();
-      await page.reload();
+      await page.reload();await page.locator('#sceneNavChat').click();
       await page.waitForFunction(
         () =>
           document.querySelector("#messageInput").value === "待会再发的草稿",
@@ -615,7 +622,7 @@ try {
   );
   await check('previous release local utilities and theme are recovered without publishing',async()=>{
     await old.page.evaluate(()=>{localStorage.setItem('anniversary.OldRoom1',JSON.stringify({name:'原来那一天',date:'2020-05-20'}));localStorage.setItem('memoir.OldRoom1','上一版只写给自己的内容');localStorage.setItem('lyrics.OldRoom1','旧的歌词和备注');localStorage.setItem('theme.v2','warm-dark');localStorage.setItem('mailbox.theme','"clean"');});
-    await old.page.reload();await old.page.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));assert.equal(await old.page.locator('html').getAttribute('data-theme'),'warm-dark');
+    await old.page.reload();await old.page.locator('#sceneNavChat').click();await old.page.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));assert.equal(await old.page.locator('html').getAttribute('data-theme'),'warm-dark');
     const sent=old.control.sends.length;
     await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('#relationClose').click();
     await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('#relationClose').click();
@@ -624,7 +631,7 @@ try {
   await old.page.locator("#backBtn").click();
   await check('signed-out room entry requests login instead of inventing a device identity',async()=>{
     await old.page.evaluate(()=>{localStorage.removeItem('sb-yuzgbxeprpohlakxjcut-auth-token');});
-    await old.page.reload();await old.page.locator('#addRoomBtn').click();await old.page.locator('#createBtn').click();
+    await old.page.reload();await old.page.locator('#sceneNavChat').click();await old.page.locator('#addRoomBtn').click();await old.page.locator('#createBtn').click();
     await old.page.locator('#accountScrim').waitFor({state:'visible'});
     assert.equal(await old.page.locator('#accountEmail').isVisible(),true);
   });
@@ -657,7 +664,7 @@ try {
   await check('second browser restores the same account; matching nickname and device never claim legacy rows',async()=>{
     const second=await setup({secure:true,rows:[...secureRows,fixture(88,secureId,'未确认的历史','test-device',{sender_name:'我'})]});
     await second.page.evaluate(()=>{localStorage.setItem('device_id','different-device');localStorage.setItem('nickname','朋友');});
-    await second.page.reload();await second.page.locator('.msg').first().waitFor();
+    await second.page.reload();await second.page.locator('#sceneNavChat').click();await second.page.locator('.msg').first().waitFor();
     assert.equal(await second.page.locator('.msg.mine').count(),1);
     assert.equal(await second.page.locator('[data-message-id="1"]').evaluate(el=>el.classList.contains('mine')),true);
     assert.equal(await second.page.locator('[data-message-id="88"]').evaluate(el=>el.classList.contains('mine')),false);
@@ -710,7 +717,7 @@ try {
   await check("tablet layout and warm memory wall remain usable", async () => {
     await s.page.locator("#menuBtn").click();
     await s.page.locator("#themeMenuBtn").click();
-    await s.page.locator('[data-theme-pick=warm-light]').click();
+    await s.page.locator('#settingsScrim [data-theme-pick=warm-light]').click();
     await s.page.locator('[data-close=settingsScrim]').click();
     await s.page.locator('#relationHandle').click();
     await s.page.locator('[data-open-view=wall]').click();
@@ -776,13 +783,13 @@ try {
   await check('local audio persists, publishes playback and responds to remote pause',async()=>{
     const samples=8000*8,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF');buffer.writeUInt32LE(36+samples*2,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(8000,24);buffer.writeUInt32LE(16000,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i*.1)*1000),44+i*2);
     await s.page.locator('#relationHandle').click();await s.page.locator('#listenBtn').click();await s.page.locator('#listenFile').setInputFiles({name:'our-song.wav',mimeType:'audio/wav',buffer});await s.page.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await s.page.locator('#lyricsFile').setInputFiles({name:'song.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]这一刻\n[00:02.00]在同一首歌里')});await s.page.locator('#listenShare').click();await s.page.waitForFunction(()=>document.querySelector('#listenSync').checked);assert.equal(s.control.listen.track_key.length,64);const playing=s.page.waitForResponse(r=>r.url().endsWith('/rpc/mailbox_set_listen')&&r.request().postDataJSON().p_playing===true);await s.page.locator('#listenToggle').click();await playing;await s.page.waitForFunction(()=>!document.querySelector('#listenAudio').paused);assert.equal(s.control.listen.is_playing,true);
-    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('#relationClose').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
+    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('#relationClose').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#sceneNavChat').click();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
   });
   await check('four themes across phone, tablet portrait/landscape and desktop have usable chat, drawer, diary, wall',async()=>{
     for(const [device,width,height] of [['phone',390,844],['small-phone',320,680],['tablet-portrait',820,1180],['tablet-landscape',1180,820],['desktop',1440,900],['phone-landscape',844,390]]){
       await s.page.setViewportSize({width,height});
       for(const theme of ['ins-light','ins-dark','warm-light','warm-dark']){
-        await s.page.locator('#menuBtn').click();await s.page.locator('#themeMenuBtn').click();await s.page.locator(`[data-theme-pick=${theme}]`).click();await s.page.locator('[data-close=settingsScrim]').click();
+        await s.page.locator('#menuBtn').click();await s.page.locator('#themeMenuBtn').click();await s.page.locator(`#settingsScrim [data-theme-pick=${theme}]`).click();await s.page.locator('[data-close=settingsScrim]').click();
         for(const view of ['chat','diary','wall']){
           if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'visible'});}
           assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme} ${view} overflow`);assert.ok(await s.page.locator('#messages').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${device} ${theme} ${view} pane overflow`);
@@ -805,7 +812,7 @@ try {
     async () => {
       s.control.denyJoin = true;
       const before = s.control.readCalls;
-      await s.page.reload();
+      await s.page.reload();await s.page.locator('#sceneNavChat').click();
       await s.page.waitForFunction(() =>
         document
           .querySelector("#connectionNote")
@@ -855,7 +862,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.SCENE_ONLY)await runScene({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});

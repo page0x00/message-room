@@ -1,6 +1,6 @@
-import {storeGet,storeSet,isMine,compareCreated,normalizeMessage,roomLink,errorText} from './core.js?v=2.4.1';
-import {client,loadMessages} from './backend.js?v=2.4.1';
-import {notificationLabel,noticePanels} from './notice-core.js?v=2.4.1';
+import {storeGet,storeSet,isMine,compareCreated,normalizeMessage,roomLink,errorText} from './core.js?v=2.4.2';
+import {client,loadMessages} from './backend.js?v=2.4.2';
+import {notificationLabel,noticePanels} from './notice-core.js?v=2.4.2';
 export function newRows(rows,cursor,identity){return rows.map(normalizeMessage).filter(row=>!isMine(row,identity)&&cursor&&compareCreated(row,cursor)>0);}
 export function initNotifications({$,state,toast,persist,recentRooms,renderRecent}){
   let channels=[],generation=0,identity='',audioContext,registration,pollBusy=false;
@@ -9,7 +9,7 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
   const preferences={inApp:true,sound:false,system:false,...storeGet('notifications',{})};
   const record=room=>storeGet('notice.'+(state.userId||identity||'signed-out')+'.'+room,{cursor:null,unread:0});
   const unread=room=>Number(record(room).unread)||0;
-  const active=room=>room===state.room&&state.ready&&state.view==='chat'&&!document.hidden&&$('messages').scrollHeight-$('messages').scrollTop-$('messages').clientHeight<100&&$('relationSpace').inert;
+  const active=room=>room===state.room&&state.ready&&state.view==='chat'&&state.sceneView!=='home'&&!document.hidden&&$('messages').scrollHeight-$('messages').scrollTop-$('messages').clientHeight<100&&$('relationSpace').inert;
   const status=text=>$('notificationStatus').textContent=text;
   async function worker(){
     if(!('serviceWorker' in navigator))throw new Error('这个浏览器没有开放后台通知，可继续使用网页内提示。');
@@ -129,6 +129,7 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
   window.addEventListener('storage',event=>{if(event.key?.startsWith('mailbox.notice.'))badge();});
   setInterval(()=>{void poll();void syncReminders();},60000);
   if('serviceWorker' in navigator){void worker().catch(()=>{});navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='mailbox-push'){void poll();void syncReminders();}});}
+  document.addEventListener('mailbox:scene-view',()=>{if(active(state.room))read(state.room);});
   document.addEventListener('mailbox:space-close',()=>{if(active(state.room))read(state.room);});
   return {prime,ingest,read,unread,watch,onOpen(fn){openPanel=fn;},syncReminders};
 }
