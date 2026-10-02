@@ -1,3 +1,4 @@
+import {runFilms} from './films.browser.mjs';
 import {runMemories} from './memories.browser.mjs';
 import {runMusic} from './music.browser.mjs';
 import {runDaily} from './daily.browser.mjs';
@@ -268,7 +269,7 @@ async function setup({
         if(method==='GET'){const found=rows.filter(matches);return reply(profiles||url.searchParams.has('id')?found[0]||null:found);}
         if(method==='POST'){const row={...json,revision:1};rows.push(row);return reply(row);}
         if(method==='PATCH'){const row=rows.find(matches);if(!row)return reply(null);Object.assign(row,json);return reply(row);}
-        if(method==='DELETE'){if(profiles)control.memoryProfiles=rows.filter(r=>!matches(r));else control.memoryFilms=rows.filter(r=>!matches(r));return reply([]);}}
+        if(method==='DELETE'){const deleted=rows.filter(matches).map(r=>({id:r.id}));if(profiles)control.memoryProfiles=rows.filter(r=>!matches(r));else control.memoryFilms=rows.filter(r=>!matches(r));return reply(deleted);}}
       if(['/music_tracks','/music_likes','/music_colors','/music_playlists'].some(t=>path.endsWith(t))){const table=path.split('/').at(-1),rows=control.music[table],matches=r=>['id','room_id','owner_user_id','track_key','revision'].every(k=>!url.searchParams.has(k)||String(r[k])===url.searchParams.get(k).slice(3));
         if(method==='GET'){const found=rows.filter(matches);return reply(url.searchParams.has('id')?found[0]:found);}
         if(method==='POST'){const row=rows.find(r=>table==='music_playlists'?r.id===json.id:r.room_id===json.room_id&&r.owner_user_id===json.owner_user_id&&(table==='music_colors'||r.track_key===json.track_key));if(row)Object.assign(row,json);else rows.push({...json,...(table==='music_playlists'?{revision:1}:{})});return reply(row||rows.at(-1));}
@@ -385,7 +386,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY){
+  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -842,7 +843,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.MUSIC_ONLY)await runMusic({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.DAILY_ONLY)await runDaily({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SPACE_ONLY)await runSpace({setup,check,secureId,user,friend,fixture,root});
