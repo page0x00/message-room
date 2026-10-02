@@ -1,4 +1,4 @@
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.4.0';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.4.1';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -6,8 +6,8 @@ export function setTheme(value){
   document.documentElement.dataset.theme=theme;storeSet('theme',theme);
   document.querySelector('meta[name=theme-color]').content={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522','rain-night':'#101e2b','moon-glass':'#111a2c'}[theme];
   document.querySelectorAll('[data-theme-pick]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themePick===theme)));
-  const quote=document.querySelector('.home-art .handwriting');if(quote)quote.textContent=['rain-night','moon-glass'].includes(theme)?'群星不怕显得\n像萤火那样。':'Good things\ntake their time.';
-  if(quote)quote.title=['rain-night','moon-glass'].includes(theme)?'泰戈尔《飞鸟集》第 48 则 · 据英文自译':'';
+  const quote=document.querySelector('.home-art .handwriting');if(quote)quote.textContent=['rain-night','moon-glass'].includes(theme)?'群星不怕显得\n像萤火那样。':'生如夏花，\n死如秋叶。';
+  if(quote)quote.title=['rain-night','moon-glass'].includes(theme)?'泰戈尔《飞鸟集》第 48 则 · 据英文自译':'泰戈尔《飞鸟集》第 82 则 · 据英文自译';
 }
 export function contactTarget(value){
   value=String(value||'').trim();
