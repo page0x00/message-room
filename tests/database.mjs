@@ -1,3 +1,4 @@
+import {runMemoryDatabase} from './memories.database.mjs';
 import {runMusicDatabase} from './music.database.mjs';
 import {runDailyDatabase} from './daily.database.mjs';
 // Executes the REAL migrations in an isolated PostgreSQL WASM instance.
@@ -456,6 +457,8 @@ try {
   const musicSql=await readFile(new URL('../supabase/migrations/20261004_music_space.sql',import.meta.url),'utf8');
   await db.exec(musicSql);await db.exec(musicSql);
   await runMusicDatabase({db,check,as,denied,scalar,a,b,c,room});
+  const memorySql=await readFile(new URL('../supabase/migrations/20261005_memories.sql',import.meta.url),'utf8');await db.exec(memorySql);await db.exec(memorySql);
+  await runMemoryDatabase({db,check,as,denied,scalar,a,b,room});
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );
