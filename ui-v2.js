@@ -36,6 +36,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     state.spaceView=id==='diarySpace'?'diary':id==='wallSpace'?'wall':null;
     state.spacePanel=id;
     $('spacePages').scrollTop=0;
+    document.dispatchEvent(new CustomEvent('mailbox:space-page',{detail:{panel:id}}));
   }
   function drawer(open){
     if(open&&!state.room)return;

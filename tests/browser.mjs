@@ -1,3 +1,4 @@
+import {runMemories} from './memories.browser.mjs';
 import {runMusic} from './music.browser.mjs';
 import {runDaily} from './daily.browser.mjs';
 import {runSpace} from './space.browser.mjs';
@@ -150,6 +151,7 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
+    memoryProfiles:[],memoryFilms:[],
     music:{music_tracks:[],music_likes:[],music_colors:[],music_playlists:[]},musicReport:{daily:[],tracks:[],total_seconds:0},
     daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
   };
@@ -262,6 +264,11 @@ async function setup({
         if(method==='DELETE'){control.memoirs=control.memoirs.filter(r=>r.id!==url.searchParams.get('id')?.slice(3));return reply([]);}
       }
       if(path.endsWith('/rpc/mailbox_edit_card')){const row=control.records.find(r=>String(r.id)===json.p_id);if((row.card_revision||1)!==json.p_revision)return reply({code:'40001'},409);row.message_payload=json.p_payload;row.card_revision=(row.card_revision||1)+1;return reply(row);}
+      if(path.endsWith('/memory_profiles')||path.endsWith('/memory_films')){const profiles=path.endsWith('/memory_profiles'),rows=profiles?control.memoryProfiles:control.memoryFilms,matches=r=>['id','room_id','owner_user_id','revision'].every(k=>!url.searchParams.has(k)||String(r[k])===url.searchParams.get(k).slice(3));
+        if(method==='GET'){const found=rows.filter(matches);return reply(profiles||url.searchParams.has('id')?found[0]||null:found);}
+        if(method==='POST'){const row={...json,revision:1};rows.push(row);return reply(row);}
+        if(method==='PATCH'){const row=rows.find(matches);if(!row)return reply(null);Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){if(profiles)control.memoryProfiles=rows.filter(r=>!matches(r));else control.memoryFilms=rows.filter(r=>!matches(r));return reply([]);}}
       if(['/music_tracks','/music_likes','/music_colors','/music_playlists'].some(t=>path.endsWith(t))){const table=path.split('/').at(-1),rows=control.music[table],matches=r=>['id','room_id','owner_user_id','track_key','revision'].every(k=>!url.searchParams.has(k)||String(r[k])===url.searchParams.get(k).slice(3));
         if(method==='GET'){const found=rows.filter(matches);return reply(url.searchParams.has('id')?found[0]:found);}
         if(method==='POST'){const row=rows.find(r=>table==='music_playlists'?r.id===json.id:r.room_id===json.room_id&&r.owner_user_id===json.owner_user_id&&(table==='music_colors'||r.track_key===json.track_key));if(row)Object.assign(row,json);else rows.push({...json,...(table==='music_playlists'?{revision:1}:{})});return reply(row||rows.at(-1));}
@@ -378,7 +385,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY){
+  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -835,7 +842,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.MUSIC_ONLY)await runMusic({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.MUSIC_ONLY)await runMusic({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.DAILY_ONLY)await runDaily({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SPACE_ONLY)await runSpace({setup,check,secureId,user,friend,fixture,root});
   else await runInteractions({setup,check,secureId,user,friend,fixture,root});

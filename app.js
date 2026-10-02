@@ -1,3 +1,4 @@
+import {initMemorySpace} from './memory-space.js?v=2.3.0';
 import {initDailySpace} from './daily-space.js?v=2.3.0';
 import {
   parseRoom,
@@ -241,6 +242,7 @@ async function openRoom(target) {
   });
   features.roomChanged();
   daily.reset();
+  memories.reset();
   actions?.reset();
   $("connectionNote").hidden=true;
   $("home").classList.remove("active");
@@ -321,6 +323,7 @@ async function openRoom(target) {
     notifications.prime(room,state.messages);
     features.ready();
     daily.ready();
+    memories.ready();
     actions?.load();
     if (!supported && (state.quotes.length || state.date))
       toast(
@@ -434,6 +437,7 @@ function home() {
   state.refreshPromise = null;
   features.roomChanged();
   daily.reset();
+  memories.reset();
   actions?.reset();
   $("room").classList.remove("active");
   $("home").classList.add("active");
@@ -479,7 +483,7 @@ function author(message) {
 function render(options={}){
   renderProjection($('messages'),'chat',options);
   if(state.spaceView==='diary')renderProjection($('diaryEntries'),'diary');
-  if(state.spaceView==='wall')renderProjection($('wallEntries'),'wall');
+  if(state.spaceView==='wall')memories.render();
 }
 function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
   const wasNearBottom =
@@ -1044,6 +1048,7 @@ const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
 });
 const daily=initDailySpace({$,state,node,toast,notice,ui});
+const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
 renderRecent();
 void notifications.watch();
