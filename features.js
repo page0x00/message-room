@@ -125,12 +125,13 @@ export function initFeatures(ctx){
     }catch(e){if(current(s))$('attachmentStatus').textContent=e.name==='AbortError'?'已停止，已完成的文件不会重发。':messageError(e)+' 未完成的文件和附言已保留，可重试。';}
     finally{if(current(s)){mediaBusy=false;mediaController=null;queueRender();}}
   };
-  function renderMedia(message,bubble){
+  function renderMedia(message,bubble,view='chat'){
+    const cacheId=message.id+':'+view;
     if(message.import_label)bubble.append(node('div','import-label',`截图摘录 · ${message.import_label}（由留言者导入）`));
     if(!message.media_path)return;
-    if(mediaCards.has(message.id)){bubble.append(mediaCards.get(message.id));return;}
+    if(mediaCards.has(cacheId)){bubble.append(mediaCards.get(cacheId));return;}
     const card=node('div','media-card');card.append(node('span','media-label',(message.media_name||'附件')+' · '+bytesLabel(message.media_size||0)));
-    const button=node('button','',message.message_type==='file'?'下载附件':'打开附件');button.type='button';card.append(button);bubble.append(card);mediaCards.set(message.id,card);
+    const button=node('button','',message.message_type==='file'?'下载附件':'打开附件');button.type='button';card.append(button);bubble.append(card);mediaCards.set(cacheId,card);
     if(!state.secure||!mediaPathValid(message.media_path,state.room)){button.disabled=true;button.textContent='附件路径不可用';return;}
     button.onclick=async()=>{
       const s=snap();button.disabled=true;button.textContent='正在读取……';
@@ -147,7 +148,7 @@ export function initFeatures(ctx){
     };
     if(message.message_type==='image'){button.dataset.autoload='true';mediaObserver.observe(button);}
   }
-  const mediaObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){mediaObserver.unobserve(entry.target);if(entry.target.isConnected)entry.target.click();}},{root:$('messages'),rootMargin:'250px'});
+  const mediaObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){mediaObserver.unobserve(entry.target);if(entry.target.isConnected)entry.target.click();}},{root:null,rootMargin:'250px'});
 
   // Shared dates, with an explicitly local mode for legacy rooms.
   function renderCalendar(){
@@ -176,7 +177,7 @@ export function initFeatures(ctx){
       if(s.secure){const [info,rows]=await Promise.all([data.roomDetails(s.room),data.events(s.room)]);if(!current(s))return;calendar=rows;since=info.relationship_since||localDate(info.created_at);}
       else{calendar=storeGet(key('events',s),[]);if(!Array.isArray(calendar))calendar=[];since=storeGet(key('relationship',s),'')||localDate(state.messages[0]?.created_at);}
       if(!current(s))return;daysCard(since);if(fillDate)$('relationshipSince').value=since;
-      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();if(state.view==='wall')onMessages([]);
+      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();if(state.spaceView==='wall')onMessages([]);
     }catch(e){if(current(s))$('relationshipNote').textContent=messageError(e);}
     finally{if(current(s))calendarBusy=false;}
   }

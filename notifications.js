@@ -104,5 +104,6 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
   window.addEventListener('storage',event=>{if(event.key?.startsWith('mailbox.notice.'))badge();});
   setInterval(()=>void poll(),60000);
   if('serviceWorker' in navigator){void worker().catch(()=>{});navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='mailbox-push')void poll();});}
+  document.addEventListener('mailbox:space-close',()=>{if(active(state.room))read(state.room);});
   return {prime,ingest,read,unread,watch};
 }

@@ -1,3 +1,4 @@
+import {runSpace} from './space.browser.mjs';
 import {runInteractions} from './interactions.browser.mjs';
 import { chromium } from "playwright";
 import { createServer } from "node:http";
@@ -358,7 +359,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY){
+  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -384,7 +385,7 @@ try {
     "legacy history preserved; authenticated UUID places only own messages right",
     async () => {
       assert.equal(control.authCalls, 0);
-      assert.equal(await page.locator(".msg").count(), 2);
+      assert.equal(await page.locator("#messages .msg").count(), 2);
       const ownA = await page.locator(".mine .avatar").boundingBox(),
         ownB = await page.locator(".mine .bubble").boundingBox();
       const theirA = await page
@@ -446,11 +447,11 @@ try {
       assert.deepEqual(control.sends[0].reply_to, ["1", "2"]);
       assert.equal(control.sends[0].display_date, "2024-09-04");
       for (const view of ["diary", "wall", "chat"]) {
-        if(view==='chat')await page.locator('#returnChat').click();else{await page.locator('#relationHandle').click();await page.locator(`[data-open-view=${view}]`).click();}
-        assert.equal(await page.locator(".msg").count(), 3);
+        if(view!=='chat'){await page.locator('#relationHandle').click();await page.locator(`[data-open-view=${view}]`).click();assert.equal(await page.locator(`#${view==='diary'?'diary':'wall'}Entries .msg`).count(),3);await page.locator('#relationClose').click();}
+        assert.equal(await page.locator("#messages .msg").count(), 3);
       }
       assert.equal(control.sends.length, 1);
-      assert.equal(await page.locator(".quote-card").count(), 2);
+      assert.equal(await page.locator("#messages .quote-card").count(), 2);
     },
   );
   await check(
@@ -550,7 +551,7 @@ try {
       await page.waitForFunction(() =>
         document.querySelector("#toast").textContent.includes("上一间房"),
       );
-      assert.equal(await page.locator(".msg").count(), 0);
+      assert.equal(await page.locator("#messages .msg").count(), 0);
       assert.equal(
         await page.locator("#messageInput").inputValue(),
         "另一间的草稿",
@@ -577,9 +578,9 @@ try {
     await old.page.evaluate(()=>{localStorage.setItem('anniversary.OldRoom1',JSON.stringify({name:'原来那一天',date:'2020-05-20'}));localStorage.setItem('memoir.OldRoom1','上一版只写给自己的内容');localStorage.setItem('lyrics.OldRoom1','旧的歌词和备注');localStorage.setItem('theme.v2','warm-dark');localStorage.setItem('mailbox.theme','"clean"');});
     await old.page.reload();await old.page.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));assert.equal(await old.page.locator('html').getAttribute('data-theme'),'warm-dark');
     const sent=old.control.sends.length;
-    await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('[data-close=relationshipScrim]').click();
-    await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('[data-close=memoirScrim]').click();
-    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('[data-close=listenScrim]').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
+    await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('#relationClose').click();
+    await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('#relationClose').click();
+    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('#relationClose').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
   });
   await old.page.locator("#backBtn").click();
   await check('signed-out room entry requests login instead of inventing a device identity',async()=>{
@@ -604,7 +605,7 @@ try {
     "secure room reuses signed-in UUID and exposes protected profile workflow",
     async () => {
       assert.equal(await s.page.locator(".mine").count(), 1);
-      assert.equal(await s.page.locator(".msg").count(), 2);
+      assert.equal(await s.page.locator("#messages .msg").count(), 2);
       await s.page.locator("#roomInfoBtn").click();
       assert.match(
         await s.page.locator("#profileNote").textContent(),
@@ -646,7 +647,7 @@ try {
         s.control.records.filter((r) => r.content === "只发送一次").length,
         1,
       );
-      assert.equal(await s.page.locator(".msg").count(), 3);
+      assert.equal(await s.page.locator("#messages .msg").count(), 3);
     },
   );
   await check(
@@ -683,7 +684,7 @@ try {
       path: resolve(root, "test-results/tablet-wall.png"),
     });
   });
-  await s.page.locator('#returnChat').click();
+  await s.page.locator('#relationClose').click();
   await check('left swipe opens relationship space; vertical gesture and right swipe do not',async()=>{
     await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchstart',{touches:[new Touch({identifier:1,target:el,clientX:600,clientY:300})]}));});
     await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchend',{changedTouches:[new Touch({identifier:1,target:el,clientX:450,clientY:305})]}));});
@@ -698,9 +699,9 @@ try {
     await s.page.locator('#relationshipSince').fill('2024-09-04');await s.page.locator('#relationshipForm button').click();
     await s.page.locator('#eventTitle').fill('第一次听同一首歌');await s.page.locator('#eventDate').fill('2026-09-20');await s.page.locator('#eventSave').click();
     await s.page.locator('.event-card').waitFor();assert.equal(s.control.events[0].owner_user_id,user);
-    await s.page.locator('[data-close=relationshipScrim]').click();
+    await s.page.locator('#relationClose').click();
     await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=wall]').click();
-    assert.match(await s.page.locator('.wall-event').textContent(),/第一次听同一首歌/);await s.page.locator('#returnChat').click();
+    assert.match(await s.page.locator('.wall-event').textContent(),/第一次听同一首歌/);await s.page.locator('#relationClose').click();
   });
   await check('attachment retry after ambiguous send reuses upload path and message nonce',async()=>{
     await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('a shared note')});
@@ -731,12 +732,12 @@ try {
   });
   if(process.env.TEST_STAGE==='cards'){await s.context.close();await runInteractions({setup,check,secureId,user,friend,fixture,root});await browser.close();server.close();console.log('PASS message cards stage');process.exit(0);}
   await check('private memoir generates a date projection, saves privately and does not send chat',async()=>{
-    const count=s.control.sends.length;await s.page.locator('#relationHandle').click();await s.page.locator('#memoirBtn').click();await s.page.locator('#memoirStart').fill('2020-01-01');await s.page.locator('#memoirEnd').fill('2099-01-01');await s.page.locator('#memoirGenerate').click();await s.page.waitForFunction(()=>document.querySelector('#memoirBody').value.includes('第一封信'));await s.page.locator('#memoirTitle').fill('这一页，只有我');await s.page.locator('#memoirSave').click();await s.page.waitForFunction(()=>document.querySelector('#memoirNote').textContent.includes('已保存'));assert.equal(s.control.memoirs.length,1);assert.equal(s.control.memoirs[0].owner_user_id,user);assert.equal(s.control.sends.length,count);await s.page.locator('[data-close=memoirScrim]').click();
+    const count=s.control.sends.length;await s.page.locator('#relationHandle').click();await s.page.locator('#memoirBtn').click();await s.page.locator('#memoirStart').fill('2020-01-01');await s.page.locator('#memoirEnd').fill('2099-01-01');await s.page.locator('#memoirGenerate').click();await s.page.waitForFunction(()=>document.querySelector('#memoirBody').value.includes('第一封信'));await s.page.locator('#memoirTitle').fill('这一页，只有我');await s.page.locator('#memoirSave').click();await s.page.waitForFunction(()=>document.querySelector('#memoirNote').textContent.includes('已保存'));assert.equal(s.control.memoirs.length,1);assert.equal(s.control.memoirs[0].owner_user_id,user);assert.equal(s.control.sends.length,count);await s.page.locator('#relationClose').click();
   });
   await check('local audio persists, publishes playback and responds to remote pause',async()=>{
     const samples=8000*8,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF');buffer.writeUInt32LE(36+samples*2,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(8000,24);buffer.writeUInt32LE(16000,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i*.1)*1000),44+i*2);
     await s.page.locator('#relationHandle').click();await s.page.locator('#listenBtn').click();await s.page.locator('#listenFile').setInputFiles({name:'our-song.wav',mimeType:'audio/wav',buffer});await s.page.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await s.page.locator('#lyricsFile').setInputFiles({name:'song.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]这一刻\n[00:02.00]在同一首歌里')});await s.page.locator('#listenShare').click();await s.page.waitForFunction(()=>document.querySelector('#listenSync').checked);assert.equal(s.control.listen.track_key.length,64);const playing=s.page.waitForResponse(r=>r.url().endsWith('/rpc/mailbox_set_listen')&&r.request().postDataJSON().p_playing===true);await s.page.locator('#listenToggle').click();await playing;await s.page.waitForFunction(()=>!document.querySelector('#listenAudio').paused);assert.equal(s.control.listen.is_playing,true);
-    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('[data-close=listenScrim]').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
+    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('#relationClose').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
   });
   await check('four themes across phone, tablet portrait/landscape and desktop have usable chat, drawer, diary, wall',async()=>{
     for(const [device,width,height] of [['phone',390,844],['small-phone',320,680],['tablet-portrait',820,1180],['tablet-landscape',1180,820],['desktop',1440,900],['phone-landscape',844,390]]){
@@ -744,20 +745,21 @@ try {
       for(const theme of ['ins-light','ins-dark','warm-light','warm-dark']){
         await s.page.locator('#menuBtn').click();await s.page.locator('#themeMenuBtn').click();await s.page.locator(`[data-theme-pick=${theme}]`).click();await s.page.locator('[data-close=settingsScrim]').click();
         for(const view of ['chat','diary','wall']){
-          if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});}
+          if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'visible'});}
           assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme} ${view} overflow`);assert.ok(await s.page.locator('#messages').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${device} ${theme} ${view} pane overflow`);
           const pane=await s.page.locator('#messages').boundingBox();assert.ok(pane.height>90,`${device} ${view} missing content`);
           if(view==='chat'){const box=await s.page.locator('#composer').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,`${device} ${theme} composer`);}
           if(['phone','tablet-landscape','desktop'].includes(device))await s.page.screenshot({path:resolve(root,`test-results/${device}-${theme}-${view}.png`)});
+          if(view!=='chat')await s.page.locator('#relationClose').click();
         }
-        await s.page.locator('#returnChat').click();await s.page.locator('#relationHandle').click();const drawer=await s.page.locator('#relationSpace').boundingBox();assert.ok(drawer.width<=width&&drawer.height<=height);if(device==='phone')await s.page.screenshot({animations:'disabled',path:resolve(root,`test-results/${device}-${theme}-space.png`)});await s.page.locator('#relationClose').click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});
+        await s.page.locator('#relationHandle').click();const drawer=await s.page.locator('#relationSpace').boundingBox();assert.ok(drawer.width<=width+1&&drawer.height<=height+1,`${device} ${theme}: drawer ${JSON.stringify(drawer)} vs ${width}x${height}`);if(device==='phone')await s.page.screenshot({animations:'disabled',path:resolve(root,`test-results/${device}-${theme}-space.png`)});await s.page.locator('#relationClose').click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});
       }
     }
   });
   await check('new incoming messages notify once; history, theme and view changes do not notify',async()=>{
     const id=s.control.records.length+100;s.control.records.push(fixture(id,secureId,'新的晚安',friend,{author_id:friend,created_at:new Date(Date.now()+1000).toISOString()}));
     await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('新留言'));
-    await s.page.evaluate(()=>document.querySelector('#toast').textContent='已读检查');await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=diary]').click();await s.page.locator('#returnChat').click();await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForTimeout(150);assert.equal(await s.page.locator('#toast').textContent(),'已读检查');
+    await s.page.evaluate(()=>document.querySelector('#toast').textContent='已读检查');await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=diary]').click();await s.page.locator('#relationClose').click();await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForTimeout(150);assert.equal(await s.page.locator('#toast').textContent(),'已读检查');
   });
   await check(
     "secure invite rejection never falls back to legacy reads",
@@ -772,7 +774,7 @@ try {
       );
       assert.equal(await s.page.locator("#sendBtn").isDisabled(), true);
       assert.equal(s.control.readCalls, before);
-      assert.equal(await s.page.locator(".msg").count(), 0);
+      assert.equal(await s.page.locator("#messages .msg").count(), 0);
     },
   );
   assert.deepEqual(s.errors, []);
@@ -795,7 +797,7 @@ try {
   await check(
     "keyset pagination loads beyond one page without duplicates",
     async () => {
-      assert.equal(await p.page.locator(".msg").count(), 100);
+      assert.equal(await p.page.locator("#messages .msg").count(), 100);
       await p.page.locator("#olderBtn").click();
       await p.page.waitForFunction(
         () => document.querySelectorAll(".msg").length === 125,
@@ -804,7 +806,7 @@ try {
       assert.equal(
         new Set(
           await p.page
-            .locator(".msg")
+            .locator("#messages .msg")
             .evaluateAll((nodes) => nodes.map((n) => n.dataset.messageId)),
         ).size,
         125,
@@ -814,11 +816,12 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  await runInteractions({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.SPACE_ONLY)await runSpace({setup,check,secureId,user,friend,fixture,root});
+  else await runInteractions({setup,check,secureId,user,friend,fixture,root});
   console.log(
     `\n${checks} browser integration checks passed. All Supabase requests were intercepted; production was not contacted.`,
   );
-} finally {
+} catch(error){console.error(error);process.exitCode=1;} finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
 }

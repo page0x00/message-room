@@ -81,6 +81,7 @@ function persist(key, value) {
 }
 
 function showSheet(id) {
+  if($(id)?.dataset.spacePanel){ui.openFeature(id);return;}
   focusBeforeSheet = document.activeElement;
   $(id).hidden = false;
   $(id).querySelector("input:not([type=file]):not([hidden]),button")?.focus();
@@ -88,6 +89,7 @@ function showSheet(id) {
 
 function closeSheet(id) {
   $(id).hidden = true;
+  if($(id)?.dataset.spacePanel)ui.drawer(false);
   document.dispatchEvent(new CustomEvent('mailbox:sheet-close',{detail:{id}}));
   focusBeforeSheet?.focus();
   if (id === "noticeScrim" && noticeResolve) {
@@ -470,13 +472,17 @@ function author(message) {
   };
 }
 
-function render({ bottom = false, stick = false } = {}) {
-  const box = $("messages");
+function render(options={}){
+  renderProjection($('messages'),'chat',options);
+  if(state.spaceView==='diary')renderProjection($('diaryEntries'),'diary');
+  if(state.spaceView==='wall')renderProjection($('wallEntries'),'wall');
+}
+function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
   const wasNearBottom =
     box.scrollHeight - box.scrollTop - box.clientHeight < 100;
   const oldTop = box.scrollTop;
   const fragment = document.createDocumentFragment();
-  box.className = "messages view-" + state.view;
+  box.className = "messages view-" + view;
   if (!state.messages.some(m=>!actions?.hidden(m.id)))
     fragment.append(
       node(
@@ -489,17 +495,17 @@ function render({ bottom = false, stick = false } = {}) {
     );
   const byId = new Map(state.messages.map((m) => [m.id, m]));
   let lastDay = '',container=fragment;
-  if(state.view==='wall')fragment.append(node('p','wall-intro','把值得留下的瞬间，慢慢贴在这里。'));
-  for (const message of projectMessages(state.messages.filter(m=>!actions?.hidden(m.id)), state.view).filter(m=>state.view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
-    const day = displayDay(message, state.view);
+  if(view==='wall')fragment.append(node('p','wall-intro','把值得留下的瞬间，慢慢贴在这里。'));
+  for (const message of projectMessages(state.messages.filter(m=>!actions?.hidden(m.id)), view).filter(m=>view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
+    const day = displayDay(message, view);
     if (day !== lastDay) {
-      if(state.view==='diary'){container=node('section','diary-page');fragment.append(container);}
-      if(state.view!=='wall')container.append(node('div','day',day||'日期未知'));
+      if(view==='diary'){container=node('section','diary-page');fragment.append(container);}
+      if(view!=='wall')container.append(node('div','day',day||'日期未知'));
       lastDay = day;
     }
     const who = author(message);
     const row = node("article", "msg" + (who.mine ? " mine" : ""));
-    row.dataset.messageId = message.id;
+    if(view==='chat')row.dataset.messageId=message.id;else row.dataset.sourceMessageId=message.id;
     const wrap = node("div", "bubble-wrap");
     wrap.append(node("span", "sender-name", who.name));
     const bubble = node("div", "bubble");
@@ -515,7 +521,7 @@ function render({ bottom = false, stick = false } = {}) {
         );
       referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
-    if(!cards.render(message,bubble)){features.renderMedia(message,bubble);bubble.append(node("div","message-text",message.content));}
+    if(!cards.render(message,bubble)){features.renderMedia(message,bubble,view);bubble.append(node("div","message-text",message.content));}
     wrap.append(bubble);
     const meta = node("div", "meta");
     const stamp = new Date(message.created_at);
@@ -532,39 +538,35 @@ function render({ bottom = false, stick = false } = {}) {
     time.dateTime = message.created_at;
     time.title = "真实发送时间：" + stamp.toLocaleString("zh-CN");
     meta.append(time);
-    if (message.display_date && state.view !== "chat")
+    if (message.display_date && view !== "chat")
       meta.append(
         node("span", "", " · 发送于 " + localDate(message.created_at)),
       );
     wrap.append(meta);
     const portrait = avatar(who.image, who.name);
-    if(state.view==='wall')wrap.append(node('time','wall-date',displayDay(message,'wall')));
-    row.append(portrait,wrap);actions?.decorate(row,message);container.append(row);
+    if(view==='wall')wrap.append(node('time','wall-date',displayDay(message,'wall')));
+    row.append(portrait,wrap);if(view==='chat')actions?.decorate(row,message);container.append(row);
   }
-  if(state.view==='wall')features.renderWall(fragment);
-  if(state.view==='wall'){const grid=node('div','wall-grid');grid.append(fragment);box.replaceChildren(grid);}else box.replaceChildren(fragment);
+  if(view==='wall')features.renderWall(fragment);
+  if(view==='wall'){const grid=node('div','wall-grid');grid.append(fragment);box.replaceChildren(grid);}else box.replaceChildren(fragment);
+  if(view!=='chat'){box.scrollTop=oldTop;return;}
   $("olderBtn").hidden = !state.hasMore;
   $("historyCount").textContent = state.messages.length
     ? `${state.messages.length} 条${state.hasMore ? " · 还有更早留言" : ""}`
     : "";
   renderQuotes();
   actions?.rendered();
-  if (bottom || (stick && wasNearBottom && state.view === "chat"))
+  if (bottom || (stick && wasNearBottom && view === "chat"))
     box.scrollTop = box.scrollHeight;
   else box.scrollTop = oldTop;
-  if(state.ready&&state.view==='chat'&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
+  if(state.ready&&view==='chat'&&$('relationSpace').inert&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
 }
 
 function setView(view) {
-  view=['chat','diary','wall'].includes(view)?view:'chat';
-  state.view = view;
-  $('viewHeading').hidden=view==='chat';$('viewTitle').textContent=view==='diary'?'日记':'回忆墙';$('diaryFilters').hidden=view!=='diary';$('composer').hidden=view!=='chat';$('room').dataset.view=view;
-  document.querySelectorAll("[data-view]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === view);
-    button.setAttribute("aria-pressed", String(button.dataset.view === view));
-  });
-  render({ bottom: view === "chat" });
-  if (view !== "chat") $("messages").scrollTop = 0;
+  state.view='chat';$('room').dataset.view='chat';$('composer').hidden=false;
+  if(view==='diary'||view==='wall')ui.openFeature(view+'Space');
+  else ui.drawer(false);
+  render();
 }
 
 function renderQuotes() {
@@ -927,7 +929,7 @@ $("clearQuotes").onclick = () => {
 };
 $("refreshBtn").onclick = () => refreshMessages(true);
 $("olderBtn").onclick = loadOlder;
-$("messages").onclick = (event) => {
+$("messages").onclick = $("spacePages").onclick = (event) => {
   const reference=event.target.closest('[data-reference-id]');
   if(reference)void revealReference(reference.dataset.referenceId);
 };
@@ -950,6 +952,7 @@ document.addEventListener("keydown", (event) => {
   );
   if (!sheet) return;
   if (event.key === "Escape") {
+    event.preventDefault();event.stopImmediatePropagation();
     closeSheet(sheet.id);
     return;
   }
@@ -1031,7 +1034,7 @@ const notifications=initNotifications({$,state,toast,persist,recentRooms,renderR
 const ui=initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home});
 const heading=$('roomInfoBtn'),label=node('span');label.append($('roomTitle'),$('roomStatus'));heading.replaceChildren(avatar('','友'),label);
 $('pinRoomBtn').onclick=()=>{const records=recentRooms();const row=records.find(r=>r.room===state.room);if(row){row.pinned=!row.pinned;persist('recent',records);renderRecent();toast(row.pinned?'这个房间已置顶。':'已取消置顶。');}closeSheet('menuScrim');};
-$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
+$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&$('relationSpace').inert&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
 const cards=initMessageCards({$,state,node,toast,showSheet,closeSheet,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render();}});
 const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
