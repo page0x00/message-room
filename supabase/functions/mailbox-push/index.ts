@@ -7,10 +7,10 @@ const origin=Deno.env.get('MAILBOX_ORIGIN')||'https://page0x00.github.io';
 const cors={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Vary':'Origin'};
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json'}});
 async function deliver(jobs:any[]){
- let sent=0,failed=0;
- for(const job of jobs){
-  if(!allowedEndpoint(job.endpoint))continue;
-  const claim=await admin.rpc('mailbox_claim_push',{p_subscription:job.subscription_id,p_message:job.delivery_id});if(claim.error)throw claim.error;if(!claim.data)continue;
+ let sent=0,failed=0,offset=0;
+ async function one(job:any){
+  if(!allowedEndpoint(job.endpoint))return;
+  const claim=await admin.rpc('mailbox_claim_push',{p_subscription:job.subscription_id,p_message:job.delivery_id});if(claim.error)throw claim.error;if(!claim.data)return;
   try{
    const payload=job.kind==='message'?notificationPayload({room_id:job.room_id,id:job.source_id}):JSON.stringify({room:job.room_id,id:job.source_id,kind:job.kind});
    await webpush.sendNotification({endpoint:job.endpoint,keys:{p256dh:job.p256dh,auth:job.auth}},payload,{TTL:job.kind==='listen'?600:3600,urgency:'normal',timeout:8000});
@@ -21,6 +21,8 @@ async function deliver(jobs:any[]){
    else{await admin.from('mailbox_push_deliveries').update({status:'failed',lease_until:new Date(Date.now()+60000).toISOString()}).eq('subscription_id',job.subscription_id).eq('message_id',job.delivery_id);failed++;}
   }
  }
+ // At most four requests at once; a 20-item cron batch fits the network deadline.
+ await Promise.all(Array.from({length:Math.min(4,jobs.length)},async()=>{while(offset<jobs.length){const job=jobs[offset++];try{await one(job);}catch{failed++;}}}));
  return {sent,failed};
 }
 Deno.serve(async req=>{

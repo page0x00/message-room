@@ -1,5 +1,5 @@
-import {client} from './backend.js?v=2.3.0';
-import {localDate} from './core.js?v=2.3.0';
+import {client} from './backend.js?v=2.4.0';
+import {localDate} from './core.js?v=2.4.0';
 
 export function initPetSpace({$,state,node,toast,notice,ui}){
  const pane=node('section','space-page');pane.id='petSpace';pane.hidden=true;

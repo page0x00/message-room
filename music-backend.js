@@ -1,5 +1,5 @@
-import {client} from './backend.js?v=2.3.0';
-import {listRows} from './daily-backend.js?v=2.3.0';
+import {client} from './backend.js?v=2.4.0';
+import {listRows} from './daily-backend.js?v=2.4.0';
 const take=r=>{if(r.error)throw r.error;return r.data;};
 export async function readLibrary(room){const sb=client(true),tables=['music_tracks','music_likes','music_colors'];const rows=await Promise.all(tables.map(async table=>{let all=[];for(let offset=0;offset<20000;offset+=500){const part=take(await sb.from(table).select('*').eq('room_id',room).order('owner_user_id').range(offset,offset+499))||[];all.push(...part);if(part.length<500)return all;}throw new Error('音乐记录较多，请稍后再试。');}));return {tracks:rows[0],likes:rows[1],colors:rows[2],playlists:await listRows('music_playlists',room)};}
 export async function track(row){return take(await client(true).from('music_tracks').upsert(row,{onConflict:'room_id,owner_user_id,track_key'}).select().single());}

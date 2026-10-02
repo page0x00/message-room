@@ -110,6 +110,7 @@ async function setup({
   viewport = { width: 390, height: 844 },
   rows = null,
   notificationFixture = false,
+  uploads = [],
 } = {}) {
   const context = await browser.newContext({ viewport, serviceWorkers:"block" });
   await context.addInitScript(({user}) => {
@@ -155,7 +156,7 @@ async function setup({
     readCalls: 0,
     memoryProfiles:[],memoryFilms:[],petConsents:[],petState:null,petConfigured:false,petCalls:0,notices:[],listenInvites:0,
     music:{music_tracks:[],music_likes:[],music_colors:[],music_playlists:[]},musicReport:{daily:[],tracks:[],total_seconds:0},
-    daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
+    daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(uploads), featureFail:false,
   };
   await context.route('**/ocr.js?*',route=>route.fulfill({contentType:'text/javascript',body:`export async function recognizeScreenshot(file,{signal,onProgress}={}){window.ocrCalls=(window.ocrCalls||0)+1;if(window.ocrSlow)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,1200);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));},{once:true});});onProgress?.('测试识别');return {messages:[{text:'一起看晚霞',side:'left',date:'2026-09-18',dateSource:'聊天日期',time:'20:00',confidence:96,y:100}]};}` }));
   const errors = [];

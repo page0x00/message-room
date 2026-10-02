@@ -1,8 +1,8 @@
-import {noticePanels} from './notice-core.js?v=2.3.0';
-import {initPetSpace} from './pet-space.js?v=2.3.0';
-import {initFilmSpace} from './film-space.js?v=2.3.0';
-import {initMemorySpace} from './memory-space.js?v=2.3.0';
-import {initDailySpace} from './daily-space.js?v=2.3.0';
+import {noticePanels} from './notice-core.js?v=2.4.0';
+import {initPetSpace} from './pet-space.js?v=2.4.0';
+import {initFilmSpace} from './film-space.js?v=2.4.0';
+import {initMemorySpace} from './memory-space.js?v=2.4.0';
+import {initDailySpace} from './daily-space.js?v=2.4.0';
 import {
   parseRoom,
   roomLink,
@@ -18,15 +18,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.3.0";
-import * as api from "./backend.js?v=2.3.0";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.3.0";
-import { initNotifications } from "./notifications.js?v=2.3.0";
-import { initFeatures } from "./features.js?v=2.3.0";
+} from "./core.js?v=2.4.0";
+import * as api from "./backend.js?v=2.4.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.4.0";
+import { initNotifications } from "./notifications.js?v=2.4.0";
+import { initFeatures } from "./features.js?v=2.4.0";
 
-import {initMessageCards} from "./message-cards.js?v=2.3.0";
-import {initAccount} from "./account.js?v=2.3.0";
-import {initMessageActions} from "./message-actions.js?v=2.3.0";
+import {initMessageCards} from "./message-cards.js?v=2.4.0";
+import {initAccount} from "./account.js?v=2.4.0";
+import {initMessageActions} from "./message-actions.js?v=2.4.0";
 let actions;
 
 const $ = (id) => document.getElementById(id);
