@@ -1,9 +1,9 @@
-import {noticePanels} from './notice-core.js?v=2.4.1';
-import {initSceneInterface} from './scene-interface.js?v=2.4.1';
-import {initPetSpace} from './pet-space.js?v=2.4.1';
-import {initFilmSpace} from './film-space.js?v=2.4.1';
-import {initMemorySpace} from './memory-space.js?v=2.4.1';
-import {initDailySpace} from './daily-space.js?v=2.4.1';
+import {noticePanels} from './notice-core.js?v=2.4.2';
+import {initSceneInterface} from './scene-interface.js?v=2.4.2';
+import {initPetSpace} from './pet-space.js?v=2.4.2';
+import {initFilmSpace} from './film-space.js?v=2.4.2';
+import {initMemorySpace} from './memory-space.js?v=2.4.2';
+import {initDailySpace} from './daily-space.js?v=2.4.2';
 import {
   parseRoom,
   roomLink,
@@ -19,15 +19,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.4.1";
-import * as api from "./backend.js?v=2.4.1";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.4.1";
-import { initNotifications } from "./notifications.js?v=2.4.1";
-import { initFeatures } from "./features.js?v=2.4.1";
+} from "./core.js?v=2.4.2";
+import * as api from "./backend.js?v=2.4.2";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.4.2";
+import { initNotifications } from "./notifications.js?v=2.4.2";
+import { initFeatures } from "./features.js?v=2.4.2";
 
-import {initMessageCards} from "./message-cards.js?v=2.4.1";
-import {initAccount} from "./account.js?v=2.4.1";
-import {initMessageActions} from "./message-actions.js?v=2.4.1";
+import {initMessageCards} from "./message-cards.js?v=2.4.2";
+import {initAccount} from "./account.js?v=2.4.2";
+import {initMessageActions} from "./message-actions.js?v=2.4.2";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -266,6 +266,7 @@ async function openRoom(target) {
     : "旧版兼容模式：保留原有公开权限，请勿存放私密内容。";
   render();
   setView("chat");
+  document.dispatchEvent(new Event("mailbox:room-open"));
   updateStatus();
   try {
     const uid = await api.authenticate();
@@ -352,6 +353,7 @@ async function openRoom(target) {
       : "";
     $("connectionNote").hidden=false;
     $("connectionNote").textContent = errorText(error) + extra;
+    document.dispatchEvent(new Event('mailbox:show-chat'));
     render();
     updateStatus();
   }
@@ -451,6 +453,7 @@ function home() {
   actions?.reset();
   $("room").classList.remove("active");
   $("home").classList.add("active");
+  document.dispatchEvent(new Event("mailbox:room-exit"));
   document.querySelectorAll(".scrim").forEach((el) => {
     el.hidden = true;
   });
@@ -577,13 +580,13 @@ function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
   if (bottom || (stick && wasNearBottom && view === "chat"))
     box.scrollTop = box.scrollHeight;
   else box.scrollTop = oldTop;
-  if(state.ready&&view==='chat'&&$('relationSpace').inert&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
+  if(state.ready&&view==='chat'&&state.sceneView!=='home'&&$('relationSpace').inert&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
 }
 
 function setView(view) {
   state.view='chat';$('room').dataset.view='chat';$('composer').hidden=false;
   if(view==='diary'||view==='wall')ui.openFeature(view+'Space');
-  else ui.drawer(false);
+  else {ui.drawer(false);document.dispatchEvent(new Event('mailbox:show-chat'));}
   render();
 }
 
@@ -1052,7 +1055,7 @@ const notifications=initNotifications({$,state,toast,persist,recentRooms,renderR
 const ui=initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home});
 const heading=$('roomInfoBtn'),label=node('span');label.append($('roomTitle'),$('roomStatus'));heading.replaceChildren(avatar('','友'),label);
 $('pinRoomBtn').onclick=()=>{const records=recentRooms();const row=records.find(r=>r.room===state.room);if(row){row.pinned=!row.pinned;persist('recent',records);renderRecent();toast(row.pinned?'这个房间已置顶。':'已取消置顶。');}closeSheet('menuScrim');};
-$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&$('relationSpace').inert&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
+$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&state.sceneView!=='home'&&$('relationSpace').inert&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
 const cards=initMessageCards({$,state,node,toast,showSheet,closeSheet,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render();}});
 const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
@@ -1061,7 +1064,7 @@ const daily=initDailySpace({$,state,node,toast,notice,ui});
 const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
-initSceneInterface({$,node});
+initSceneInterface({$,node,state,ui});
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
 notifications.onOpen(openNotice);
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});

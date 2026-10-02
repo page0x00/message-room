@@ -67,7 +67,7 @@ npm run test:browser
 
 端侧重点：两种身份文字/多引用/附件互发、真实录音、共同歌曲进度和自动播放限制、长截图中文识别质量、关闭页面后的推送送达/点击跳回原房间。iPhone/iPad 通常需将网页添加到主屏幕后使用 Web Push；不同浏览器及系统省电设置会影响后台通知。
 
-GitHub Pages 部署 **main / 根目录**，必须保留整个仓库静态文件结构。本更新分支前端版本为 `2.4.1`；JS/CSS 入口带版本参数，Service Worker 只处理通知，不缓存页面、消息或媒体。直接访问 [正式页面](https://page0x00.github.io/message-room/)。
+GitHub Pages 部署 **main / 根目录**，必须保留整个仓库静态文件结构。本更新分支前端版本为 `2.4.2`；JS/CSS 入口带版本参数，Service Worker 只处理通知，不缓存页面、消息或媒体。直接访问 [正式页面](https://page0x00.github.io/message-room/)。
 
 若需要回退，恢复前端 Git 提交即可，不反向删除数据表、不清空消息、不关闭 RLS。独立 SQL 文件按顺序升级；不要在已升级功能的线上单独重跑旧的 Auth migration 而不接着执行功能 migration。
 
