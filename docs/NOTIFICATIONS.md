@@ -8,6 +8,8 @@
 - Worker 只处理 push、notificationclick，不缓存 HTML/JS/私密内容。跳转限定当前网站 scope 和有效房间号，不接受任意外站 URL。
 - 房间 Push 订阅由本人/成员 RLS 隔离；服务端只通知当前房间的其他有效成员；限制可信推送域名避免 SSRF。
 - 消息发送者 JWT 校验或 Dashboard 私有 webhook secret 校验；Edge 从数据库重读真实消息，不信任客户端提交的收件人/正文。
-- `mailbox_claim_push` 把前端补发、webhook 发送去重。网络临时失败释放一分钟后的重试租约，最多五次；404/410 订阅移除。未配置自动定时重试队列，可重放 webhook。
+- `mailbox_claim_push` 把前端补发、webhook 发送去重。网络临时失败释放一分钟后的重试租约，最多五次；404/410 订阅移除。新增 `mailbox_push_jobs` 服务端队列读取与 `SCHEDULE_PUSH.sql` 每五分钟调度，处理新消息和各类提醒的失败重试；未部署调度时不会假称已经自动重试。
 
 实际配置和双设备验收见 [SETUP.md](../SETUP.md)。代码已提供不等于线上推送服务已部署。
+
+关系提醒存于 `relation_notices`，按 UUID/RLS 仅接收人可读；源数据完成或假条生效后不再派发对应条目。已读通过 RPC 保存，客户端未读标记与系统通知都不含私人日记/金额/聊天正文。一起听邀请要求调用者确为最近一次同步的操作者，并按 play_id 去重。后台任务的密钥独立于 webhook，存 Secrets/Vault。

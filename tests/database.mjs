@@ -1,3 +1,5 @@
+import {runNoticeDatabase} from './notices.database.mjs';
+import {runPetDatabase} from './pet.database.mjs';
 import {runMemoryDatabase} from './memories.database.mjs';
 import {runMusicDatabase} from './music.database.mjs';
 import {runDailyDatabase} from './daily.database.mjs';
@@ -459,6 +461,10 @@ try {
   await runMusicDatabase({db,check,as,denied,scalar,a,b,c,room});
   const memorySql=await readFile(new URL('../supabase/migrations/20261005_memories.sql',import.meta.url),'utf8');await db.exec(memorySql);await db.exec(memorySql);
   await runMemoryDatabase({db,check,as,denied,scalar,a,b,room});
+  const petSql=await readFile(new URL('../supabase/migrations/20261006_pet.sql',import.meta.url),'utf8');await db.exec(petSql);await db.exec(petSql);
+  await runPetDatabase({db,check,as,denied,scalar,a,b,c,room});
+  const noticeSql=await readFile(new URL('../supabase/migrations/20261007_notices.sql',import.meta.url),'utf8');await db.exec(noticeSql);await db.exec(noticeSql);
+  await runNoticeDatabase({db,check,as,denied,scalar,a,b,c,room});
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );

@@ -1,3 +1,4 @@
+import {runCompanions} from './companions.browser.mjs';
 import {runFilms} from './films.browser.mjs';
 import {runMemories} from './memories.browser.mjs';
 import {runMusic} from './music.browser.mjs';
@@ -6,7 +7,7 @@ import {runSpace} from './space.browser.mjs';
 import {runInteractions} from './interactions.browser.mjs';
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { readFile, mkdir } from "node:fs/promises";
+import { readFile, mkdir, access, link, unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve, extname } from "node:path";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -63,14 +64,14 @@ try {
   // Only unpack the executable; system fonts/libs are already available. This
   // avoids Lambda archive ownership operations on ordinary development hosts.
   const executablePath = resolve(root, "test-results/chromium");
-  await pipeline(
-    createReadStream(
-      resolve(root, "node_modules/@sparticuz/chromium/bin/chromium.br"),
-    ),
-    createBrotliDecompress(),
-    createWriteStream(executablePath),
-  );
-  await chmod(executablePath, 0o755);
+  try{await access(executablePath,1);}catch{
+    const unpacked=executablePath+'.'+process.pid;
+    try{
+      await pipeline(createReadStream(resolve(root,"node_modules/@sparticuz/chromium/bin/chromium.br")),createBrotliDecompress(),createWriteStream(unpacked));
+      await chmod(unpacked,0o755);
+      try{await link(unpacked,executablePath);}catch(e){if(e.code!=='EEXIST')throw e;}
+    }finally{await unlink(unpacked).catch(()=>{});}
+  }
   browser = await chromium.launch({
     headless: true,
     args: [
@@ -152,7 +153,7 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
-    memoryProfiles:[],memoryFilms:[],
+    memoryProfiles:[],memoryFilms:[],petConsents:[],petState:null,petConfigured:false,petCalls:0,notices:[],listenInvites:0,
     music:{music_tracks:[],music_likes:[],music_colors:[],music_playlists:[]},musicReport:{daily:[],tracks:[],total_seconds:0},
     daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
   };
@@ -275,6 +276,13 @@ async function setup({
         if(method==='POST'){const row=rows.find(r=>table==='music_playlists'?r.id===json.id:r.room_id===json.room_id&&r.owner_user_id===json.owner_user_id&&(table==='music_colors'||r.track_key===json.track_key));if(row)Object.assign(row,json);else rows.push({...json,...(table==='music_playlists'?{revision:1}:{})});return reply(row||rows.at(-1));}
         if(method==='PATCH'){const row=rows.find(matches);if(!row)return reply(null);Object.assign(row,json);return reply(row);}
         if(method==='DELETE'){control.music[table]=rows.filter(r=>!matches(r));return reply([]);}}
+      if(path.endsWith('/rpc/mailbox_sync_notices'))return reply(control.notices);
+      if(path.endsWith('/rpc/mailbox_read_notice')){const n=control.notices.find(n=>n.id===json.p_id);if(n)n.seen_at=new Date().toISOString();return reply(null);}
+      if(path.endsWith('/rpc/mailbox_invite_listen')){control.listenInvites++;return reply(1);}
+      if(path.endsWith('/pet_consents'))return reply(control.petConsents);
+      if(path.endsWith('/pet_states'))return reply(control.petState);
+      if(path.endsWith('/rpc/mailbox_pet_consent')){control.petState=null;const c={room_id:json.p_room,user_id:user,enabled:json.p_enabled,automatic:json.p_auto,date_start:json.p_start,date_end:json.p_end};control.petConsents=control.petConsents.filter(c=>c.user_id!==user).concat(c);return reply(c);}
+      if(path.endsWith('/functions/v1/mailbox-pet')){if(method==='GET')return reply({configured:control.petConfigured});control.petCalls++;if(!control.petConfigured)return reply({error:'AI 暂时未连接'},503);control.petState={room_id:secureId,owner_user_id:user,source_count:1,updated_at:new Date().toISOString(),generations:1,data:{name:'小烬',mood:'curious',line:'记住那个一起看海的约定。',traits:['好奇','爱听故事'],memories:[{text:'约好一起去看海。',sources:['1']}]}};return reply({state:control.petState});}
       if(path.endsWith('/rpc/mailbox_listen_report'))return reply(control.musicReport);
       if(path.endsWith('/rpc/mailbox_listen_heartbeat'))return reply({server_now:new Date().toISOString(),listeners:json.p_playing?1:0});
       if(path.endsWith('/rpc/mailbox_read_listen'))return reply({session:control.listen,server_now:new Date().toISOString()});
@@ -386,7 +394,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY){
+  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -843,7 +851,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.MUSIC_ONLY)await runMusic({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.DAILY_ONLY)await runDaily({setup,check,secureId,user,friend,fixture,root});

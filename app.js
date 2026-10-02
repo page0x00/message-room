@@ -1,3 +1,5 @@
+import {noticePanels} from './notice-core.js?v=2.3.0';
+import {initPetSpace} from './pet-space.js?v=2.3.0';
 import {initFilmSpace} from './film-space.js?v=2.3.0';
 import {initMemorySpace} from './memory-space.js?v=2.3.0';
 import {initDailySpace} from './daily-space.js?v=2.3.0';
@@ -245,6 +247,7 @@ async function openRoom(target) {
   daily.reset();
   memories.reset();
   films.reset();
+  pet.reset();
   actions?.reset();
   $("connectionNote").hidden=true;
   $("home").classList.remove("active");
@@ -326,6 +329,7 @@ async function openRoom(target) {
     features.ready();
     daily.ready();
     memories.ready();
+    pet.ready();
     actions?.load();
     if (!supported && (state.quotes.length || state.date))
       toast(
@@ -333,6 +337,7 @@ async function openRoom(target) {
       );
     rememberRoom();
     void notifications.watch();
+    const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);openNotice(noticePanel);}
     render({ bottom: true });
     updateStatus();
   } catch (error) {
@@ -441,6 +446,7 @@ function home() {
   daily.reset();
   memories.reset();
   films.reset();
+  pet.reset();
   actions?.reset();
   $("room").classList.remove("active");
   $("home").classList.add("active");
@@ -1053,6 +1059,9 @@ const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,
 const daily=initDailySpace({$,state,node,toast,notice,ui});
 const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
+const pet=initPetSpace({$,state,node,toast,notice,ui});
+function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
+notifications.onOpen(openNotice);
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
 renderRecent();
 void notifications.watch();

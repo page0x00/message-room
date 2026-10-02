@@ -7,14 +7,15 @@
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:db": "node tests/database.mjs",
-    "check": "node --check message-cards.js && node --check account.js && node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js && node --check screenshot-import.js && node --check ocr-layout.js && node --check import-core.js && node --check screenshot-store.js && node --check message-actions.js && node --check daily-core.js && node --check daily-backend.js && node --check daily-space.js && node --check music-space.js && node --check music-core.js && node --check music-backend.js && node --check memory-core.js && node --check memory-backend.js && node --check memory-space.js && node --check film-space.js && node --check film-audio.js",
+    "check": "node --check message-cards.js && node --check account.js && node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js && node --check screenshot-import.js && node --check ocr-layout.js && node --check import-core.js && node --check screenshot-store.js && node --check message-actions.js && node --check daily-core.js && node --check daily-backend.js && node --check daily-space.js && node --check music-space.js && node --check music-core.js && node --check music-backend.js && node --check memory-core.js && node --check memory-backend.js && node --check memory-space.js && node --check film-space.js && node --check film-audio.js && node --check pet-space.js && node --check notice-core.js && node --check supabase/functions/mailbox-pet/policy.mjs",
     "build:sql": "node scripts/build-sql.mjs",
     "test:ocr": "node tests/ocr-browser.mjs",
     "test:daily": "DAILY_ONLY=1 node tests/browser.mjs",
     "test:space": "SPACE_ONLY=1 node tests/browser.mjs",
     "test:music": "MUSIC_ONLY=1 node tests/browser.mjs",
     "test:memory": "MEMORY_ONLY=1 node tests/browser.mjs",
-    "test:film": "FILM_ONLY=1 node tests/browser.mjs"
+    "test:film": "FILM_ONLY=1 node tests/browser.mjs",
+    "test:companion": "COMPANION_ONLY=1 node tests/browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",
