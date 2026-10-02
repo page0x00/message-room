@@ -1,8 +1,9 @@
-import {noticePanels} from './notice-core.js?v=2.4.0';
-import {initPetSpace} from './pet-space.js?v=2.4.0';
-import {initFilmSpace} from './film-space.js?v=2.4.0';
-import {initMemorySpace} from './memory-space.js?v=2.4.0';
-import {initDailySpace} from './daily-space.js?v=2.4.0';
+import {noticePanels} from './notice-core.js?v=2.4.1';
+import {initSceneInterface} from './scene-interface.js?v=2.4.1';
+import {initPetSpace} from './pet-space.js?v=2.4.1';
+import {initFilmSpace} from './film-space.js?v=2.4.1';
+import {initMemorySpace} from './memory-space.js?v=2.4.1';
+import {initDailySpace} from './daily-space.js?v=2.4.1';
 import {
   parseRoom,
   roomLink,
@@ -18,15 +19,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.4.0";
-import * as api from "./backend.js?v=2.4.0";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.4.0";
-import { initNotifications } from "./notifications.js?v=2.4.0";
-import { initFeatures } from "./features.js?v=2.4.0";
+} from "./core.js?v=2.4.1";
+import * as api from "./backend.js?v=2.4.1";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.4.1";
+import { initNotifications } from "./notifications.js?v=2.4.1";
+import { initFeatures } from "./features.js?v=2.4.1";
 
-import {initMessageCards} from "./message-cards.js?v=2.4.0";
-import {initAccount} from "./account.js?v=2.4.0";
-import {initMessageActions} from "./message-actions.js?v=2.4.0";
+import {initMessageCards} from "./message-cards.js?v=2.4.1";
+import {initAccount} from "./account.js?v=2.4.1";
+import {initMessageActions} from "./message-actions.js?v=2.4.1";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -1060,6 +1061,7 @@ const daily=initDailySpace({$,state,node,toast,notice,ui});
 const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
+initSceneInterface({$,node});
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
 notifications.onOpen(openNotice);
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});

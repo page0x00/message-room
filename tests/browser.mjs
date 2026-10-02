@@ -1,3 +1,4 @@
+import {runSkins} from './skins.browser.mjs';
 import {runCompanions} from './companions.browser.mjs';
 import {runFilms} from './films.browser.mjs';
 import {runMemories} from './memories.browser.mjs';
@@ -23,6 +24,8 @@ const mime = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",
 };
@@ -395,7 +398,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -852,7 +855,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.MUSIC_ONLY)await runMusic({setup,check,secureId,user,friend,fixture,root});
