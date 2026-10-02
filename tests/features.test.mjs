@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {fileInfo,MAX_FILE_SIZE,mediaPathValid,daysBetween,eventCountdown,parseLyrics,activeLyric,playbackPosition,memoirText} from '../feature-core.js';
 test('attachment allowlist excludes executable previews and oversize files',()=>{
   assert.equal(fileInfo({name:'照片.PNG',type:'',size:12}).type,'image');
-  for(const file of [{name:'x.svg',type:'image/svg+xml',size:12},{name:'x.html',type:'text/html',size:12},{name:'x.png',type:'image/png',size:MAX_FILE_SIZE+1},{name:'x.png',type:'image/png',size:0}])assert.throws(()=>fileInfo(file));
+  for(const file of [{name:'x.svg',type:'image/svg+xml',size:12},{name:'x.html',type:'text/html',size:12}])assert.equal(fileInfo(file).type,'file');
+  for(const file of [{name:'x.png',type:'image/png',size:MAX_FILE_SIZE+1},{name:'x.png',type:'image/png',size:0}])assert.throws(()=>fileInfo(file));
 });
 test('attachment names and paths cannot escape room scope',()=>{
   assert.equal(fileInfo({name:'../../x.png',type:'image/png',size:1}).name,'.._.._x.png');

@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {musicPeriod,fullDuration,nextTrack,libraryTracks,lyricWords} from '../music-core.js';
+test('listening periods use Shanghai dates; full duration preserves seconds',()=>{assert.deepEqual(musicPeriod('week',new Date('2026-09-20T20:00:00Z')),{start:'2026-09-21',end:'2026-09-21'});assert.equal(fullDuration(22356),'6 小时 12 分 36 秒');});
+test('music queues wrap, repeat and shuffle without choosing the same song',()=>{assert.equal(nextTrack(['a','b'],'b',1,'list'),'a');assert.equal(nextTrack(['a','b'],'a',1,'single'),'a');assert.equal(nextTrack(['a','b'],'a',1,'shuffle',()=>0),'b');assert.equal(libraryTracks([{track_key:'a',owner_user_id:'b',title:'other'},{track_key:'a',owner_user_id:'me',title:'own'}],'me')[0].title,'own');assert.ok(lyricWords([{lyrics:[{text:'rain rain light'}]}]).some(([word,count])=>word==='rain'&&count===2));});

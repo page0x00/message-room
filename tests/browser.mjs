@@ -1,7 +1,13 @@
+import {runCompanions} from './companions.browser.mjs';
+import {runFilms} from './films.browser.mjs';
+import {runMemories} from './memories.browser.mjs';
+import {runMusic} from './music.browser.mjs';
+import {runDaily} from './daily.browser.mjs';
+import {runSpace} from './space.browser.mjs';
 import {runInteractions} from './interactions.browser.mjs';
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { readFile, mkdir } from "node:fs/promises";
+import { readFile, mkdir, access, link, unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve, extname } from "node:path";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -58,14 +64,14 @@ try {
   // Only unpack the executable; system fonts/libs are already available. This
   // avoids Lambda archive ownership operations on ordinary development hosts.
   const executablePath = resolve(root, "test-results/chromium");
-  await pipeline(
-    createReadStream(
-      resolve(root, "node_modules/@sparticuz/chromium/bin/chromium.br"),
-    ),
-    createBrotliDecompress(),
-    createWriteStream(executablePath),
-  );
-  await chmod(executablePath, 0o755);
+  try{await access(executablePath,1);}catch{
+    const unpacked=executablePath+'.'+process.pid;
+    try{
+      await pipeline(createReadStream(resolve(root,"node_modules/@sparticuz/chromium/bin/chromium.br")),createBrotliDecompress(),createWriteStream(unpacked));
+      await chmod(unpacked,0o755);
+      try{await link(unpacked,executablePath);}catch(e){if(e.code!=='EEXIST')throw e;}
+    }finally{await unlink(unpacked).catch(()=>{});}
+  }
   browser = await chromium.launch({
     headless: true,
     args: [
@@ -104,29 +110,34 @@ async function setup({
   viewport = { width: 390, height: 844 },
   rows = null,
   notificationFixture = false,
+  uploads = [],
 } = {}) {
   const context = await browser.newContext({ viewport, serviceWorkers:"block" });
-  await context.addInitScript(() => {
+  await context.addInitScript(({user}) => {
     localStorage.setItem("device_id", "test-device");
     localStorage.setItem("nickname", "小辞");
-  });
+    const expiry=Math.floor(Date.now()/1000)+3600;
+    const token=btoa(JSON.stringify({alg:'HS256'}))+'.'+btoa(JSON.stringify({sub:user,exp:expiry,role:'authenticated'}))+'.mock';
+    if(!sessionStorage.getItem('fixture-initialized'))localStorage.setItem('sb-yuzgbxeprpohlakxjcut-auth-token',JSON.stringify({access_token:token,refresh_token:'mock-refresh',expires_at:expiry,expires_in:3600,token_type:'bearer',user:{id:user,is_anonymous:false,email:'account@example.test',aud:'authenticated'}}));
+    sessionStorage.setItem('fixture-initialized','1');
+  },{user});
   if(notificationFixture)await context.addInitScript(()=>{
     window.noticeFixture={requests:0,shown:[]};class TestNotification{static permission='default';static async requestPermission(){window.noticeFixture.requests++;return this.permission='granted';}}
     window.Notification=TestNotification;const reg={showNotification:async(title,options)=>window.noticeFixture.shown.push({title,...options})};Object.defineProperty(navigator,'serviceWorker',{value:{register:async()=>reg,ready:Promise.resolve(reg),addEventListener:()=>{}}});
   });
   const records = rows || [
     fixture(1, "OldRoom1", "你到宿舍了吗？\n一路辛苦了。", "friend-device"),
-    fixture(2, "OldRoom1", "到啦。窗外有很好看的晚霞。", "test-device"),
+    fixture(2, "OldRoom1", "到啦。窗外有很好看的晚霞。", "test-device", {author_id:user}),
   ];
   const memberRows = [
     {
-      user_id: user,
+      user_id: user,room_id:secureId,
       display_name: "小辞",
       avatar_data: null,
       joined_at: "2026-09-19T00:00:00Z",
     },
     {
-      user_id: friend,
+      user_id: friend,room_id:secureId,
       display_name: "朋友",
       avatar_data: null,
       joined_at: "2026-09-19T00:00:00Z",
@@ -143,7 +154,9 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
-    events: [], memoirs: [], listen: null, uploads:new Map(), featureFail:false,
+    memoryProfiles:[],memoryFilms:[],petConsents:[],petState:null,petConfigured:false,petCalls:0,notices:[],listenInvites:0,
+    music:{music_tracks:[],music_likes:[],music_colors:[],music_playlists:[]},musicReport:{daily:[],tracks:[],total_seconds:0},
+    daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(uploads), featureFail:false,
   };
   await context.route('**/ocr.js?*',route=>route.fulfill({contentType:'text/javascript',body:`export async function recognizeScreenshot(file,{signal,onProgress}={}){window.ocrCalls=(window.ocrCalls||0)+1;if(window.ocrSlow)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,1200);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));},{once:true});});onProgress?.('测试识别');return {messages:[{text:'一起看晚霞',side:'left',date:'2026-09-18',dateSource:'聊天日期',time:'20:00',confidence:96,y:100}]};}` }));
   const errors = [];
@@ -224,6 +237,7 @@ async function setup({
         return reply(null);
       }
       if (path.endsWith("/room_members")) {
+        if(url.searchParams.get("select") === "room_id,joined_at") return reply(secure?[memberRows[0]]:[]);
         if (method === "PATCH") {
           Object.assign(memberRows[0], json);
           return reply({ user_id: user });
@@ -231,6 +245,15 @@ async function setup({
         return reply(memberRows);
       }
       if(path.endsWith('/mailbox_rooms'))return reply({room_id:secureId,created_at:'2026-09-01T00:00:00Z',relationship_since:json?.relationship_since||'2026-09-03'});
+      if(['/space_entries','/pockets','/pocket_entries','/pocket_leaves'].some(t=>path.endsWith(t))){const table=path.split('/').at(-1),id=url.searchParams.get('id')?.slice(3);let rows=control.daily[table];
+        if(method==='GET')return reply(id?rows.find(r=>r.id===id):rows.filter(r=>r.room_id===url.searchParams.get('room_id')?.slice(3)));
+        if(method==='POST'){if(rows.some(r=>r.id===json.id))return reply({code:'23505'},409);const row={...json,revision:1,created_at:new Date().toISOString()};rows.push(row);return reply(row);}
+        if(method==='PATCH'){const row=rows.find(r=>r.id===id&&String(r.revision)===url.searchParams.get('revision')?.slice(3));if(!row)return reply(null);Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){control.daily[table]=rows.filter(r=>r.id!==id);return reply([{id}]);}}
+      if(path.endsWith('/rpc/mailbox_space_clock'))return reply({server_now:new Date().toISOString()});
+      if(path.endsWith('/rpc/mailbox_create_pocket')){const row={id:json.p_id,room_id:json.p_room,owner_user_id:user,title:json.p_title,target_cents:json.p_target,daily_cents:json.p_daily,mode:json.p_mode,qr_path:json.p_qr,cover_path:json.p_cover,due_date:json.p_due,note:json.p_note,created_at:new Date().toISOString()};control.daily.pockets.push(row);return reply(row);}
+      if(path.endsWith('/rpc/mailbox_pocket_action')){control.pocketRequests=(control.pocketRequests||[]).concat([json]);if(control.pocketFailBefore){control.pocketFailBefore=false;return reply({message:'temporary offline',code:'XX000'},500);}let row=control.daily.pocket_entries.find(r=>r.id===json.p_id);if(row){if(json.p_action==='confirm'&&new Date(row.available_at)>new Date())return reply({code:'22023',message:'Cooling period or balance'},400);if(json.p_action==='cancel')row.status='cancelled';if(json.p_action==='confirm')row.status='settled';return reply(row);}row={id:json.p_id,pocket_id:json.p_pocket,room_id:secureId,owner_user_id:user,kind:json.p_action,cents:json.p_cents,reason:json.p_reason,status:json.p_action==='deposit'||json.p_emergency?'settled':'pending',available_at:new Date(Date.now()+json.p_hours*3600000).toISOString(),created_at:new Date().toISOString()};control.daily.pocket_entries.push(row);if(control.pocketAmbiguous){control.pocketAmbiguous=false;return reply({message:'lost response',code:'XX000'},500);}return reply(row);}
+      if(path.endsWith('/rpc/mailbox_pocket_leave')){const row={id:json.p_id,pocket_id:json.p_pocket,room_id:secureId,owner_user_id:user,date_start:json.p_start,date_end:json.p_end,reason:json.p_reason,created_at:new Date().toISOString()};control.daily.pocket_leaves.push(row);return reply(row);}
       if(path.endsWith('/anniversaries')){
         if(method==='GET')return reply(control.events);
         if(method==='POST'){control.events.push(json);return reply(json);}
@@ -243,6 +266,26 @@ async function setup({
         if(method==='PATCH'){const row=control.memoirs.find(r=>r.id===url.searchParams.get('id')?.slice(3));Object.assign(row,json);return reply(row);}
         if(method==='DELETE'){control.memoirs=control.memoirs.filter(r=>r.id!==url.searchParams.get('id')?.slice(3));return reply([]);}
       }
+      if(path.endsWith('/rpc/mailbox_edit_card')){const row=control.records.find(r=>String(r.id)===json.p_id);if((row.card_revision||1)!==json.p_revision)return reply({code:'40001'},409);row.message_payload=json.p_payload;row.card_revision=(row.card_revision||1)+1;return reply(row);}
+      if(path.endsWith('/memory_profiles')||path.endsWith('/memory_films')){const profiles=path.endsWith('/memory_profiles'),rows=profiles?control.memoryProfiles:control.memoryFilms,matches=r=>['id','room_id','owner_user_id','revision'].every(k=>!url.searchParams.has(k)||String(r[k])===url.searchParams.get(k).slice(3));
+        if(method==='GET'){const found=rows.filter(matches);return reply(profiles||url.searchParams.has('id')?found[0]||null:found);}
+        if(method==='POST'){const row={...json,revision:1};rows.push(row);return reply(row);}
+        if(method==='PATCH'){const row=rows.find(matches);if(!row)return reply(null);Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){const deleted=rows.filter(matches).map(r=>({id:r.id}));if(profiles)control.memoryProfiles=rows.filter(r=>!matches(r));else control.memoryFilms=rows.filter(r=>!matches(r));return reply(deleted);}}
+      if(['/music_tracks','/music_likes','/music_colors','/music_playlists'].some(t=>path.endsWith(t))){const table=path.split('/').at(-1),rows=control.music[table],matches=r=>['id','room_id','owner_user_id','track_key','revision'].every(k=>!url.searchParams.has(k)||String(r[k])===url.searchParams.get(k).slice(3));
+        if(method==='GET'){const found=rows.filter(matches);return reply(url.searchParams.has('id')?found[0]:found);}
+        if(method==='POST'){const row=rows.find(r=>table==='music_playlists'?r.id===json.id:r.room_id===json.room_id&&r.owner_user_id===json.owner_user_id&&(table==='music_colors'||r.track_key===json.track_key));if(row)Object.assign(row,json);else rows.push({...json,...(table==='music_playlists'?{revision:1}:{})});return reply(row||rows.at(-1));}
+        if(method==='PATCH'){const row=rows.find(matches);if(!row)return reply(null);Object.assign(row,json);return reply(row);}
+        if(method==='DELETE'){control.music[table]=rows.filter(r=>!matches(r));return reply([]);}}
+      if(path.endsWith('/rpc/mailbox_sync_notices'))return reply(control.notices);
+      if(path.endsWith('/rpc/mailbox_read_notice')){const n=control.notices.find(n=>n.id===json.p_id);if(n)n.seen_at=new Date().toISOString();return reply(null);}
+      if(path.endsWith('/rpc/mailbox_invite_listen')){control.listenInvites++;return reply(1);}
+      if(path.endsWith('/pet_consents'))return reply(control.petConsents);
+      if(path.endsWith('/pet_states'))return reply(control.petState);
+      if(path.endsWith('/rpc/mailbox_pet_consent')){control.petState=null;const c={room_id:json.p_room,user_id:user,enabled:json.p_enabled,automatic:json.p_auto,date_start:json.p_start,date_end:json.p_end};control.petConsents=control.petConsents.filter(c=>c.user_id!==user).concat(c);return reply(c);}
+      if(path.endsWith('/functions/v1/mailbox-pet')){if(method==='GET')return reply({configured:control.petConfigured});control.petCalls++;if(!control.petConfigured)return reply({error:'AI 暂时未连接'},503);control.petState={room_id:secureId,owner_user_id:user,source_count:1,updated_at:new Date().toISOString(),generations:1,data:{name:'小烬',mood:'curious',line:'记住那个一起看海的约定。',traits:['好奇','爱听故事'],memories:[{text:'约好一起去看海。',sources:['1']}]}};return reply({state:control.petState});}
+      if(path.endsWith('/rpc/mailbox_listen_report'))return reply(control.musicReport);
+      if(path.endsWith('/rpc/mailbox_listen_heartbeat'))return reply({server_now:new Date().toISOString(),listeners:json.p_playing?1:0});
       if(path.endsWith('/rpc/mailbox_read_listen'))return reply({session:control.listen,server_now:new Date().toISOString()});
       if(path.endsWith('/rpc/mailbox_set_listen')){if(json.p_revision!==(control.listen?.revision||0))return reply({code:'40001'},409);control.listen={track_key:json.p_key,track_name:json.p_name,position_seconds:json.p_position,is_playing:json.p_playing,revision:json.p_revision+1,updated_at:new Date().toISOString()};return reply({session:control.listen,server_now:new Date().toISOString()});}
       if(path.endsWith('/functions/v1/mailbox-push'))return reply({error:'Push not configured'},503);
@@ -293,7 +336,7 @@ async function setup({
           await new Promise((resolve) => setTimeout(resolve, 350));
         if (
           !metadata &&
-          url.searchParams.get("select") === "display_date,reply_to"
+          url.searchParams.get("select") === "display_date,reply_to,author_id,client_nonce"
         )
           return reply(
             { code: "PGRST204", message: "Column does not exist" },
@@ -352,7 +395,7 @@ async function setup({
   return { page, context, control, errors, join };
 }
 try {
-  if(!process.env.INTERACTIONS_ONLY){
+  if(!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -375,10 +418,10 @@ try {
   );
   await t.join();
   await check(
-    "old room opens without Auth, own messages right / friend left",
+    "legacy history preserved; authenticated UUID places only own messages right",
     async () => {
       assert.equal(control.authCalls, 0);
-      assert.equal(await page.locator(".msg").count(), 2);
+      assert.equal(await page.locator("#messages .msg").count(), 2);
       const ownA = await page.locator(".mine .avatar").boundingBox(),
         ownB = await page.locator(".mine .bubble").boundingBox();
       const theirA = await page
@@ -440,11 +483,11 @@ try {
       assert.deepEqual(control.sends[0].reply_to, ["1", "2"]);
       assert.equal(control.sends[0].display_date, "2024-09-04");
       for (const view of ["diary", "wall", "chat"]) {
-        if(view==='chat')await page.locator('#returnChat').click();else{await page.locator('#relationHandle').click();await page.locator(`[data-open-view=${view}]`).click();}
-        assert.equal(await page.locator(".msg").count(), 3);
+        if(view!=='chat'){await page.locator('#relationHandle').click();await page.locator(`[data-open-view=${view}]`).click();assert.equal(await page.locator(`#${view==='diary'?'diary':'wall'}Entries .msg`).count(),3);await page.locator('#relationClose').click();}
+        assert.equal(await page.locator("#messages .msg").count(), 3);
       }
       assert.equal(control.sends.length, 1);
-      assert.equal(await page.locator(".quote-card").count(), 2);
+      assert.equal(await page.locator("#messages .quote-card").count(), 2);
     },
   );
   await check(
@@ -476,7 +519,7 @@ try {
       await page.locator("#saveProfile").click();
       assert.ok(await page.locator(".mine .avatar img").count());
       const profile = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem("mailbox.profile.OldRoom1")),
+        JSON.parse(localStorage.getItem("mailbox.profile.00000000-0000-4000-a000-000000000001.OldRoom1")),
       );
       assert.match(profile.myAvatar, /^data:image\/jpeg;base64,/);
       assert.ok(profile.myAvatar.length < 60000);
@@ -544,7 +587,7 @@ try {
       await page.waitForFunction(() =>
         document.querySelector("#toast").textContent.includes("上一间房"),
       );
-      assert.equal(await page.locator(".msg").count(), 0);
+      assert.equal(await page.locator("#messages .msg").count(), 0);
       assert.equal(
         await page.locator("#messageInput").inputValue(),
         "另一间的草稿",
@@ -558,43 +601,30 @@ try {
   const old = await setup({ metadata: false });
   await old.join();
   await check(
-    "unmigrated database supports old sends and explicitly gates metadata",
+    "unmigrated database stays readable but will not send without a stable author",
     async () => {
       await old.page.locator('[data-message-id="1"] .bubble').dispatchEvent('contextmenu');await old.page.locator('#selectQuote').click();await old.page.locator('#selectionCancel').click();
-      assert.equal(await old.page.locator("#quoteTray").isVisible(), false);
-      await old.page.locator("#messageInput").fill("旧版继续聊");
-      await old.page.locator("#sendBtn").click();
-      await old.page.waitForFunction(
-        () => !document.querySelector("#messageInput").value,
-      );
-      assert.equal(Object.hasOwn(old.control.sends[0], "reply_to"), false);
-      assert.equal(Object.hasOwn(old.control.sends[0], "author_id"), false);
+      assert.equal(await old.page.locator('#quoteTray').isVisible(),false);
+      await old.page.locator('#messageInput').fill('升级后再发送');
+      assert.equal(await old.page.locator('#sendBtn').isDisabled(),true);
+      assert.equal(old.control.sends.length,0);
     },
   );
   await check('previous release local utilities and theme are recovered without publishing',async()=>{
     await old.page.evaluate(()=>{localStorage.setItem('anniversary.OldRoom1',JSON.stringify({name:'原来那一天',date:'2020-05-20'}));localStorage.setItem('memoir.OldRoom1','上一版只写给自己的内容');localStorage.setItem('lyrics.OldRoom1','旧的歌词和备注');localStorage.setItem('theme.v2','warm-dark');localStorage.setItem('mailbox.theme','"clean"');});
     await old.page.reload();await old.page.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));assert.equal(await old.page.locator('html').getAttribute('data-theme'),'warm-dark');
     const sent=old.control.sends.length;
-    await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('[data-close=relationshipScrim]').click();
-    await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('[data-close=memoirScrim]').click();
-    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('[data-close=listenScrim]').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
+    await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('#relationClose').click();
+    await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('#relationClose').click();
+    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('#relationClose').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
   });
   await old.page.locator("#backBtn").click();
-  old.control.failAuth = true;
-  await check(
-    "legacy room creation requires explicit privacy acknowledgment",
-    async () => {
-      await old.page.locator("#addRoomBtn").click();
-      await old.page.locator("#createBtn").click();
-      await old.page.locator("#noticeScrim").waitFor({ state: "visible" });
-      assert.match(
-        await old.page.locator("#noticeBody").textContent(),
-        /公开权限/,
-      );
-      await old.page.locator("#noticeCancel").click();
-      assert.equal(await old.page.locator("#home").isVisible(), true);
-    },
-  );
+  await check('signed-out room entry requests login instead of inventing a device identity',async()=>{
+    await old.page.evaluate(()=>{localStorage.removeItem('sb-yuzgbxeprpohlakxjcut-auth-token');});
+    await old.page.reload();await old.page.locator('#addRoomBtn').click();await old.page.locator('#createBtn').click();
+    await old.page.locator('#accountScrim').waitFor({state:'visible'});
+    assert.equal(await old.page.locator('#accountEmail').isVisible(),true);
+  });
   assert.deepEqual(old.errors, []);
   await old.context.close();
 
@@ -608,10 +638,10 @@ try {
     rows: secureRows,
   });
   await check(
-    "secure room uses anonymous Auth and exposes protected profile workflow",
+    "secure room reuses signed-in UUID and exposes protected profile workflow",
     async () => {
-      assert.ok(s.control.authCalls >= 1);
-      assert.equal(await s.page.locator(".msg").count(), 2);
+      assert.equal(await s.page.locator(".mine").count(), 1);
+      assert.equal(await s.page.locator("#messages .msg").count(), 2);
       await s.page.locator("#roomInfoBtn").click();
       assert.match(
         await s.page.locator("#profileNote").textContent(),
@@ -621,6 +651,17 @@ try {
       await s.page.locator("#saveProfile").click();
     },
   );
+  await check('second browser restores the same account; matching nickname and device never claim legacy rows',async()=>{
+    const second=await setup({secure:true,rows:[...secureRows,fixture(88,secureId,'未确认的历史','test-device',{sender_name:'我'})]});
+    await second.page.evaluate(()=>{localStorage.setItem('device_id','different-device');localStorage.setItem('nickname','朋友');});
+    await second.page.reload();await second.page.locator('.msg').first().waitFor();
+    assert.equal(await second.page.locator('.msg.mine').count(),1);
+    assert.equal(await second.page.locator('[data-message-id="1"]').evaluate(el=>el.classList.contains('mine')),true);
+    assert.equal(await second.page.locator('[data-message-id="88"]').evaluate(el=>el.classList.contains('mine')),false);
+    assert.ok(!(await second.page.locator('[data-message-id="88"]').innerText()).startsWith('我'));
+    assert.deepEqual(second.errors,[]);await second.context.close();
+  });
+  if(process.env.TEST_STAGE==='identity'){await s.context.close();await browser.close();server.close();console.log('PASS identity stage: second isolated browser verified');process.exit(0);}
   await check(
     "secure sends have authenticated authors and nonce; ambiguous retry deduplicates",
     async () => {
@@ -642,7 +683,7 @@ try {
         s.control.records.filter((r) => r.content === "只发送一次").length,
         1,
       );
-      assert.equal(await s.page.locator(".msg").count(), 3);
+      assert.equal(await s.page.locator("#messages .msg").count(), 3);
     },
   );
   await check(
@@ -679,7 +720,7 @@ try {
       path: resolve(root, "test-results/tablet-wall.png"),
     });
   });
-  await s.page.locator('#returnChat').click();
+  await s.page.locator('#relationClose').click();
   await check('left swipe opens relationship space; vertical gesture and right swipe do not',async()=>{
     await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchstart',{touches:[new Touch({identifier:1,target:el,clientX:600,clientY:300})]}));});
     await s.page.evaluate(()=>{const el=document.querySelector('#messages');el.dispatchEvent(new TouchEvent('touchend',{changedTouches:[new Touch({identifier:1,target:el,clientX:450,clientY:305})]}));});
@@ -691,12 +732,12 @@ try {
   });
   await check('relationship calendar adds shared anniversaries and paints memory wall nodes',async()=>{
     await s.page.locator('#relationHandle').click();await s.page.locator('#relationshipBtn').click();
-    await s.page.locator('#relationshipSince').fill('2024-09-04');await s.page.locator('#relationshipForm button').click();
-    await s.page.locator('#eventTitle').fill('第一次听同一首歌');await s.page.locator('#eventDate').fill('2026-09-20');await s.page.locator('#eventSave').click();
+    await s.page.locator('#relationshipEditor summary').click();await s.page.locator('#relationshipSince').fill('2024-09-04');await s.page.locator('#relationshipForm button').click();
+    await s.page.locator('#eventEditor summary').click();await s.page.locator('#eventTitle').fill('第一次听同一首歌');await s.page.locator('#eventDate').fill('2026-09-20');await s.page.locator('#eventSave').click();
     await s.page.locator('.event-card').waitFor();assert.equal(s.control.events[0].owner_user_id,user);
-    await s.page.locator('[data-close=relationshipScrim]').click();
+    await s.page.locator('#relationClose').click();
     await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=wall]').click();
-    assert.match(await s.page.locator('.wall-event').textContent(),/第一次听同一首歌/);await s.page.locator('#returnChat').click();
+    assert.match(await s.page.locator('.wall-event').textContent(),/第一次听同一首歌/);await s.page.locator('#relationClose').click();
   });
   await check('attachment retry after ambiguous send reuses upload path and message nonce',async()=>{
     await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('a shared note')});
@@ -716,15 +757,23 @@ try {
   await check('OCR recognition produces editable drafts and sends only after explicit confirmation',async()=>{
 
     const count=s.control.sends.length;await s.page.locator('#composeMore').click();await s.page.locator('#importBtn').click();await s.page.locator('#ocrFile').setInputFiles({name:'chat.png',mimeType:'image/png',buffer:await readFile(resolve(root,'test-results/mobile-chat.png'))});await s.page.waitForFunction(()=>!document.querySelector('#ocrRecognize').disabled&&document.querySelector('#ocrQueueCount').textContent.includes('1 张'));await s.page.locator('#ocrRecognize').click();await s.page.locator('.import-row textarea').waitFor();await s.page.waitForFunction(()=>!document.querySelector('#importSend').disabled);assert.equal(s.control.sends.length,count);
-    await s.page.locator('.import-row textarea').fill('修改过的摘录');await s.page.locator('.import-row input[type=file]').setInputFiles({name:'supplement.txt',mimeType:'text/plain',buffer:Buffer.from('original supplement')});await s.page.waitForFunction(()=>document.querySelector('.import-row').textContent.includes('已就绪'));await s.page.locator('#importSend').click();assert.equal(s.control.sends.length,count);await s.page.locator('#noticeConfirm').click();await s.page.waitForFunction(()=>document.querySelector('.import-row').classList.contains('sent'));assert.equal(s.control.sends.at(-1).author_id,user);assert.equal(s.control.sends.at(-1).content,'修改过的摘录');assert.equal(s.control.sends.at(-1).media_name,'supplement.txt');assert.equal(s.control.sends.at(-1).message_type,'file');await s.page.locator('[data-close=importScrim]').click();
+    await s.page.locator('.import-row textarea').fill('修改过的摘录');await s.page.locator('.import-row input[type=file]').setInputFiles({name:'supplement.txt',mimeType:'text/plain',buffer:Buffer.from('original supplement')});await s.page.waitForFunction(()=>document.querySelector('.import-row').textContent.includes('已就绪'));await s.page.locator('#importSend').click();assert.equal(s.control.sends.length,count);await s.page.locator('#noticeConfirm').click();await s.page.waitForFunction(()=>document.querySelector('.import-row').classList.contains('sent'));assert.equal(s.control.sends.at(-1).author_id,user);assert.equal(s.control.sends.at(-1).content,'修改过的摘录');assert.equal(s.control.sends.at(-1).message_payload.entries[0].media_name,'supplement.txt');assert.equal(s.control.sends.at(-1).message_type,'screenshot');assert.equal(s.control.sends.at(-1).message_payload.originals.length,1);await s.page.locator('[data-close=importScrim]').click();
   });
+  await check('normal file chooser is multiple without directory mode; scanned batches wait for confirmation',async()=>{
+    await s.page.locator('#attachBtn').click();assert.equal(await s.page.locator('#attachmentFile').getAttribute('webkitdirectory'),null);assert.equal(await s.page.locator('#attachmentFile').getAttribute('multiple'),'');
+    const before=s.control.sends.length;await s.page.locator('#attachmentFile').setInputFiles([{name:'clip.mov',mimeType:'video/quicktime',buffer:Buffer.from('video')},{name:'archive.bin',mimeType:'application/octet-stream',buffer:Buffer.from('file')}]);await s.page.waitForFunction(()=>document.querySelectorAll('#attachmentQueue input:checked').length>=2);assert.equal(s.control.sends.length,before);await s.page.locator('#attachmentNew').click();await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);assert.ok(s.control.sends.some(r=>r.media_name==='archive.bin'&&r.message_type==='file'));
+  });
+  await check('screenshot compact card opens original and editable independent detail',async()=>{
+    const card=s.control.records.findLast(r=>r.message_type==='screenshot');await s.page.locator(`[data-message-id="${card.id}"] .message-record-card`).click();await s.page.locator('#messageDetailScrim').waitFor();assert.equal(await s.page.locator('#messageOriginalRows button').count(),1);await s.page.locator('#messageDetailEdit').click();await s.page.locator('#messageDetailRows textarea').fill('再次修正的文字');await s.page.locator('#messageDetailSave').click();await s.page.waitForFunction(()=>document.querySelector('#messageDetailEdit').hidden===false);assert.equal(card.message_payload.entries[0].text,'再次修正的文字');await s.page.screenshot({path:root+'/test-results/screenshot-card-detail.png'});await s.page.locator('#messageDetailScrim header button').click();assert.equal(await s.page.locator('.forward-record').count(),0);
+  });
+  if(process.env.TEST_STAGE==='cards'){await s.context.close();await runInteractions({setup,check,secureId,user,friend,fixture,root});await browser.close();server.close();console.log('PASS message cards stage');process.exit(0);}
   await check('private memoir generates a date projection, saves privately and does not send chat',async()=>{
-    const count=s.control.sends.length;await s.page.locator('#relationHandle').click();await s.page.locator('#memoirBtn').click();await s.page.locator('#memoirStart').fill('2020-01-01');await s.page.locator('#memoirEnd').fill('2099-01-01');await s.page.locator('#memoirGenerate').click();await s.page.waitForFunction(()=>document.querySelector('#memoirBody').value.includes('第一封信'));await s.page.locator('#memoirTitle').fill('这一页，只有我');await s.page.locator('#memoirSave').click();await s.page.waitForFunction(()=>document.querySelector('#memoirNote').textContent.includes('已保存'));assert.equal(s.control.memoirs.length,1);assert.equal(s.control.memoirs[0].owner_user_id,user);assert.equal(s.control.sends.length,count);await s.page.locator('[data-close=memoirScrim]').click();
+    const count=s.control.sends.length;await s.page.locator('#relationHandle').click();await s.page.locator('#memoirBtn').click();await s.page.locator('#memoirStart').fill('2020-01-01');await s.page.locator('#memoirEnd').fill('2099-01-01');await s.page.locator('#memoirGenerate').click();await s.page.waitForFunction(()=>document.querySelector('#memoirBody').value.includes('第一封信'));await s.page.locator('#memoirTitle').fill('这一页，只有我');await s.page.locator('#memoirSave').click();await s.page.waitForFunction(()=>document.querySelector('#memoirNote').textContent.includes('已保存'));assert.equal(s.control.memoirs.length,1);assert.equal(s.control.memoirs[0].owner_user_id,user);assert.equal(s.control.sends.length,count);await s.page.locator('#relationClose').click();
   });
   await check('local audio persists, publishes playback and responds to remote pause',async()=>{
     const samples=8000*8,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF');buffer.writeUInt32LE(36+samples*2,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(8000,24);buffer.writeUInt32LE(16000,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i*.1)*1000),44+i*2);
     await s.page.locator('#relationHandle').click();await s.page.locator('#listenBtn').click();await s.page.locator('#listenFile').setInputFiles({name:'our-song.wav',mimeType:'audio/wav',buffer});await s.page.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await s.page.locator('#lyricsFile').setInputFiles({name:'song.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]这一刻\n[00:02.00]在同一首歌里')});await s.page.locator('#listenShare').click();await s.page.waitForFunction(()=>document.querySelector('#listenSync').checked);assert.equal(s.control.listen.track_key.length,64);const playing=s.page.waitForResponse(r=>r.url().endsWith('/rpc/mailbox_set_listen')&&r.request().postDataJSON().p_playing===true);await s.page.locator('#listenToggle').click();await playing;await s.page.waitForFunction(()=>!document.querySelector('#listenAudio').paused);assert.equal(s.control.listen.is_playing,true);
-    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('[data-close=listenScrim]').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
+    s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('#relationClose').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
   });
   await check('four themes across phone, tablet portrait/landscape and desktop have usable chat, drawer, diary, wall',async()=>{
     for(const [device,width,height] of [['phone',390,844],['small-phone',320,680],['tablet-portrait',820,1180],['tablet-landscape',1180,820],['desktop',1440,900],['phone-landscape',844,390]]){
@@ -732,20 +781,21 @@ try {
       for(const theme of ['ins-light','ins-dark','warm-light','warm-dark']){
         await s.page.locator('#menuBtn').click();await s.page.locator('#themeMenuBtn').click();await s.page.locator(`[data-theme-pick=${theme}]`).click();await s.page.locator('[data-close=settingsScrim]').click();
         for(const view of ['chat','diary','wall']){
-          if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});}
+          if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'visible'});}
           assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme} ${view} overflow`);assert.ok(await s.page.locator('#messages').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${device} ${theme} ${view} pane overflow`);
           const pane=await s.page.locator('#messages').boundingBox();assert.ok(pane.height>90,`${device} ${view} missing content`);
           if(view==='chat'){const box=await s.page.locator('#composer').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,`${device} ${theme} composer`);}
           if(['phone','tablet-landscape','desktop'].includes(device))await s.page.screenshot({path:resolve(root,`test-results/${device}-${theme}-${view}.png`)});
+          if(view!=='chat')await s.page.locator('#relationClose').click();
         }
-        await s.page.locator('#returnChat').click();await s.page.locator('#relationHandle').click();const drawer=await s.page.locator('#relationSpace').boundingBox();assert.ok(drawer.width<=width&&drawer.height<=height);if(device==='phone')await s.page.screenshot({animations:'disabled',path:resolve(root,`test-results/${device}-${theme}-space.png`)});await s.page.locator('#relationClose').click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});
+        await s.page.locator('#relationHandle').click();const drawer=await s.page.locator('#relationSpace').boundingBox();assert.ok(drawer.width<=width+1&&drawer.height<=height+1,`${device} ${theme}: drawer ${JSON.stringify(drawer)} vs ${width}x${height}`);if(device==='phone')await s.page.screenshot({animations:'disabled',path:resolve(root,`test-results/${device}-${theme}-space.png`)});await s.page.locator('#relationClose').click();await s.page.locator('#relationSpace').waitFor({state:'hidden'});
       }
     }
   });
   await check('new incoming messages notify once; history, theme and view changes do not notify',async()=>{
     const id=s.control.records.length+100;s.control.records.push(fixture(id,secureId,'新的晚安',friend,{author_id:friend,created_at:new Date(Date.now()+1000).toISOString()}));
     await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('新留言'));
-    await s.page.evaluate(()=>document.querySelector('#toast').textContent='已读检查');await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=diary]').click();await s.page.locator('#returnChat').click();await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForTimeout(150);assert.equal(await s.page.locator('#toast').textContent(),'已读检查');
+    await s.page.evaluate(()=>document.querySelector('#toast').textContent='已读检查');await s.page.locator('#relationHandle').click();await s.page.locator('[data-open-view=diary]').click();await s.page.locator('#relationClose').click();await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForTimeout(150);assert.equal(await s.page.locator('#toast').textContent(),'已读检查');
   });
   await check(
     "secure invite rejection never falls back to legacy reads",
@@ -760,7 +810,7 @@ try {
       );
       assert.equal(await s.page.locator("#sendBtn").isDisabled(), true);
       assert.equal(s.control.readCalls, before);
-      assert.equal(await s.page.locator(".msg").count(), 0);
+      assert.equal(await s.page.locator("#messages .msg").count(), 0);
     },
   );
   assert.deepEqual(s.errors, []);
@@ -783,7 +833,7 @@ try {
   await check(
     "keyset pagination loads beyond one page without duplicates",
     async () => {
-      assert.equal(await p.page.locator(".msg").count(), 100);
+      assert.equal(await p.page.locator("#messages .msg").count(), 100);
       await p.page.locator("#olderBtn").click();
       await p.page.waitForFunction(
         () => document.querySelectorAll(".msg").length === 125,
@@ -792,7 +842,7 @@ try {
       assert.equal(
         new Set(
           await p.page
-            .locator(".msg")
+            .locator("#messages .msg")
             .evaluateAll((nodes) => nodes.map((n) => n.dataset.messageId)),
         ).size,
         125,
@@ -802,11 +852,17 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  await runInteractions({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.MEMORY_ONLY)await runMemories({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.MUSIC_ONLY)await runMusic({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.DAILY_ONLY)await runDaily({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.SPACE_ONLY)await runSpace({setup,check,secureId,user,friend,fixture,root});
+  else await runInteractions({setup,check,secureId,user,friend,fixture,root});
   console.log(
     `\n${checks} browser integration checks passed. All Supabase requests were intercepted; production was not contacted.`,
   );
-} finally {
+} catch(error){console.error(error);process.exitCode=1;} finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
 }

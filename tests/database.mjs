@@ -1,3 +1,8 @@
+import {runNoticeDatabase} from './notices.database.mjs';
+import {runPetDatabase} from './pet.database.mjs';
+import {runMemoryDatabase} from './memories.database.mjs';
+import {runMusicDatabase} from './music.database.mjs';
+import {runDailyDatabase} from './daily.database.mjs';
 // Executes the REAL migrations in an isolated PostgreSQL WASM instance.
 // Supabase's auth/storage roles and schemas are represented here; no live data is touched.
 import { PGlite } from "@electric-sql/pglite";
@@ -417,6 +422,49 @@ try {
   await check('Push claims deduplicate client and webhook requests, retry failures, stop delivered retries',async()=>{assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),true);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),false);await db.query("update mailbox_push_deliveries set status='failed',lease_until=now()-interval '2 minutes' where subscription_id=$1",[subId]);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),true);await db.query("update mailbox_push_deliveries set status='sent',lease_until=now()-interval '2 minutes' where subscription_id=$1",[subId]);assert.equal(await scalar('select mailbox_claim_push($1,$2)',[subId,'123']),false);});
   await db.exec('reset role');
   await check('single INSTALL.sql transaction reapplies without losing messages or private drafts',async()=>{await db.exec(await readFile(new URL('../supabase/INSTALL.sql',import.meta.url),'utf8'));assert.equal(await scalar("select count(*) from messages where room_id='OLDroom'"),3);assert.equal(await scalar('select body from memoirs where id=$1',[memoirId]),'revised');});
+  await check('UUID-only identity migration preserves unknown historical authors',async()=>{
+    const identity=await readFile(new URL('../supabase/migrations/20261001_identity.sql',import.meta.url),'utf8');
+    await db.exec(identity);await db.exec(identity);
+    assert.equal(await scalar("select author_id from messages where content='legacy sentinel'"),null);
+    await as();await denied("insert into messages(room_id,content,sender) values('OLDroom','spoof','device-id')");
+    await as(a);await insert('OLDroom',a,crypto.randomUUID(),'stable on all devices');
+    await denied("insert into messages(room_id,content,sender,author_id,client_nonce) values('OLDroom','forged',$1,$2,gen_random_uuid())",[a,b]);
+    await denied("update messages set author_id=$1 where content='legacy sentinel'",[a]);
+    await db.exec('reset role');
+  });
+  await check('structured cards validate media scope, preserve order and enforce author/revision edits',async()=>{
+    const migration=await readFile(new URL('../supabase/migrations/20261002_message_cards.sql',import.meta.url),'utf8');await db.exec(migration);await db.exec(migration);
+    await as(a);const payload={version:1,kind:'screenshot',entries:[{id:'a',text:'first',label:'对方',side:'left',date:'2026-09-20',time:'10:02'},{id:'b',text:'second',label:'我',side:'right',date:'2026-09-20',time:'10:03'}],originals:[]};
+    const card=(await db.query("insert into messages(room_id,sender,author_id,client_nonce,content,message_type,message_payload) values($1,$2::text,$2::uuid,gen_random_uuid(),'first','screenshot',$3) returning *",[room.room_id,a,JSON.stringify(payload)])).rows[0];
+    payload.entries[0].text='corrected';const edited=await scalar('select mailbox_edit_card($1,$2,1,$3)',[room.room_id,String(card.id),JSON.stringify(payload)]);assert.equal(edited.card_revision,2);assert.equal(new Date(edited.created_at).getTime(),new Date(card.created_at).getTime());assert.equal(edited.message_payload.entries[1].text,'second');
+    await denied('select mailbox_edit_card($1,$2,1,$3)',[room.room_id,String(card.id),JSON.stringify(payload)],'40001');
+    payload.originals=[{path:'v2_other/'+a+'/'+crypto.randomUUID(),size:10,mime:'image/png'}];await denied('select mailbox_edit_card($1,$2,2,$3)',[room.room_id,String(card.id),JSON.stringify(payload)],'22023');
+    await as(b);await denied('select mailbox_edit_card($1,$2,2,$3)',[room.room_id,String(card.id),JSON.stringify(payload)]);
+    await db.exec('reset role');
+  });
+  await check('card originals are private before publishing, shared only with members and protected from replacement',async()=>{
+    await as(a);const path=`${room.room_id}/${a}/${crypto.randomUUID()}`;
+    await db.query("insert into storage.objects(bucket_id,name,metadata) values('message-media',$1,$2)",[path,JSON.stringify({size:18,mimetype:'image/png'})]);
+    await as(b);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);
+    await as(a);const payload={version:1,kind:'screenshot',entries:[{id:'photo-source',text:'saved screenshot',side:'left'}],originals:[{path,size:18,mime:'image/png'}]};
+    await db.query("insert into messages(room_id,sender,author_id,client_nonce,content,message_type,message_payload) values($1,$2::text,$2::uuid,gen_random_uuid(),'saved screenshot','screenshot',$3)",[room.room_id,a,JSON.stringify(payload)]);
+    assert.equal((await db.query('delete from storage.objects where name=$1 returning id',[path])).rows.length,0);
+    await as(b);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),1);
+    await as(c);assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);
+    await as();assert.equal(await scalar('select count(*) from storage.objects where name=$1',[path]),0);await db.exec('reset role');
+  });
+  const dailySql=await readFile(new URL('../supabase/migrations/20261003_daily_space.sql',import.meta.url),'utf8');
+  await db.exec(dailySql);await db.exec(dailySql);
+  await runDailyDatabase({db,check,as,denied,scalar,a,b,c,room});
+  const musicSql=await readFile(new URL('../supabase/migrations/20261004_music_space.sql',import.meta.url),'utf8');
+  await db.exec(musicSql);await db.exec(musicSql);
+  await runMusicDatabase({db,check,as,denied,scalar,a,b,c,room});
+  const memorySql=await readFile(new URL('../supabase/migrations/20261005_memories.sql',import.meta.url),'utf8');await db.exec(memorySql);await db.exec(memorySql);
+  await runMemoryDatabase({db,check,as,denied,scalar,a,b,room});
+  const petSql=await readFile(new URL('../supabase/migrations/20261006_pet.sql',import.meta.url),'utf8');await db.exec(petSql);await db.exec(petSql);
+  await runPetDatabase({db,check,as,denied,scalar,a,b,c,room});
+  const noticeSql=await readFile(new URL('../supabase/migrations/20261007_notices.sql',import.meta.url),'utf8');await db.exec(noticeSql);await db.exec(noticeSql);
+  await runNoticeDatabase({db,check,as,denied,scalar,a,b,c,room});
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,
   );

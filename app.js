@@ -1,7 +1,11 @@
+import {noticePanels} from './notice-core.js?v=2.4.0';
+import {initPetSpace} from './pet-space.js?v=2.4.0';
+import {initFilmSpace} from './film-space.js?v=2.4.0';
+import {initMemorySpace} from './memory-space.js?v=2.4.0';
+import {initDailySpace} from './daily-space.js?v=2.4.0';
 import {
   parseRoom,
   roomLink,
-  legacyRoom,
   randomId,
   localDate,
   validDate,
@@ -14,13 +18,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.3.0";
-import * as api from "./backend.js?v=2.3.0";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.3.0";
-import { initNotifications } from "./notifications.js?v=2.3.0";
-import { initFeatures } from "./features.js?v=2.3.0";
+} from "./core.js?v=2.4.0";
+import * as api from "./backend.js?v=2.4.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.4.0";
+import { initNotifications } from "./notifications.js?v=2.4.0";
+import { initFeatures } from "./features.js?v=2.4.0";
 
-import {initMessageActions} from "./message-actions.js?v=2.3.0";
+import {initMessageCards} from "./message-cards.js?v=2.4.0";
+import {initAccount} from "./account.js?v=2.4.0";
+import {initMessageActions} from "./message-actions.js?v=2.4.0";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -49,21 +55,6 @@ const state = {
   avatarRevision: 0,
   refreshPromise: null,
 };
-let deviceId;
-try {
-  deviceId = localStorage.getItem("device_id");
-} catch {
-  /* Storage unavailable. */
-}
-if (!deviceId) {
-  deviceId = "u_" + randomId();
-  try {
-    localStorage.setItem("device_id", deviceId);
-  } catch {
-    /* Keep identity for this tab. */
-  }
-}
-state.deviceId = deviceId;
 let toastTimer, noticeResolve, focusBeforeSheet;
 const dailyCopies = [
   "有些话，晚一点抵达也没关系。",
@@ -88,12 +79,14 @@ function toast(text) {
 }
 
 function persist(key, value) {
+  if(key === "recent") key += "." + (state.userId || "signed-out");
   const saved = storeSet(key, value);
   if (!saved) toast("本机存储空间不足或不可用，请先复制保存未发送内容。");
   return saved;
 }
 
 function showSheet(id) {
+  if($(id)?.dataset.spacePanel){ui.openFeature(id);return;}
   focusBeforeSheet = document.activeElement;
   $(id).hidden = false;
   $(id).querySelector("input:not([type=file]):not([hidden]),button")?.focus();
@@ -101,6 +94,7 @@ function showSheet(id) {
 
 function closeSheet(id) {
   $(id).hidden = true;
+  if($(id)?.dataset.spacePanel)ui.drawer(false);
   document.dispatchEvent(new CustomEvent('mailbox:sheet-close',{detail:{id}}));
   focusBeforeSheet?.focus();
   if (id === "noticeScrim" && noticeResolve) {
@@ -135,7 +129,7 @@ function defaultName() {
 }
 
 function readProfile(room) {
-  const saved = storeGet("profile." + room, {});
+  const saved = storeGet("profile." + state.userId + "." + room, {});
   return {
     myName: String(saved?.myName || defaultName()).slice(0, 24),
     myAvatar: safeAvatar(saved?.myAvatar),
@@ -145,7 +139,7 @@ function readProfile(room) {
 }
 
 function recentRooms() {
-  const records = storeGet("recent", []);
+  const records = storeGet("recent." + (state.userId || "signed-out"), []);
   return Array.isArray(records)
     ? records.filter((r) => r && parseRoom(r.room)).slice(0, 40)
     : [];
@@ -174,7 +168,7 @@ function renderRecent() {
 
 function saveDraft() {
   if (!state.room) return;
-  persist("draft." + state.room, {
+  persist("draft." + state.userId + "." + state.room, {
     text: $("messageInput").value,
     quotes: state.quotes,
     date: state.date,
@@ -183,7 +177,7 @@ function saveDraft() {
 }
 
 function loadDraft() {
-  const draft = storeGet("draft." + state.room, {});
+  const draft = storeGet("draft." + state.userId + "." + state.room, {});
   $("messageInput").value =
     typeof draft?.text === "string" ? draft.text.slice(0, 5000) : "";
   state.quotes = Array.isArray(draft?.quotes)
@@ -212,7 +206,7 @@ function updateStatus() {
           ? "信已连上 · 左滑看看我们的空间"
           : "等一句你的话 · 左滑打开空间");
   $("sendBtn").disabled =
-    !state.ready ||
+    !state.ready || !state.userId || !state.metadata ||
     state.pending.has(state.room) ||
     !$("messageInput").value.trim();
   $("sendBtn").textContent = state.pending.has(state.room) ? "发送中" : "发送";
@@ -238,7 +232,7 @@ async function openRoom(target) {
     room: valid.room,
     secure: valid.secure,
     invite: target.invite || "",
-    userId: "",
+    userId: state.userId,
     ready: false,
     connected: false,
     messages: [],
@@ -250,6 +244,10 @@ async function openRoom(target) {
     view: "chat",
   });
   features.roomChanged();
+  daily.reset();
+  memories.reset();
+  films.reset();
+  pet.reset();
   actions?.reset();
   $("connectionNote").hidden=true;
   $("home").classList.remove("active");
@@ -265,11 +263,15 @@ async function openRoom(target) {
   $("connectionNote").textContent = state.secure
     ? "正在验证邀请及成员身份……"
     : "旧版兼容模式：保留原有公开权限，请勿存放私密内容。";
-  loadDraft();
   render();
   setView("chat");
   updateStatus();
   try {
+    const uid = await api.authenticate();
+    if (epoch !== state.epoch) return;
+    state.userId = uid;
+    state.profile = readProfile(state.room);
+    loadDraft();
     if (state.secure) {
       const identity = await api.joinRoom(state.room, state.invite);
       if (epoch !== state.epoch) return;
@@ -285,7 +287,7 @@ async function openRoom(target) {
           myAvatar: safeAvatar(me.avatar_data),
         };
       $("connectionNote").textContent =
-        "凭完整邀请链接加入。匿名身份保存在此浏览器，请勿清除网站数据。";
+        "身份由账号 UUID 确认。绑定邮箱后，可在其他设备登录同一个账号。";
     }
     const room = state.room,
       secure = state.secure;
@@ -325,6 +327,9 @@ async function openRoom(target) {
     state.ready = true;
     notifications.prime(room,state.messages);
     features.ready();
+    daily.ready();
+    memories.ready();
+    pet.ready();
     actions?.load();
     if (!supported && (state.quotes.length || state.date))
       toast(
@@ -332,6 +337,7 @@ async function openRoom(target) {
       );
     rememberRoom();
     void notifications.watch();
+    const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);openNotice(noticePanel);}
     render({ bottom: true });
     updateStatus();
   } catch (error) {
@@ -339,6 +345,7 @@ async function openRoom(target) {
     state.stop?.();
     state.stop = null;
     state.ready = false;
+    if(error.code === "AUTH_REQUIRED") account.open();
     const extra = state.secure
       ? " 请使用包含 #key= 的完整邀请链接；若尚未升级，请先完成数据库设置。"
       : "";
@@ -436,6 +443,10 @@ function home() {
   state.ready = false;
   state.refreshPromise = null;
   features.roomChanged();
+  daily.reset();
+  memories.reset();
+  films.reset();
+  pet.reset();
   actions?.reset();
   $("room").classList.remove("active");
   $("home").classList.add("active");
@@ -469,8 +480,8 @@ function author(message) {
     name: mine
       ? state.profile.myName
       : state.profile.otherName ||
-        member?.display_name ||
-        message.sender_name ||
+        (member?.display_name === "我" ? "朋友" : member?.display_name) ||
+        (message.sender_name === "我" ? (message.author_id ? "朋友" : "历史成员") : message.sender_name) ||
         "朋友",
     image: mine
       ? state.profile.myAvatar
@@ -478,13 +489,17 @@ function author(message) {
   };
 }
 
-function render({ bottom = false, stick = false } = {}) {
-  const box = $("messages");
+function render(options={}){
+  renderProjection($('messages'),'chat',options);
+  if(state.spaceView==='diary')renderProjection($('diaryEntries'),'diary');
+  if(state.spaceView==='wall')memories.render();
+}
+function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
   const wasNearBottom =
     box.scrollHeight - box.scrollTop - box.clientHeight < 100;
   const oldTop = box.scrollTop;
   const fragment = document.createDocumentFragment();
-  box.className = "messages view-" + state.view;
+  box.className = "messages view-" + view;
   if (!state.messages.some(m=>!actions?.hidden(m.id)))
     fragment.append(
       node(
@@ -497,17 +512,17 @@ function render({ bottom = false, stick = false } = {}) {
     );
   const byId = new Map(state.messages.map((m) => [m.id, m]));
   let lastDay = '',container=fragment;
-  if(state.view==='wall')fragment.append(node('p','wall-intro','把值得留下的瞬间，慢慢贴在这里。'));
-  for (const message of projectMessages(state.messages.filter(m=>!actions?.hidden(m.id)), state.view).filter(m=>state.view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
-    const day = displayDay(message, state.view);
+  if(view==='wall')fragment.append(node('p','wall-intro','把值得留下的瞬间，慢慢贴在这里。'));
+  for (const message of projectMessages(state.messages.filter(m=>!actions?.hidden(m.id)), view).filter(m=>view!=='diary'||((!$('diaryDate').value||displayDay(m,'diary')===$('diaryDate').value)&&(state.diaryFilter!=='mine'||isMine(m,state))&&(state.diaryFilter!=='media'||m.media_path)))) {
+    const day = displayDay(message, view);
     if (day !== lastDay) {
-      if(state.view==='diary'){container=node('section','diary-page');fragment.append(container);}
-      if(state.view!=='wall')container.append(node('div','day',day||'日期未知'));
+      if(view==='diary'){container=node('section','diary-page');fragment.append(container);}
+      if(view!=='wall')container.append(node('div','day',day||'日期未知'));
       lastDay = day;
     }
     const who = author(message);
     const row = node("article", "msg" + (who.mine ? " mine" : ""));
-    row.dataset.messageId = message.id;
+    if(view==='chat')row.dataset.messageId=message.id;else row.dataset.sourceMessageId=message.id;
     const wrap = node("div", "bubble-wrap");
     wrap.append(node("span", "sender-name", who.name));
     const bubble = node("div", "bubble");
@@ -523,8 +538,7 @@ function render({ bottom = false, stick = false } = {}) {
         );
       referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
-    features.renderMedia(message,bubble);
-    if(/^【(?:合并转发|截图合并整理)】/.test(message.content)){const record=node('details','forward-record');record.append(node('summary','',message.content.startsWith('【合并转发】')?'合并转发 · 点击展开':'截图整理 · 点击展开'),node('div','message-text',message.content.replace(/^【[^】]+】\s*/,'')));bubble.append(record);}else bubble.append(node("div", "message-text", message.content));
+    if(!cards.render(message,bubble)){features.renderMedia(message,bubble,view);bubble.append(node("div","message-text",message.content));}
     wrap.append(bubble);
     const meta = node("div", "meta");
     const stamp = new Date(message.created_at);
@@ -541,39 +555,35 @@ function render({ bottom = false, stick = false } = {}) {
     time.dateTime = message.created_at;
     time.title = "真实发送时间：" + stamp.toLocaleString("zh-CN");
     meta.append(time);
-    if (message.display_date && state.view !== "chat")
+    if (message.display_date && view !== "chat")
       meta.append(
         node("span", "", " · 发送于 " + localDate(message.created_at)),
       );
     wrap.append(meta);
     const portrait = avatar(who.image, who.name);
-    if(state.view==='wall')wrap.append(node('time','wall-date',displayDay(message,'wall')));
-    row.append(portrait,wrap);actions?.decorate(row,message);container.append(row);
+    if(view==='wall')wrap.append(node('time','wall-date',displayDay(message,'wall')));
+    row.append(portrait,wrap);if(view==='chat')actions?.decorate(row,message);container.append(row);
   }
-  if(state.view==='wall')features.renderWall(fragment);
-  if(state.view==='wall'){const grid=node('div','wall-grid');grid.append(fragment);box.replaceChildren(grid);}else box.replaceChildren(fragment);
+  if(view==='wall')features.renderWall(fragment);
+  if(view==='wall'){const grid=node('div','wall-grid');grid.append(fragment);box.replaceChildren(grid);}else box.replaceChildren(fragment);
+  if(view!=='chat'){box.scrollTop=oldTop;return;}
   $("olderBtn").hidden = !state.hasMore;
   $("historyCount").textContent = state.messages.length
     ? `${state.messages.length} 条${state.hasMore ? " · 还有更早留言" : ""}`
     : "";
   renderQuotes();
   actions?.rendered();
-  if (bottom || (stick && wasNearBottom && state.view === "chat"))
+  if (bottom || (stick && wasNearBottom && view === "chat"))
     box.scrollTop = box.scrollHeight;
   else box.scrollTop = oldTop;
-  if(state.ready&&state.view==='chat'&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
+  if(state.ready&&view==='chat'&&$('relationSpace').inert&&!document.hidden&&box.scrollHeight-box.scrollTop-box.clientHeight<100)notifications.read(state.room);
 }
 
 function setView(view) {
-  view=['chat','diary','wall'].includes(view)?view:'chat';
-  state.view = view;
-  $('viewHeading').hidden=view==='chat';$('viewTitle').textContent=view==='diary'?'日记':'回忆墙';$('diaryFilters').hidden=view!=='diary';$('composer').hidden=view!=='chat';$('room').dataset.view=view;
-  document.querySelectorAll("[data-view]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === view);
-    button.setAttribute("aria-pressed", String(button.dataset.view === view));
-  });
-  render({ bottom: view === "chat" });
-  if (view !== "chat") $("messages").scrollTop = 0;
+  state.view='chat';$('room').dataset.view='chat';$('composer').hidden=false;
+  if(view==='diary'||view==='wall')ui.openFeature(view+'Space');
+  else ui.drawer(false);
+  render();
 }
 
 function renderQuotes() {
@@ -598,7 +608,7 @@ function resizeComposer() {
 async function send(event) {
   event.preventDefault();
   const content = $("messageInput").value.trim();
-  if (!content || !state.ready || state.pending.has(state.room)) return;
+  if (!content || !state.ready || !state.userId || !state.metadata || state.pending.has(state.room)) return;
   if (!navigator.onLine) {
     toast("网络已断开，草稿已保留。");
     return;
@@ -610,13 +620,14 @@ async function send(event) {
   const snapshot = {
     room: state.room,
     secure: state.secure,
+    userId: state.userId,
     nonce: state.draftNonce,
     text: $("messageInput").value,
   };
   const row = {
     room_id: state.room,
     content,
-    sender: state.secure ? state.userId : state.deviceId,
+    sender: state.userId,
     sender_name: state.profile.myName,
   };
   if (state.metadata)
@@ -624,8 +635,7 @@ async function send(event) {
       display_date: state.date || null,
       reply_to: [...state.quotes],
     });
-  if (state.secure)
-    Object.assign(row, {
+  Object.assign(row, {
       author_id: state.userId,
       client_nonce: snapshot.nonce,
     });
@@ -635,9 +645,9 @@ async function send(event) {
   try {
     const message = await api.sendMessage(row, snapshot.secure);
     // Only clear the exact draft sent. Typing or switching rooms during a request is safe.
-    const saved = storeGet("draft." + snapshot.room, {});
-    if (saved.nonce === snapshot.nonce) persist("draft." + snapshot.room, {});
-    if (state.room === snapshot.room) {
+    const saved = storeGet("draft." + snapshot.userId + "." + snapshot.room, {});
+    if (saved.nonce === snapshot.nonce) persist("draft." + snapshot.userId + "." + snapshot.room, {});
+    if (state.room === snapshot.room && state.userId === snapshot.userId) {
       state.messages = mergeMessages(state.messages, [message]);
       if (
         state.draftNonce === snapshot.nonce &&
@@ -653,7 +663,7 @@ async function send(event) {
       resizeComposer();
     } else toast("上一间房的留言已发送。");
   } catch (error) {
-    if (state.room === snapshot.room)
+    if (state.room === snapshot.room && state.userId === snapshot.userId)
       toast(
         snapshot.secure
           ? errorText(error) + " 草稿保留，可用原草稿重试。"
@@ -676,17 +686,11 @@ async function create() {
     if (state.ready)
       void notice(
         "房间已创建",
-        "从菜单复制完整邀请链接发给朋友。链接持有者可以加入并查看留言，请勿公开发布。匿名身份只保存在当前浏览器；清除网站数据或换设备会成为新的成员。",
+        "从菜单复制完整邀请链接发给朋友。链接持有者可以加入并查看留言，请勿公开发布。请在账号页绑定邮箱，换设备后登录同一邮箱即可找回身份与房间。",
       );
   } catch (error) {
-    const allowLegacy = await notice(
-      "暂时无法创建邀请房间",
-      errorText(error) +
-        "\n你仍可创建旧版房间继续留言，它沿用旧的公开权限，不适合私密内容。",
-      "创建旧版房间",
-      true,
-    );
-    if (allowLegacy) await openRoom({ room: legacyRoom() });
+    if(error.code === 'AUTH_REQUIRED') account.open();
+    else toast(errorText(error));
   } finally {
     state.busy = false;
     $("createBtn").disabled = false;
@@ -785,7 +789,7 @@ async function saveProfile() {
   try {
     if (state.secure) await api.saveMember(room, state.userId, profile);
     if (epoch !== state.epoch) return;
-    if (!persist("profile." + room, profile)) return;
+    if (!persist("profile." + state.userId + "." + room, profile)) return;
     state.profile = profile;
     try {
       localStorage.setItem("nickname", profile.myName);
@@ -942,7 +946,7 @@ $("clearQuotes").onclick = () => {
 };
 $("refreshBtn").onclick = () => refreshMessages(true);
 $("olderBtn").onclick = loadOlder;
-$("messages").onclick = (event) => {
+$("messages").onclick = $("spacePages").onclick = (event) => {
   const reference=event.target.closest('[data-reference-id]');
   if(reference)void revealReference(reference.dataset.referenceId);
 };
@@ -965,6 +969,7 @@ document.addEventListener("keydown", (event) => {
   );
   if (!sheet) return;
   if (event.key === "Escape") {
+    event.preventDefault();event.stopImmediatePropagation();
     closeSheet(sheet.id);
     return;
   }
@@ -1046,14 +1051,32 @@ const notifications=initNotifications({$,state,toast,persist,recentRooms,renderR
 const ui=initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home});
 const heading=$('roomInfoBtn'),label=node('span');label.append($('roomTitle'),$('roomStatus'));heading.replaceChildren(avatar('','友'),label);
 $('pinRoomBtn').onclick=()=>{const records=recentRooms();const row=records.find(r=>r.room===state.room);if(row){row.pinned=!row.pinned;persist('recent',records);renderRecent();toast(row.pinned?'这个房间已置顶。':'已取消置顶。');}closeSheet('menuScrim');};
-$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
+$('messages').addEventListener('scroll',()=>{const pane=$('messages');if(state.view==='chat'&&$('relationSpace').inert&&!document.hidden&&pane.scrollHeight-pane.scrollTop-pane.clientHeight<80)notifications.read(state.room);},{passive:true});
+const cards=initMessageCards({$,state,node,toast,showSheet,closeSheet,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render();}});
 const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,notice,author,
   onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}
 });
+const daily=initDailySpace({$,state,node,toast,notice,ui});
+const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
+const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
+const pet=initPetSpace({$,state,node,toast,notice,ui});
+function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
+notifications.onOpen(openNotice);
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
 renderRecent();
 void notifications.watch();
 const initial = parseRoom(location.href);
+const account=initAccount({$,state,node,toast,showSheet,closeSheet,
+  async onIdentity(user,previous){
+    const target=state.room?{room:state.room,invite:state.invite}:null;
+    if(previous && previous!==user?.id){home();state.messages=[];state.members=[];state.profile={};}
+    state.userId=user?.id||'';
+    renderRecent();void notifications.watch();
+    if(target&&user&&previous!==user.id)await openRoom(target);
+  },
+  onRooms(rows){const local=recentRooms();if(!storeGet('rooms-imported.'+state.userId,false)){for(const r of storeGet('recent',[]))if(parseRoom(r.room)&&!local.some(x=>x.room===r.room))local.push(r);persist('rooms-imported.'+state.userId,true);}for(const row of rows)if(!local.some(r=>r.room===row.room_id))local.push({room:row.room_id,secure:true,title:'留言室',visited:Date.parse(row.joined_at)});persist('recent',local);renderRecent();}
+});
+await account.ready;
 if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);
   void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" });

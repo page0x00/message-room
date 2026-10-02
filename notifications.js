@@ -1,10 +1,13 @@
-import {storeGet,storeSet,isMine,compareCreated,normalizeMessage,roomLink,errorText} from './core.js?v=2.3.0';
-import {client,loadMessages} from './backend.js?v=2.3.0';
+import {storeGet,storeSet,isMine,compareCreated,normalizeMessage,roomLink,errorText} from './core.js?v=2.4.0';
+import {client,loadMessages} from './backend.js?v=2.4.0';
+import {notificationLabel,noticePanels} from './notice-core.js?v=2.4.0';
 export function newRows(rows,cursor,identity){return rows.map(normalizeMessage).filter(row=>!isMine(row,identity)&&cursor&&compareCreated(row,cursor)>0);}
 export function initNotifications({$,state,toast,persist,recentRooms,renderRecent}){
   let channels=[],generation=0,identity='',audioContext,registration,pollBusy=false;
+  let reminderGeneration=0,reminderBusy=false,noticeRows=[],openPanel=null;
+  const reminders=document.createElement('div');reminders.className='relation-notices';reminders.id='relationNotices';reminders.hidden=true;$('spaceHome').prepend(reminders);
   const preferences={inApp:true,sound:false,system:false,...storeGet('notifications',{})};
-  const record=room=>storeGet('notice.'+room,{cursor:null,unread:0});
+  const record=room=>storeGet('notice.'+(state.userId||identity||'signed-out')+'.'+room,{cursor:null,unread:0});
   const unread=room=>Number(record(room).unread)||0;
   const active=room=>room===state.room&&state.ready&&state.view==='chat'&&!document.hidden&&$('messages').scrollHeight-$('messages').scrollTop-$('messages').clientHeight<100&&$('relationSpace').inert;
   const status=text=>$('notificationStatus').textContent=text;
@@ -19,11 +22,11 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
     if(navigator.setAppBadge){const task=total?navigator.setAppBadge(total):navigator.clearAppBadge();task?.catch(()=>{});}
     renderRecent();
   }
-  function read(room){if(!room)return;const saved=record(room);if(!saved.unread)return;saved.unread=0;storeSet('notice.'+room,saved);badge();}
+  function read(room){if(!room)return;const saved=record(room);if(!saved.unread)return;saved.unread=0;storeSet('notice.'+(state.userId||identity||'signed-out')+'.'+room,saved);badge();}
   function prime(room,rows){
     const newest=[...rows].sort(compareCreated).at(-1);const saved=record(room);
     if(newest&&(!saved.cursor||compareCreated(newest,saved.cursor)>0))saved.cursor={id:String(newest.id),created_at:newest.created_at};
-    saved.unread=0;storeSet('notice.'+room,saved);badge();
+    saved.unread=0;storeSet('notice.'+(state.userId||identity||'signed-out')+'.'+room,saved);badge();
   }
   function beep(){
     if(!preferences.sound||!audioContext||audioContext.state!=='running')return;
@@ -32,17 +35,17 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
   async function systemNotice(room,id){
     if(!preferences.system||!('Notification' in window)||Notification.permission!=='granted'||(!document.hidden&&room===state.room))return;
     // Push supplies the system notification when subscribed; avoid a second local one.
-    if(storeGet('push.'+room,null))return;
+    if(storeGet('push.'+room,null)?.userId===(state.userId||identity))return;
     const options={body:'你有一条新留言',tag:'mailbox-'+room+'-'+id,icon:'./assets/icon-192.png',data:{room},renotify:false};
     try{const sw=await worker();await sw.showNotification('小小留言室',options);}catch{try{const notice=new Notification('小小留言室',options);notice.onclick=()=>{window.focus();location.href=roomLink(location.href,room,recentRooms().find(r=>r.room===room)?.invite||'');};}catch{/* In-app notification remains available. */}}
   }
   function ingest(room,rows,{silent=false}={}){
     if(!rows.length)return;
     const saved=record(room),sorted=rows.map(normalizeMessage).sort(compareCreated),newest=sorted.at(-1);
-    const incoming=newRows(sorted,saved.cursor,{userId:state.userId||identity,deviceId:state.deviceId});
+    const incoming=newRows(sorted,saved.cursor,{userId:state.userId||identity});
     if(!saved.cursor||compareCreated(newest,saved.cursor)>0)saved.cursor={id:newest.id,created_at:newest.created_at};
     if(incoming.length&&!active(room))saved.unread=Math.min(9999,(saved.unread||0)+incoming.length);
-    storeSet('notice.'+room,saved);
+    storeSet('notice.'+(state.userId||identity||'signed-out')+'.'+room,saved);
     const records=recentRooms(),recent=records.find(r=>r.room===room);
     if(recent&&(!recent.lastAt||Date.parse(newest.created_at)>=Date.parse(recent.lastAt))){recent.lastAt=newest.created_at;recent.preview=newest.content||newest.media_name||'新留言';persist('recent',records);}
     badge();
@@ -56,6 +59,7 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
     }}finally{pollBusy=false;}
   }
   async function watch(){
+    reminderGeneration++;reminderBusy=false;noticeRows=[];renderNotices();
     const revision=++generation;for(const [sb,channel] of channels)void sb.removeChannel(channel);channels=[];
     try{identity=(await client(true).auth.getSession()).data.session?.user.id||'';}catch{identity='';}
     if(revision!==generation)return;
@@ -66,7 +70,7 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
       for(const room of rooms)channel=channel.on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'room_id=eq.'+room.room},payload=>{if(revision===generation)ingest(room.room,[payload.new]);});
       channel.subscribe();channels.push([sb,channel]);
     }
-    void poll();
+    void poll();void syncReminders();
   }
   $('inAppNotify').checked=preferences.inApp;$('soundNotify').checked=preferences.sound;
   $('inAppNotify').onchange=()=>{preferences.inApp=$('inAppNotify').checked;persist('notifications',preferences);};
@@ -79,7 +83,7 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
     preferences.system=true;persist('notifications',preferences);return worker();
   }
   $('notifyBtn').onclick=async()=>{try{await permission();status('系统通知已开启。网页保持打开时可提示新留言；离线推送需另行开启。');}catch(e){status(e.message);}};
-  function pushStatus(){const enabled=state.room&&storeGet('push.'+state.room,null);$('pushOffBtn').hidden=!enabled;$('pushBtn').disabled=!state.secure||!state.ready;$('pushBtn').textContent=enabled?'检查 / 更新离线推送':'开启当前房间离线推送';}
+  function pushStatus(){const saved=state.room&&storeGet('push.'+state.room,null),enabled=saved?.userId===state.userId;$('pushOffBtn').hidden=!enabled;$('pushBtn').disabled=!state.secure||!state.ready;$('pushBtn').textContent=enabled?'检查 / 更新离线推送':'开启当前房间离线推送';}
   $('pushBtn').onclick=async()=>{
     if(!state.secure||!state.ready){status('请先打开邀请房间，再为它开启离线推送。');return;}
     const room=state.room,userId=state.userId;$('pushBtn').disabled=true;
@@ -98,11 +102,33 @@ export function initNotifications({$,state,toast,persist,recentRooms,renderRecen
       persist('push.'+room,{endpoint:value.endpoint,userId});status('当前房间已订阅离线推送。系统通知不会展示留言正文。');
     }catch(e){status(e.message||'订阅失败，请重试。');}finally{pushStatus();}
   };
-  $('pushOffBtn').onclick=async()=>{const room=state.room,saved=storeGet('push.'+room,null);if(!saved)return;try{const result=await client(true).from('push_subscriptions').delete().eq('room_id',room).eq('user_id',saved.userId).eq('endpoint',saved.endpoint);if(result.error)throw result.error;persist('push.'+room,null);status('已关闭这个房间的离线推送。');pushStatus();}catch(e){status(errorText(e));}};
+  $('pushOffBtn').onclick=async()=>{const room=state.room,saved=storeGet('push.'+room,null);if(!saved||saved.userId!==state.userId)return;try{const result=await client(true).from('push_subscriptions').delete().eq('room_id',room).eq('user_id',saved.userId).eq('endpoint',saved.endpoint);if(result.error)throw result.error;persist('push.'+room,null);status('已关闭这个房间的离线推送。');pushStatus();}catch(e){status(errorText(e));}};
+  function renderNotices(){
+    const unread=noticeRows.filter(n=>!n.seen_at);reminders.hidden=!noticeRows.length;reminders.replaceChildren();
+    $('relationHandle').dataset.reminders=String(unread.length);$('relationHandle').classList.toggle('has-reminders',unread.length>0);
+    for(const n of noticeRows){const row=document.createElement('div'),b=document.createElement('button'),dismiss=document.createElement('button');row.className='relation-notice'+(n.seen_at?' seen':'');b.type=dismiss.type='button';b.textContent=notificationLabel(n.kind);dismiss.textContent='✓';dismiss.setAttribute('aria-label','标记已看：'+notificationLabel(n.kind));b.onclick=()=>{void mark(n);openPanel?.(noticePanels[n.kind]);};dismiss.onclick=()=>void mark(n);row.append(b,dismiss);reminders.append(row);}
+  }
+  async function mark(n){const room=state.room,user=state.userId;try{const result=await client(true).rpc('mailbox_read_notice',{p_room:room,p_id:n.id});if(result.error)throw result.error;if(room===state.room&&user===state.userId){n.seen_at=new Date().toISOString();renderNotices();}}catch{toast('没有保存已读状态，稍后可以再试。');}}
+  async function reminderSystem(n){
+    if(!preferences.system||!('Notification' in window)||Notification.permission!=='granted'||storeGet('push.'+n.room_id,null)?.userId===state.userId)return;
+    try{const sw=await worker();await sw.showNotification('小小留言室',{body:notificationLabel(n.kind),tag:'mailbox-'+n.room_id+'-'+n.id,icon:'./assets/icon-192.png',data:{room:n.room_id,kind:n.kind},renotify:false});}catch{}
+  }
+  async function syncReminders(){
+    if(reminderBusy||!state.secure||!state.ready||!state.userId||!navigator.onLine)return;
+    reminderBusy=true;const version=reminderGeneration,room=state.room,user=state.userId;
+    try{const result=await client(true).rpc('mailbox_sync_notices',{p_room:room});if(result.error)throw result.error;if(version!==reminderGeneration||room!==state.room||user!==state.userId)return;
+      noticeRows=Array.isArray(result.data)?result.data:[];renderNotices();const key='reminder-seen.'+user+'.'+room,seen=new Set(storeGet(key,[])),fresh=noticeRows.filter(n=>!n.seen_at&&!seen.has(n.id));
+      if(fresh.length){if(preferences.inApp)toast(notificationLabel(fresh[0].kind)+(fresh.length>1?` · 还有 ${fresh.length-1} 项提醒`:''));beep();for(const n of fresh)void reminderSystem(n);storeSet(key,[...seen,...fresh.map(n=>n.id)].slice(-300));}
+    }catch{/* Existing in-app daily records remain readable when the reminder service is unavailable. */}finally{if(version===reminderGeneration)reminderBusy=false;}
+  }
+  document.addEventListener('mailbox:listen-invite',async e=>{const room=e.detail?.room,user=state.userId;if(room!==state.room||!state.secure)return;try{const result=await client(true).rpc('mailbox_invite_listen',{p_room:room});if(result.error)throw result.error;if(room===state.room&&user===state.userId)toast('一起听邀请已留给朋友。');}catch{if(room===state.room&&user===state.userId)toast('歌曲已同步，邀请提醒暂时没有发出。');}});
+  document.addEventListener('mailbox:space-open',()=>void syncReminders());
+  document.addEventListener('mailbox:daily-reminders',()=>void syncReminders());
   document.addEventListener('mailbox:settings-open',pushStatus);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(active(state.room))read(state.room);void poll();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(active(state.room))read(state.room);void poll();void syncReminders();}});
   window.addEventListener('storage',event=>{if(event.key?.startsWith('mailbox.notice.'))badge();});
-  setInterval(()=>void poll(),60000);
-  if('serviceWorker' in navigator){void worker().catch(()=>{});navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='mailbox-push')void poll();});}
-  return {prime,ingest,read,unread,watch};
+  setInterval(()=>{void poll();void syncReminders();},60000);
+  if('serviceWorker' in navigator){void worker().catch(()=>{});navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='mailbox-push'){void poll();void syncReminders();}});}
+  document.addEventListener('mailbox:space-close',()=>{if(active(state.room))read(state.room);});
+  return {prime,ingest,read,unread,watch,onOpen(fn){openPanel=fn;},syncReminders};
 }
