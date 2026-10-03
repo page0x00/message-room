@@ -103,7 +103,7 @@ GitHub Pages 部署 **main / 根目录**，必须保留整个仓库静态文件�
 
 ### AI 小宠物
 
-当前版本支持在网页设置 OpenAI、Claude、Gemini、DeepSeek、Azure、OpenRouter 和自定义 API。请先完成 [2.5.0 API 配置与部署](docs/API_SETTINGS.md)，包括 `20261008_api_connections.sql`、加密密钥和两个函数。以下是可选的旧站点默认 OpenAI 配置；个人连接启用后优先使用个人配置。
+当前版本支持在网页设置 OpenAI、Claude、Gemini、DeepSeek、Azure、OpenRouter 和自定义 API。默认可在界面填写 URL、Key 和模型使用本机直连，Key 不进入数据库，无需加密密钥或 API 函数。小小陪伴的授权与结果同步需执行最新 SQL（已安装 2.5.0 时只执行 `20261009_direct_api.sql`）。如需账号同步，再按 [API 配置与部署](docs/API_SETTINGS.md) 设置加密密钥及两个函数。以下是可选的旧站点默认 OpenAI 配置；个人连接启用后优先使用个人配置。
 
 1. 在 Edge Function Secrets 设置 **OPENAI_API_KEY**、**MAILBOX_PET_MODEL**（你账户可用并支持 Responses 结构化输出的模型 ID），以及实际网站 Origin 对应的 **MAILBOX_ORIGIN**。
 2. 部署 `supabase functions deploy mailbox-pet --project-ref yuzgbxeprpohlakxjcut`。仅服务端使用 AI 密钥；函数先通过 Supabase `auth.getUser` 验证用户，再从数据库读取范围，拒绝浏览器伪造他人身份或提交任意聊天当上下文。

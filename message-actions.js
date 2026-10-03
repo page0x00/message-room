@@ -1,8 +1,8 @@
-import {cardData,cardPreview} from './message-cards.js?v=2.5.0';
-import {storeGet,isMine,randomId,displayDay,compareCreated} from './core.js?v=2.5.0';
-import {splitText} from './ocr-layout.js?v=2.5.0';
-import * as api from './backend.js?v=2.5.0';
-import {mediaBlob} from './feature-backend.js?v=2.5.0';
+import {cardData,cardPreview} from './message-cards.js?v=2.5.1';
+import {storeGet,isMine,randomId,displayDay,compareCreated} from './core.js?v=2.5.1';
+import {splitText} from './ocr-layout.js?v=2.5.1';
+import * as api from './backend.js?v=2.5.1';
+import {mediaBlob} from './feature-backend.js?v=2.5.1';
 
 export function forwardUnits(rows,mode,name){
   const sorted=[...rows].sort(compareCreated),units=[];
