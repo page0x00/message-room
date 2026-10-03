@@ -23,4 +23,28 @@ export async function runAPIDatabase({db,check,as,denied,scalar,a,b,room}){
   await as(a);await scalar("select mailbox_pet_consent($1,false,false,'2026-01-01',null,$2)",[rid,scope]);await db.exec('reset role');
   await denied('select mailbox_pet_finish($1,$2,$3,$4,$5,$6)',[rid,a,p.request,{name:'test'},scope,'config-1'],'40001');
  });
+ await check('browser direct RPCs preserve ownership, author consent and source validation without storing API keys',async()=>{
+  const rid=room.room_id,scope='https://openrouter.ai',config='a'.repeat(64);
+  await as();await denied('select mailbox_pet_prepare_direct($1,$2,$3)',[rid,scope,config]);
+  await as(a);await scalar("select mailbox_pet_consent($1,true,false,'2026-01-01',null,$2)",[rid,scope]);
+  await db.exec('reset role');await db.query('update mailbox_private.pet_jobs set last_attempt=null,attempts=0 where room_id=$1',[rid]);
+  await as(a);await denied('select mailbox_pet_prepare_direct($1,$2,$3)',[rid,'https://api.openai.com',config]);
+  const prepared=await scalar('select mailbox_pet_prepare_direct($1,$2,$3)',[rid,scope,config]);assert.ok(prepared.context.length);assert.ok(prepared.context.every(m=>m.author===a));
+  const pet={name:'光',mood:'calm',line:'记得日常。',traits:['好奇'],memories:[{text:'日常',sources:['fabricated']} ]};
+  const args=[rid,scope,config,prepared.request,pet];await denied('select mailbox_pet_finish_direct($1,$2,$3,$4,$5)',args,'22023');
+  pet.memories[0].sources=[prepared.context[0].id];
+  await as(b);await denied('select mailbox_pet_finish_direct($1,$2,$3,$4,$5)',args,'40001');
+  await as(a);const saved=await scalar('select mailbox_pet_finish_direct($1,$2,$3,$4,$5)',args);assert.equal(saved.owner_user_id,a);assert.deepEqual(saved.data,pet);
+  assert.equal((await scalar('select mailbox_pet_prepare_direct($1,$2,$3)',[rid,scope,config])).cached,true);
+  await as(b);assert.equal(await scalar('select count(*) from pet_states where room_id=$1',[rid]),0);
+  await db.exec('reset role');
+ });
+ await check('browser direct output cannot be saved after consent is revoked',async()=>{
+  const rid=room.room_id,scope='https://openrouter.ai',config='b'.repeat(64);
+  await db.exec('reset role');await db.query('update mailbox_private.pet_jobs set last_attempt=null,attempts=0 where room_id=$1',[rid]);
+  await as(a);const prepared=await scalar('select mailbox_pet_prepare_direct($1,$2,$3)',[rid,scope,config]);
+  await scalar("select mailbox_pet_consent($1,false,false,'2026-01-01',null,$2)",[rid,scope]);
+  await denied('select mailbox_pet_finish_direct($1,$2,$3,$4,$5)',[rid,scope,config,prepared.request,{name:'光',mood:'calm',line:'日常',traits:[],memories:[]}],'40001');
+  await db.exec('reset role');
+ });
 }
