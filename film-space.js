@@ -1,9 +1,9 @@
-import {randomId,storeGet,storeSet} from './core.js?v=2.5.0';
-import {normalizeFrames} from './memory-core.js?v=2.5.0';
-import {createFilmAudio} from './film-audio.js?v=2.5.0';
-import * as db from './memory-backend.js?v=2.5.0';
-import {upload} from './daily-backend.js?v=2.5.0';
-import {mediaBlob} from './feature-backend.js?v=2.5.0';
+import {randomId,storeGet,storeSet} from './core.js?v=2.5.1';
+import {normalizeFrames} from './memory-core.js?v=2.5.1';
+import {createFilmAudio} from './film-audio.js?v=2.5.1';
+import * as db from './memory-backend.js?v=2.5.1';
+import {upload} from './daily-backend.js?v=2.5.1';
+import {mediaBlob} from './feature-backend.js?v=2.5.1';
 
 export function initFilmSpace({$,state,node,toast,notice,ui,memories}){
  const pane=node('section','space-page');pane.id='filmSpace';pane.hidden=true;pane.innerHTML='<div class="sheet film-space"><div class="daily-toolbar"><h3>我的回忆胶片</h3><button id="filmNew" class="text-btn">＋ 新的一卷</button></div><div id="filmList"></div><div id="filmEditor" hidden><label class="field">这卷胶片的名字<input id="filmTitle" maxlength="120" value="我们的片段"/></label><div class="film-editor-actions"><button id="filmAdd">＋ 选择回忆</button><button id="filmSave">保存胶片</button><button id="filmPreview">▷ 预览放映</button></div><div id="filmFrames"></div><label class="file-picker">选择背景音乐（20 MB 以内）<input id="filmBgm" type="file" accept="audio/*"/></label><p id="filmBgmName"></p><button id="filmRemoveBgm" class="text-btn">移除配乐</button><p id="filmSaveStatus" role="status"></p></div><p id="filmStatus" class="sheet-note" role="status"></p><div id="filmProjector" hidden><div id="filmGate"><div id="filmScene"></div><canvas id="filmGrain" width="180" height="120"></canvas><div class="film-vignette"></div><div class="film-leak"></div><div class="film-scratch"></div><div class="film-flash"></div></div><input id="filmProgress" class="film-progress" aria-label="胶片播放位置" type="range" min="0" max="1" step="1" value="0"/><div id="filmControls"><button id="filmExit" aria-label="返回胶片编辑">‹</button><button id="filmRewind" aria-label="倒带">↶</button><button id="filmPrev" aria-label="上一幕">│◀</button><button id="filmPlay">暂停</button><button id="filmNext" aria-label="下一幕">▶│</button><select id="filmSpeed" aria-label="放映速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></div><div class="film-options"><span id="filmPosition"></span><label>音效<select id="filmSound"><option value="off">关闭</option><option value="light" selected>轻微</option><option value="immersive">沉浸</option></select></label><button id="filmFullscreen">全屏</button></div><div id="filmTimeline" class="film-timeline" aria-label="胶片场景"></div></div><audio id="filmBgmAudio" loop></audio></div>';
