@@ -4,8 +4,12 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {stripTypeScriptTypes} from 'node:module';
 import {modelRequest,parsePet} from '../supabase/functions/mailbox-pet/policy.mjs';
+import {petHandler} from '../supabase/functions/mailbox-pet/handler.js';
+import {legacyProfile} from '../supabase/functions/_shared/ai-store.js';
+import {callModel} from '../supabase/functions/_shared/ai-network.js';
 import {allowedEndpoint,messageId,notificationPayload,sameSecret} from '../supabase/functions/mailbox-push/policy.mjs';
 async function handler(file,admin,env,fetch=()=>{throw Error('Unexpected network');},webpush={setVapidDetails(){}}){
+ if(file==='mailbox-pet')return petHandler({admin,env:k=>env[k],connection:async()=>{const p=legacyProfile(k=>env[k]);return p?{...p,revision:0}:null;},call:(p,k,task)=>callModel(p,k,task,async(url,options)=>{const r=await fetch(url,{...options,body:JSON.stringify(options.body)});if(!r.ok)throw Error('Upstream failed');return r.json();})});
  let serve;const source=(await readFile(new URL('../supabase/functions/'+file+'/index.ts',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
  vm.runInNewContext(stripTypeScriptTypes(source),{createClient:()=>admin,Deno:{env:{get:k=>env[k]},serve:f=>serve=f},Response,Request,AbortSignal,Date,JSON,Set,Boolean,fetch,modelRequest,parsePet,webpush,allowedEndpoint,messageId,notificationPayload,sameSecret});return serve;
 }

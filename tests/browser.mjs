@@ -1,3 +1,4 @@
+import {runAPI} from './api.browser.mjs';
 import {runScene} from './scene.browser.mjs';
 import {runSkins} from './skins.browser.mjs';
 import {runCompanions} from './companions.browser.mjs';
@@ -159,6 +160,7 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
+    apiProfiles:[],apiActive:null,apiRevision:0,apiCalls:0,apiModelCalls:0,apiFailNext:false,
     memoryProfiles:[],memoryFilms:[],petConsents:[],petState:null,petConfigured:false,petCalls:0,notices:[],listenInvites:0,
     music:{music_tracks:[],music_likes:[],music_colors:[],music_playlists:[]},musicReport:{daily:[],tracks:[],total_seconds:0},
     daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(uploads), featureFail:false,
@@ -287,8 +289,20 @@ async function setup({
       if(path.endsWith('/rpc/mailbox_invite_listen')){control.listenInvites++;return reply(1);}
       if(path.endsWith('/pet_consents'))return reply(control.petConsents);
       if(path.endsWith('/pet_states'))return reply(control.petState);
-      if(path.endsWith('/rpc/mailbox_pet_consent')){control.petState=null;const c={room_id:json.p_room,user_id:user,enabled:json.p_enabled,automatic:json.p_auto,date_start:json.p_start,date_end:json.p_end};control.petConsents=control.petConsents.filter(c=>c.user_id!==user).concat(c);return reply(c);}
-      if(path.endsWith('/functions/v1/mailbox-pet')){if(method==='GET')return reply({configured:control.petConfigured});control.petCalls++;if(!control.petConfigured)return reply({error:'AI 暂时未连接'},503);control.petState={room_id:secureId,owner_user_id:user,source_count:1,updated_at:new Date().toISOString(),generations:1,data:{name:'小烬',mood:'curious',line:'记住那个一起看海的约定。',traits:['好奇','爱听故事'],memories:[{text:'约好一起去看海。',sources:['1']}]}};return reply({state:control.petState});}
+      if(path.endsWith('/rpc/mailbox_pet_consent')){control.petState=null;const c={room_id:json.p_room,user_id:user,enabled:json.p_enabled,automatic:json.p_auto,date_start:json.p_start,date_end:json.p_end,api_scope:json.p_scope};control.petConsents=control.petConsents.filter(c=>c.user_id!==user).concat(c);return reply(c);}
+      if(path.endsWith('/functions/v1/mailbox-api')){
+        const view=()=>({profiles:control.apiProfiles,active_id:control.apiActive,revision:control.apiRevision,encryption_ready:true,default_profile:null});
+        if(method==='GET')return reply(view());
+        if(control.apiFailNext){control.apiFailNext=false;return reply({error:'测试渠道暂时不可用'},502);}
+        if(json.revision!==control.apiRevision)return reply({error:'配置刚在其他设备改变'},409);
+        if(json.action==='test'){control.apiCalls++;return reply({ok:true,elapsed_ms:125});}
+        if(json.action==='models'){control.apiModelCalls++;return reply({models:['vendor/model-a','vendor/model-b']});}
+        if(json.action==='save'){const id=json.id||crypto.randomUUID();const updated={...json.profile,id,has_key:true};control.apiProfiles=json.id?control.apiProfiles.map(p=>p.id===id?updated:p):control.apiProfiles.concat(updated);if(json.activate)control.apiActive=id;control.apiRevision++;return reply({...view(),saved_id:id});}
+        if(json.action==='delete'){control.apiProfiles=control.apiProfiles.filter(p=>p.id!==json.id);if(control.apiActive===json.id)control.apiActive=null;}
+        if(json.action==='activate')control.apiActive=json.id;
+        control.apiRevision++;return reply(view());
+      }
+      if(path.endsWith('/functions/v1/mailbox-pet')){if(method==='GET'){const profile=control.apiProfiles.find(p=>p.id===control.apiActive);return reply({configured:!!profile||control.petConfigured,provider:profile?.name||'站点默认',scope:profile?new URL(profile.base_url).origin:'https://api.openai.com'});}control.petCalls++;if(!control.petConfigured)return reply({error:'AI 暂时未连接'},503);control.petState={room_id:secureId,owner_user_id:user,source_count:1,updated_at:new Date().toISOString(),generations:1,data:{name:'小烬',mood:'curious',line:'记住那个一起看海的约定。',traits:['好奇','爱听故事'],memories:[{text:'约好一起去看海。',sources:['1']}]}};return reply({state:control.petState});}
       if(path.endsWith('/rpc/mailbox_listen_report'))return reply(control.musicReport);
       if(path.endsWith('/rpc/mailbox_listen_heartbeat'))return reply({server_now:new Date().toISOString(),listeners:json.p_playing?1:0});
       if(path.endsWith('/rpc/mailbox_read_listen'))return reply({session:control.listen,server_now:new Date().toISOString()});
@@ -405,7 +419,7 @@ async function setup({
   return { page, context, control, errors, join:async(id)=>{await joinRoom(id);if(startView === "chat")await page.locator("#sceneNavChat").click();} };
 }
 try {
-  if(!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -862,7 +876,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.SCENE_ONLY)await runScene({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.API_ONLY)await runAPI({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.SCENE_ONLY)await runScene({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.FILM_ONLY)await runFilms({setup,check,secureId,user,friend,fixture,root});

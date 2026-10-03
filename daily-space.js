@@ -1,7 +1,7 @@
-import {localDate,storeGet,storeSet,randomId} from './core.js?v=2.4.2';
-import {cents,money,checkinStats,pocketBalance,pocketToday,wheelValues} from './daily-core.js?v=2.4.2';
-import * as db from './daily-backend.js?v=2.4.2';
-import {mediaBlob} from './feature-backend.js?v=2.4.2';
+import {localDate,storeGet,storeSet,randomId} from './core.js?v=2.5.0';
+import {cents,money,checkinStats,pocketBalance,pocketToday,wheelValues} from './daily-core.js?v=2.5.0';
+import * as db from './daily-backend.js?v=2.5.0';
+import {mediaBlob} from './feature-backend.js?v=2.5.0';
 
 export function initDailySpace({$,state,node,toast,notice,ui}){
  let records=[],pockets=[],transactions=[],leaves=[],selectedPocket='',reading=null,stop=null,epoch=0,serverOffset=0;

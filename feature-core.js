@@ -1,4 +1,4 @@
-import { validDate, localDate, displayDay, projectMessages } from './core.js?v=2.4.2';
+import { validDate, localDate, displayDay, projectMessages } from './core.js?v=2.5.0';
 
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const allowed = new Set(['application/octet-stream','video/quicktime','audio/aac','image/jpeg','image/png','image/webp','image/gif','audio/mpeg','audio/mp4','audio/ogg','audio/wav','audio/x-wav','audio/webm','audio/flac','video/mp4','video/webm','application/pdf','text/plain','application/zip','application/x-zip-compressed','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation']);
