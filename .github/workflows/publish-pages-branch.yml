@@ -1,0 +1,58 @@
+name: Publish main to Pages branch
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-pages-branch
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: source
+
+      - name: Checkout Pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages
+
+      - name: Configure git
+        run: |
+          git -C pages config user.name "github-actions[bot]"
+          git -C pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync production site and keep PR previews
+        run: |
+          find pages -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            ! -name 'pr-preview' \
+            -exec rm -rf {} +
+          rsync -a source/ pages/ \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'supabase/' \
+            --exclude 'tests/' \
+            --exclude 'node_modules/' \
+            --exclude 'docs/' \
+            --exclude 'README.md' \
+            --exclude 'SETUP.md' \
+            --exclude 'package.json' \
+            --exclude 'package-lock.json'
+          touch pages/.nojekyll
+          git -C pages add -A
+          if ! git -C pages diff --cached --quiet; then
+            git -C pages commit -m "Publish main site"
+            git -C pages push origin gh-pages
+          fi
