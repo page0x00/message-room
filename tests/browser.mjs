@@ -24,7 +24,6 @@ await mkdir(resolve(root, "test-results"), { recursive: true });
 const mime = {
   ".html": "text/html",
   ".js": "text/javascript",
-  ".mjs": "text/javascript",
   ".css": "text/css",
   ".woff2": "font/woff2",
   ".woff": "font/woff",
@@ -161,21 +160,11 @@ async function setup({
     delayRead: "",
     authCalls: 0,
     readCalls: 0,
-    apiProfiles:[],apiActive:null,apiRevision:0,apiCalls:0,apiModelCalls:0,apiFailNext:false,apiRequests:0,apiUnavailable:false,backendRequests:[],directRequests:[],directFail:false,directPrepares:0,directFinishes:0,directMissing:false,
+    apiProfiles:[],apiActive:null,apiRevision:0,apiCalls:0,apiModelCalls:0,apiFailNext:false,
     memoryProfiles:[],memoryFilms:[],petConsents:[],petState:null,petConfigured:false,petCalls:0,notices:[],listenInvites:0,
     music:{music_tracks:[],music_likes:[],music_colors:[],music_playlists:[]},musicReport:{daily:[],tracks:[],total_seconds:0},
     daily:{space_entries:[],pockets:[],pocket_entries:[],pocket_leaves:[]},events: [], memoirs: [], listen: null, uploads:new Map(uploads), featureFail:false,
   };
-  await context.route('https://direct.example.com/**',async route=>{
-    const request=route.request(),headers={'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,OPTIONS','access-control-allow-headers':'authorization,content-type'};
-    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
-    control.directRequests.push({url:request.url(),body:request.postData(),headers:request.headers()});
-    if(control.directFail)return route.abort('failed');
-    if(request.url().endsWith('/models'))return route.fulfill({headers,contentType:'application/json',body:JSON.stringify({data:[{id:'browser-model'},{id:'another-model'}]})});
-    const body=JSON.parse(request.postData()),input=body.messages?.at(-1)?.content||'',pet=input.includes('明天一起看海');
-    const result=pet?{name:'直连小光',mood:'curious',line:'记住看海的约定。',traits:['好奇'],memories:[{text:'明天一起看海。',sources:['1']}]}:{ok:true};
-    return route.fulfill({headers,contentType:'application/json',body:JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(result)}}]})});
-  });
   await context.route('**/ocr.js?*',route=>route.fulfill({contentType:'text/javascript',body:`export async function recognizeScreenshot(file,{signal,onProgress}={}){window.ocrCalls=(window.ocrCalls||0)+1;if(window.ocrSlow)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,1200);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Cancelled','AbortError'));},{once:true});});onProgress?.('测试识别');return {messages:[{text:'一起看晚霞',side:'left',date:'2026-09-18',dateSource:'聊天日期',time:'20:00',confidence:96,y:100}]};}` }));
   const errors = [];
   await context.routeWebSocket(/supabase\.co/, (ws) => {
@@ -188,7 +177,6 @@ async function setup({
         url = new URL(request.url());
       const path = url.pathname,
         method = request.method();
-      control.backendRequests.push({path,body:request.postData(),headers:request.headers()});
       let json=null;if(request.postData()&&request.headers()['content-type']?.includes('json'))json=JSON.parse(request.postData());
       const reply = (data, status = 200) =>
         route.fulfill({
@@ -302,7 +290,7 @@ async function setup({
       if(path.endsWith('/pet_consents'))return reply(control.petConsents);
       if(path.endsWith('/pet_states'))return reply(control.petState);
       if(path.endsWith('/rpc/mailbox_pet_consent')){control.petState=null;const c={room_id:json.p_room,user_id:user,enabled:json.p_enabled,automatic:json.p_auto,date_start:json.p_start,date_end:json.p_end,api_scope:json.p_scope};control.petConsents=control.petConsents.filter(c=>c.user_id!==user).concat(c);return reply(c);}
-      if(path.endsWith('/functions/v1/mailbox-api')){control.apiRequests++;if(control.apiUnavailable)return reply({error:'API backend not deployed'},503);
+      if(path.endsWith('/functions/v1/mailbox-api')){
         const view=()=>({profiles:control.apiProfiles,active_id:control.apiActive,revision:control.apiRevision,encryption_ready:true,default_profile:null});
         if(method==='GET')return reply(view());
         if(control.apiFailNext){control.apiFailNext=false;return reply({error:'测试渠道暂时不可用'},502);}
@@ -314,12 +302,6 @@ async function setup({
         if(json.action==='activate')control.apiActive=json.id;
         control.apiRevision++;return reply(view());
       }
-      if(path.endsWith('/rpc/mailbox_pet_prepare_direct')){
-        control.directPrepares++;if(control.directMissing)return reply({code:'PGRST202'},404);
-        const consent=control.petConsents.find(c=>c.user_id===user&&c.enabled&&c.api_scope===json.p_scope);if(!consent)return reply({code:'42501'},403);
-        return reply({request:'direct-request',context:control.records.filter(r=>r.author_id===user).slice(0,1).map(r=>({id:String(r.id),text:r.content,author:user}))});
-      }
-      if(path.endsWith('/rpc/mailbox_pet_finish_direct')){control.directFinishes++;control.petState={room_id:secureId,owner_user_id:user,source_count:1,updated_at:new Date().toISOString(),generations:1,data:json.p_data};return reply(control.petState);}
       if(path.endsWith('/functions/v1/mailbox-pet')){if(method==='GET'){const profile=control.apiProfiles.find(p=>p.id===control.apiActive);return reply({configured:!!profile||control.petConfigured,provider:profile?.name||'站点默认',scope:profile?new URL(profile.base_url).origin:'https://api.openai.com'});}control.petCalls++;if(!control.petConfigured)return reply({error:'AI 暂时未连接'},503);control.petState={room_id:secureId,owner_user_id:user,source_count:1,updated_at:new Date().toISOString(),generations:1,data:{name:'小烬',mood:'curious',line:'记住那个一起看海的约定。',traits:['好奇','爱听故事'],memories:[{text:'约好一起去看海。',sources:['1']}]}};return reply({state:control.petState});}
       if(path.endsWith('/rpc/mailbox_listen_report'))return reply(control.musicReport);
       if(path.endsWith('/rpc/mailbox_listen_heartbeat'))return reply({server_now:new Date().toISOString(),listeners:json.p_playing?1:0});

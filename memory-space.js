@@ -1,8 +1,8 @@
-import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.5.1';
-import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.5.1';
-import * as daily from './daily-backend.js?v=2.5.1';
-import * as db from './memory-backend.js?v=2.5.1';
-import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.5.1';
+import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.5.0';
+import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.5.0';
+import * as daily from './daily-backend.js?v=2.5.0';
+import * as db from './memory-backend.js?v=2.5.0';
+import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.5.0';
 
 export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false}){
  const pane=$('wallSpace'),box=$('wallEntries');box.className='memory-viewport';

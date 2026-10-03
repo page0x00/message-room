@@ -467,7 +467,6 @@ try {
   await runPetDatabase({db,check,as,denied,scalar,a,b,c,room});
   const noticeSql=await readFile(new URL('../supabase/migrations/20261007_notices.sql',import.meta.url),'utf8');await db.exec(noticeSql);await db.exec(noticeSql);
   await runNoticeDatabase({db,check,as,denied,scalar,a,b,c,room});
-  const directSql=await readFile(new URL('../supabase/migrations/20261009_direct_api.sql',import.meta.url),'utf8');await db.exec(directSql);await db.exec(directSql);
   await runAPIDatabase({db,check,as,denied,scalar,a,b,room});
   console.log(
     `\n${checks} PostgreSQL authorization checks passed. Live Supabase was not modified.`,

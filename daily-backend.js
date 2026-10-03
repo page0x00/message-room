@@ -1,6 +1,6 @@
-import {client,uploadMedia} from './backend.js?v=2.5.1';
-import {fileInfo} from './feature-core.js?v=2.5.1';
-import {randomId} from './core.js?v=2.5.1';
+import {client,uploadMedia} from './backend.js?v=2.5.0';
+import {fileInfo} from './feature-core.js?v=2.5.0';
+import {randomId} from './core.js?v=2.5.0';
 const stable=x=>JSON.stringify(x,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
 const take=r=>{if(r.error)throw r.error;return r.data;};
 export async function listRows(table,room){let rows=[];for(let offset=0;offset<50000;offset+=500){const page=take(await client(true).from(table).select('*').eq('room_id',room).order('id').range(offset,offset+499))||[];rows.push(...page);if(page.length<500)return rows;}throw new Error('记录较多，请缩小查询范围。');}
