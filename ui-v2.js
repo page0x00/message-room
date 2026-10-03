@@ -1,4 +1,4 @@
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.5.1';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.5.0';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;

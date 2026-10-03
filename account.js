@@ -1,5 +1,5 @@
-import {client,joinedRooms} from './backend.js?v=2.5.1';
-import {errorText,storeGet,storeSet} from './core.js?v=2.5.1';
+import {client,joinedRooms} from './backend.js?v=2.5.0';
+import {errorText,storeGet,storeSet} from './core.js?v=2.5.0';
 
 // Auth is the only source of identity; browser storage is only a cache of profiles.
 export function initAccount({$,state,node,toast,showSheet,closeSheet,onIdentity,onRooms}) {

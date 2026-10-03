@@ -1,7 +1,5 @@
-import {localConnections} from './local-api.js?v=2.5.1';
-import {generateDirectPet} from './direct-pet.js?v=2.5.1';
-import {client} from './backend.js?v=2.5.1';
-import {localDate} from './core.js?v=2.5.1';
+import {client} from './backend.js?v=2.5.0';
+import {localDate} from './core.js?v=2.5.0';
 
 export function initPetSpace({$,state,node,toast,notice,ui}){
  const pane=node('section','space-page');pane.id='petSpace';pane.hidden=true;
@@ -9,7 +7,7 @@ export function initPetSpace({$,state,node,toast,notice,ui}){
  $('spacePages').append(pane);ui.registerPanel('petSpace','小小陪伴');
  const entry=node('button','relation-card');entry.id='petSpaceBtn';entry.innerHTML='<span class="feature-symbol">✧</span><span><b>小小陪伴</b><small>从共同的日常里长大</small></span><i>›</i>';document.querySelector('.relation-grid').append(entry);
  const buddy=node('button','pet-buddy');buddy.id='petBuddy';buddy.hidden=true;buddy.setAttribute('aria-label','看看小宠物');buddy.innerHTML='<span class="pet-flame" data-mood="calm"><i class="pet-eyes"></i><i class="pet-mouth"></i></span>';$('room').append(buddy);
- let consent=null,pet=null,consents=[],busy=false,loading=false,epoch=0,lastAuto=0,configured=false,scope=null,directAbort=null;
+ let consent=null,pet=null,consents=[],busy=false,loading=false,epoch=0,lastAuto=0,configured=false,scope=null;
  const allowed=()=>consent?.enabled&&(consent.api_scope||'https://api.openai.com')===scope;
  const snap=()=>({room:state.room,user:state.userId,epoch}),current=s=>s.room===state.room&&s.user===state.userId&&s.epoch===epoch;
  const take=r=>{if(r.error)throw r.error;return r.data;};
@@ -29,13 +27,13 @@ export function initPetSpace({$,state,node,toast,notice,ui}){
   const sb=client(true),values=await Promise.all([sb.from('pet_consents').select('*').eq('room_id',s.room),sb.from('pet_states').select('*').eq('room_id',s.room).eq('owner_user_id',s.user).maybeSingle()]);
   if(!current(s))return;consents=take(values[0])||[];consent=consents.find(c=>c.user_id===s.user)||null;pet=take(values[1]);if(fill)fields();render();
  }catch(e){if(current(s)&&!pane.hidden)$('petStatus').textContent='小宠物资料暂时无法同步，请稍后再试。';}finally{if(current(s))loading=false;}}
- async function connectionStatus(){const s=snap();try{if(localConnections.mode(state.userId)==='local'){const active=localConnections.active(state.userId);configured=!!active;scope=active?new URL(active.profile.base_url).origin:null;$('petProvider').textContent=active?'本机直连：'+active.profile.name+' · '+scope:'';return true;}const result=take(await client(true).functions.invoke('mailbox-pet',{method:'GET'}));if(!current(s))return;configured=!!result.configured;scope=result.scope||(configured?'https://api.openai.com':null);$('petProvider').textContent=configured?'当前渠道：'+(result.provider||'站点默认')+' · '+scope:'';return true;}catch{if(current(s)){configured=false;scope=null;}return false;}}
+ async function connectionStatus(){const s=snap();try{const result=take(await client(true).functions.invoke('mailbox-pet',{method:'GET'}));if(!current(s))return;configured=!!result.configured;scope=result.scope||(configured?'https://api.openai.com':null);$('petProvider').textContent=configured?'当前渠道：'+(result.provider||'站点默认')+' · '+scope:'';return true;}catch{if(current(s)){configured=false;scope=null;}return false;}}
  async function open(){ui.openFeature('petSpace');if(!state.secure){$('petStatus').textContent='请在邀请房间里开启小小陪伴。';return;}const s=snap();await connectionStatus();await load(true);if(!current(s))return;$('petStatus').textContent=!configured?'AI 暂时未连接，请打开 API 与模型设置。':consent?.enabled&&!allowed()?'渠道已改变，请重新保存对当前渠道的聊天授权。':'';render();}
  $('petAPIOpen').onclick=()=>document.dispatchEvent(new Event('mailbox:api-open'));
- document.addEventListener('mailbox:api-changed',()=>{epoch++;directAbort?.abort();busy=false;loading=false;configured=false;scope=null;render();if(!pane.hidden)void open();});
+ document.addEventListener('mailbox:api-changed',()=>{configured=false;scope=null;render();if(!pane.hidden)void open();});
  entry.onclick=()=>void open();buddy.onclick=()=>void open();
  async function generate(automatic=false){if(busy||!allowed()||!state.secure)return;const s=snap();busy=true;render();if(!automatic)$('petStatus').textContent='正在读你们允许分享的日常…';try{
-  let result;if(localConnections.mode(s.user)==='local'){directAbort=new AbortController();result=await generateDirectPet({sb:client(true),user:s.user,room:s.room,signal:directAbort.signal,current:()=>current(s)});}else result=take(await client(true).functions.invoke('mailbox-pet',{body:{room:s.room}}));if(!current(s))return;configured=true;if(result.state)pet=result.state;
+  const result=take(await client(true).functions.invoke('mailbox-pet',{body:{room:s.room}}));if(!current(s))return;configured=true;if(result.state)pet=result.state;
   $('petStatus').textContent=result.empty?'这个范围里还没有可整理的普通文字留言。':result.cached?'最近的故事已经记住了。':'又留下了一点共同的日常。';render();
  }catch(e){const text=await errorText(e);if(current(s)&&!automatic)$('petStatus').textContent=text;}finally{if(current(s)){busy=false;render();}}}
  $('petRefresh').onclick=()=>void generate();
@@ -43,6 +41,6 @@ export function initPetSpace({$,state,node,toast,notice,ui}){
  $('petRevoke').onclick=async()=>{const s=snap();if(!await notice('撤回聊天授权？','这会清除这个房间内由旧授权产生的宠物记忆；原始聊天保留。','撤回并清除',true)||!current(s))return;try{take(await client(true).rpc('mailbox_pet_consent',{p_room:s.room,p_enabled:false,p_auto:false,p_start:consent.date_start,p_end:consent.date_end,p_scope:consent.api_scope||'https://api.openai.com'}));if(current(s)){pet=null;consent=null;await load(true);$('petStatus').textContent='已停止读取并清除相关记忆。';}}catch(e){if(current(s))toast(await errorText(e));}};
  async function tick(){if(document.hidden||!state.ready||!state.secure)return;await connectionStatus();await load();if(allowed()&&consent.automatic&&Date.now()-lastAuto>300000){lastAuto=Date.now();await generate(true);}}
  setInterval(()=>void tick(),60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)void tick();});
- function reset(){epoch++;directAbort?.abort();directAbort=null;pet=null;consent=null;consents=[];busy=false;loading=false;configured=false;scope=null;lastAuto=0;buddy.hidden=true;fields();render();$('petStatus').textContent='';}
+ function reset(){epoch++;pet=null;consent=null;consents=[];busy=false;loading=false;configured=false;scope=null;lastAuto=0;buddy.hidden=true;fields();render();$('petStatus').textContent='';}
  return {reset,ready:()=>void tick()};
 }
