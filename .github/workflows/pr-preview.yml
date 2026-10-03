@@ -45,7 +45,6 @@ jobs:
           rsync -a source/ "$target/" \
             --exclude '.git/' \
             --exclude '.github/' \
-            --exclude 'supabase/' \
             --exclude 'tests/' \
             --exclude 'node_modules/' \
             --exclude 'docs/' \
