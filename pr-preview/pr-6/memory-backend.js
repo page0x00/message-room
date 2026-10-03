@@ -1,8 +1,0 @@
-import {client} from './backend.js?v=2.5.1';
-import {listRows} from './daily-backend.js?v=2.5.1';
-const take=r=>{if(r.error)throw r.error;return r.data;};
-export async function readProfile(room,user){return take(await client(true).from('memory_profiles').select('*').eq('room_id',room).eq('owner_user_id',user).maybeSingle());}
-export async function saveProfile(row){if(row.revision){const r=take(await client(true).from('memory_profiles').update({data:row.data,revision:row.revision+1}).eq('room_id',row.room_id).eq('owner_user_id',row.owner_user_id).eq('revision',row.revision).select().maybeSingle());if(!r)throw new Error('另一端刚调整了回忆墙，请刷新后再试。');return r;}return take(await client(true).from('memory_profiles').insert(row).select().single());}
-export const films=room=>listRows('memory_films',room);
-export async function saveFilm(row){const {id,revision,updated_at,...fields}=row;if(revision){const r=take(await client(true).from('memory_films').update({...fields,revision:revision+1}).eq('id',id).eq('revision',revision).select().maybeSingle());if(!r)throw new Error('胶片刚在另一端改过，请重新读取再编辑。');return r;}const result=await client(true).from('memory_films').insert({id,...fields}).select().single();if(result.error?.code==='23505'){const old=take(await client(true).from('memory_films').select('*').eq('id',id).single());if(old.title===fields.title&&JSON.stringify(old.frames)===JSON.stringify(fields.frames)&&JSON.stringify(old.bgm)===JSON.stringify(fields.bgm))return old;}return take(result);}
-export async function deleteFilm(row){const rows=take(await client(true).from('memory_films').delete().eq('id',row.id).eq('revision',row.revision).select('id'));if(!rows?.length)throw new Error('胶片已在另一端更改，请重新读取后再删除。');return rows;}
