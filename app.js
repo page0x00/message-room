@@ -1,9 +1,10 @@
-import {noticePanels} from './notice-core.js?v=2.4.2';
-import {initSceneInterface} from './scene-interface.js?v=2.4.2';
-import {initPetSpace} from './pet-space.js?v=2.4.2';
-import {initFilmSpace} from './film-space.js?v=2.4.2';
-import {initMemorySpace} from './memory-space.js?v=2.4.2';
-import {initDailySpace} from './daily-space.js?v=2.4.2';
+import {initAPISettings} from './api-settings.js?v=2.5.0';
+import {noticePanels} from './notice-core.js?v=2.5.0';
+import {initSceneInterface} from './scene-interface.js?v=2.5.0';
+import {initPetSpace} from './pet-space.js?v=2.5.0';
+import {initFilmSpace} from './film-space.js?v=2.5.0';
+import {initMemorySpace} from './memory-space.js?v=2.5.0';
+import {initDailySpace} from './daily-space.js?v=2.5.0';
 import {
   parseRoom,
   roomLink,
@@ -19,15 +20,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.4.2";
-import * as api from "./backend.js?v=2.4.2";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.4.2";
-import { initNotifications } from "./notifications.js?v=2.4.2";
-import { initFeatures } from "./features.js?v=2.4.2";
+} from "./core.js?v=2.5.0";
+import * as api from "./backend.js?v=2.5.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.5.0";
+import { initNotifications } from "./notifications.js?v=2.5.0";
+import { initFeatures } from "./features.js?v=2.5.0";
 
-import {initMessageCards} from "./message-cards.js?v=2.4.2";
-import {initAccount} from "./account.js?v=2.4.2";
-import {initMessageActions} from "./message-actions.js?v=2.4.2";
+import {initMessageCards} from "./message-cards.js?v=2.5.0";
+import {initAccount} from "./account.js?v=2.5.0";
+import {initMessageActions} from "./message-actions.js?v=2.5.0";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -1063,6 +1064,7 @@ const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,
 const daily=initDailySpace({$,state,node,toast,notice,ui});
 const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
+const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
 initSceneInterface({$,node,state,ui});
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
@@ -1075,6 +1077,7 @@ const account=initAccount({$,state,node,toast,showSheet,closeSheet,
   async onIdentity(user,previous){
     const target=state.room?{room:state.room,invite:state.invite}:null;
     if(previous && previous!==user?.id){home();state.messages=[];state.members=[];state.profile={};}
+    if(previous!==user?.id)apiSettings.reset();
     state.userId=user?.id||'';
     renderRecent();void notifications.watch();
     if(target&&user&&previous!==user.id)await openRoom(target);

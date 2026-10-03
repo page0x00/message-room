@@ -1,5 +1,5 @@
-import {bubbleRegions,slices,paragraphs,dateMessages,cleanOcrText,screenshotTime,isolatedDot} from './ocr-layout.js?v=2.4.2';
-import {localDate} from './core.js?v=2.4.2';
+import {bubbleRegions,slices,paragraphs,dateMessages,cleanOcrText,screenshotTime,isolatedDot} from './ocr-layout.js?v=2.5.0';
+import {localDate} from './core.js?v=2.5.0';
 let library;
 function loadLibrary(){
   if(window.Tesseract)return Promise.resolve(window.Tesseract);

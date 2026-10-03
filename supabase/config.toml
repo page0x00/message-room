@@ -4,3 +4,7 @@ verify_jwt = false
 
 [functions.mailbox-pet]
 verify_jwt = false
+
+[functions.mailbox-api]
+# Each operation validates the bearer token with auth.getUser and uses its user ID.
+verify_jwt = false

@@ -1,5 +1,5 @@
-import {randomId} from './core.js?v=2.4.2';
-import {splitText} from './ocr-layout.js?v=2.4.2';
+import {randomId} from './core.js?v=2.5.0';
+import {splitText} from './ocr-layout.js?v=2.5.0';
 export const imageFile=file=>/\.(png|jpe?g|webp)$/i.test(file.name)||/^image\/(png|jpeg|webp)$/.test(file.type);
 export function selectedDrafts(rows,side='all'){return rows.filter(row=>!row.sent&&row.selected!==false&&(side==='all'||row.side===side));}
 export function importUnits(rows,mode='separate'){
