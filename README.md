@@ -15,7 +15,7 @@
 
 本轮工作分支：`update/relationship-space-20261001`，main 保持原状。
 
-2.5.0 新增[多渠道 API 与模型设置](docs/API_SETTINGS.md)：OpenAI、Claude、Gemini、DeepSeek、Azure、OpenRouter 和自定义兼容接口；账号同步多套配置、模型列表、详细参数、JSON 高级参数、字段排除和请求预览。需要同步升级数据库及 `mailbox-api` / `mailbox-pet` 函数。
+2.5.1 支持[本机直连与多渠道 API 设置](docs/API_SETTINGS.md)：在界面填写 URL、Key 和模型即可直接调用，Key 默认只留当前标签页，可选择记住本机。兼容 OpenAI、Claude、Gemini、DeepSeek、Azure、OpenRouter 和自定义接口，两种模式均支持多套配置、模型列表、详细参数、JSON 高级参数、字段排除和请求预览。本机 API 无需部署函数；小小陪伴的授权与回忆同步需更新 SQL。可选的账号同步模式仍需 API 函数。
 
 2.4.1 的[参考图皮肤修订](docs/UI_SKINS_20261003.md)：六套窗景与纸张材质、唱片播放器 / 唱片墙 / 竖向胶片、荷包各步骤配套，以及雨窗与月光的大屏布局。所有入口使用原有功能与数据。
 
