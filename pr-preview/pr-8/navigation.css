@@ -1,0 +1,81 @@
+/* Navigation owns the whole content area. Theme files still own its materials. */
+.scene-page-title{display:none;margin:0;font:25px/1.3 var(--hand);color:var(--scene-ink)}
+#sceneSidebarToggle{display:grid;place-items:center;width:44px;height:44px;min-height:44px;margin:0 0 10px 4px;border:1px solid var(--scene-edge);border-radius:12px;background:var(--scene-inset);color:var(--scene-ink)}
+#sceneSidebarToggle svg{width:23px;height:23px}
+.scene-sidebar{overflow:hidden}
+.scene-rail{min-height:0;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+.scene-rail button{min-height:48px;flex-shrink:0;touch-action:manipulation}
+.scene-shell[data-route-kind=page]{grid-template-rows:56px minmax(0,1fr);padding-bottom:18px;row-gap:10px}
+.scene-shell[data-route-kind=page] .scene-masthead{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.scene-shell[data-route-kind=page] .scene-page-title{display:block;flex:none}
+.scene-shell[data-route-kind=page] .scene-heading,.scene-shell[data-route-kind=page] .scene-orb,.scene-shell[data-route-kind=page] .scene-clock{display:none}
+.scene-shell[data-route-kind=page] .scene-header-tools{padding:0;align-items:center;max-width:450px;flex:1}
+.scene-shell[data-route-kind=page] .scene-search-wrap{padding-top:0}
+.scene-shell[data-route-kind=page] .scene-masthead #sceneNotifications{margin-top:0}
+.scene-shell[data-route-kind=page] .room-screen,.scene-shell[data-route-kind=page] .room-screen.active{display:block;grid-column:2;grid-row:2;position:relative;overflow:hidden;padding:0;width:100%;height:100%;min-height:0}
+.scene-shell[data-route-kind=page] .room-screen>.scene-hero,.scene-shell[data-route-kind=page] .scene-dock,.scene-shell[data-route-kind=page] .scene-shortcuts,.scene-shell[data-route-kind=page] .scene-dream{display:none}
+.scene-shell[data-route-kind=page] .chat-column{height:100%;width:100%;border-radius:12px;backdrop-filter:none;background:linear-gradient(var(--scene-wash),transparent),var(--scene) center/cover}
+.scene-shell[data-route-kind=page] .room-screen.feature-focus .chat-column{display:none}
+.scene-shell[data-route-kind=page] .room-screen.feature-focus .relation-space.open{position:relative;inset:auto;width:100%;height:100%;border-radius:12px;z-index:30;transform:none;transition:none;box-shadow:none;backdrop-filter:none}
+.scene-shell[data-route-kind=page] .relation-head{border-radius:0}
+.scene-shell[data-route-kind=page] .space-pages{scroll-behavior:auto;overflow-x:hidden}
+.scene-shell[data-route-kind=page] .space-page>.sheet,.scene-shell[data-route-kind=page] #diarySpace{backdrop-filter:none}
+.scene-shell .scene-inbox-backdrop{display:none!important}
+.scene-shell.scene-inbox-open .home,.scene-shell.has-room.scene-inbox-open .home{position:relative;inset:auto;grid-column:2;grid-row:2;width:100%;max-width:none;height:100%;margin:0;border-radius:12px;box-shadow:none;backdrop-filter:none;background:var(--surface);z-index:30}
+.scene-shell.scene-inbox-open .room-screen{display:none!important}
+.scene-shell.scene-inbox-open .home-head{min-height:64px;height:64px;padding:10px 24px}
+.scene-shell.scene-inbox-open .home-art{height:170px;max-width:none;background-position:18% 55%}
+.scene-shell.scene-inbox-open .home-main{overflow-y:auto;overscroll-behavior:contain}
+.scene-shell.scene-inbox-open .room-card small{max-width:none}
+.scene-shell[data-route-kind=page] .space-home{display:block;padding:24px clamp(18px,4cqw,52px)}
+.scene-shell[data-route-kind=page] .space-home[hidden]{display:none}
+.scene-shell[data-route-kind=page] .relation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;border:0;background:none}
+.scene-shell[data-route-kind=page] .relation-grid .relation-card{border:1px solid var(--glass-line);border-radius:8px;background:var(--glass);padding:18px;min-height:90px}
+.scene-shell[data-route-kind=page] .relation-days{padding-top:0}
+.scene-shell[data-route-kind=page] .memory-viewport>.memory-stage{height:auto;flex:1 1 0;min-height:0}
+.scene-shell[data-route-kind=page] .memory-stage{contain:layout paint}
+@media(min-width:700px) and (min-height:501px){
+ :root .scene-shell[data-scene-view]{--nav-width:clamp(146px,11.6vw,184px);grid-template-columns:var(--nav-width) minmax(0,1fr);column-gap:18px}
+ :root .scene-shell[data-scene-view].rail-collapsed{--nav-width:64px}
+ :root .scene-shell[data-scene-view] .scene-sidebar{visibility:visible;grid-column:1;grid-row:1/-1}
+ .scene-brand{min-height:88px}
+ .scene-shell[data-route-kind=page] .scene-brand{min-height:78px}
+ .scene-shell.rail-collapsed .scene-brand>span,.scene-shell.rail-collapsed .scene-brand small,.scene-shell.rail-collapsed .scene-rail button span,.scene-shell.rail-collapsed .scene-rail-footer>p,.scene-shell.rail-collapsed .scene-rail-footer>i{display:none}
+ .scene-shell.rail-collapsed .scene-brand{min-height:28px;padding:0}
+ .scene-shell.rail-collapsed .scene-rail button{display:flex;justify-content:center;align-items:center;min-height:52px;padding:10px 0}
+ .scene-shell.rail-collapsed .scene-swatches{display:grid;grid-template-columns:repeat(2,13px);gap:12px;justify-content:center;margin:0}
+ .scene-shell.rail-collapsed .scene-rail-footer{padding-inline:0}
+ .scene-shell.rail-collapsed #sceneSidebarToggle{margin-inline:auto}
+ .scene-shell:not(.rail-collapsed) .scene-brand>span{width:auto;white-space:nowrap;display:block;font-size:24px}
+ .scene-shell:not(.rail-collapsed) .scene-rail button{display:flex;gap:14px;justify-content:flex-start;padding-inline:14px;font-size:15px}
+ .scene-shell:not(.rail-collapsed) .scene-rail button small{display:block}
+ .scene-shell.scene-inbox-open .room-list{grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:8px 26px}
+}
+@media(max-width:699px),(max-height:500px){
+ #sceneSidebarToggle{display:none}
+ .scene-shell[data-route-kind=page]{padding:0;grid-template-columns:minmax(0,1fr);grid-template-rows:48px minmax(0,1fr) calc(64px + env(safe-area-inset-bottom));gap:0}
+ .scene-shell[data-route-kind=page] .scene-masthead{grid-column:1;grid-row:1;padding:0 15px;min-height:48px;z-index:35}
+ .scene-shell[data-route-kind=page] .scene-page-title{font-size:19px}
+ .scene-shell[data-route-kind=page] .scene-header-tools{flex:0;gap:4px}
+ .scene-shell[data-route-kind=page] .scene-search-wrap:focus-within{top:5px;left:10px;right:10px}
+ .scene-shell[data-route-kind=page] .room-screen,.scene-shell[data-route-kind=page] .room-screen.active{grid-column:1;grid-row:2}
+ .scene-shell[data-route-kind=page] .room-screen.feature-focus .relation-space.open{position:relative;inset:auto;height:100%;width:100%;border-radius:0;border:0;z-index:30}
+ :root .scene-shell[data-scene-view] .scene-sidebar{visibility:visible;grid-column:1;grid-row:3;margin:0;width:100%;z-index:40}
+ .scene-shell[data-route-kind=page] .scene-sidebar{background:var(--surface);backdrop-filter:none}
+ .scene-shell[data-route-kind=page] .relation-head{min-height:49px;padding:5px 13px!important}
+ .scene-shell[data-route-kind=page] .relation-head h2{font-size:20px!important}
+ .scene-shell[data-route-kind=page] .chat-column{border:0;border-radius:0}
+ .scene-shell.scene-inbox-open .home,.scene-shell.has-room.scene-inbox-open .home{grid-column:1;grid-row:2;border-radius:0;border:0;inset:auto;width:100%;height:100%}
+ .scene-shell[data-route-kind=page] .relation-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .scene-shell[data-route-kind=page] .relation-grid .relation-card{padding:12px 10px;gap:8px;min-height:88px}
+ .scene-shell[data-route-kind=page] .relation-card i{display:none}
+ .scene-shell[data-route-kind=page] .relation-card small{font-size:10px;line-height:1.5}
+ .scene-shell[data-route-kind=page] .memory-tools{padding-top:5px;padding-bottom:5px}
+ .scene-shell[data-route-kind=page] .memory-optics{min-height:52px;padding-block:7px}
+}
+@media(max-height:500px){
+ .scene-shell[data-route-kind=page]{grid-template-rows:0 minmax(0,1fr) 54px}
+ .scene-shell[data-route-kind=page] .scene-masthead{display:none}
+ .scene-shell[data-route-kind=page] .scene-sidebar,.scene-shell[data-route-kind=page] .scene-rail{height:54px}
+ .scene-shell[data-route-kind=page] .relation-head{min-height:42px}
+}

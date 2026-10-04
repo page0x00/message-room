@@ -14,6 +14,7 @@ export function createMemoryViewport({stage,surface,initial,onChange=()=>{},onSi
  const point=e=>{const r=stage.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
  const world=p=>({x:(p.x-x)/scale,y:(p.y-y)/scale});
  function paint(){
+  if(!stage.isConnected||stage.clientWidth<1||stage.clientHeight<1)return;
   const w=surface.offsetWidth*scale,h=surface.offsetHeight*scale;
   x=w<stage.clientWidth?(stage.clientWidth-w)/2:clamp(x,stage.clientWidth-w,0);
   y=h<stage.clientHeight?(stage.clientHeight-h)/2:clamp(y,stage.clientHeight-h,0);

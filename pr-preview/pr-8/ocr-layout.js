@@ -1,4 +1,4 @@
-import {validDate,localDate} from './core.js?v=2.6.0';
+import {validDate,localDate} from './core.js?v=2.6.1';
 
 export function screenshotTime(file){
   const match=String(file.name||'').match(/(?:19|20)\d{2}[-_.]?[01]\d[-_.]?[0-3]\d(?:[T_ .-]?[0-2]\d[-_.:]?[0-5]\d(?:[-_.:]?[0-5]\d)?)?/);

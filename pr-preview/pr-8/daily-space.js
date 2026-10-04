@@ -1,10 +1,11 @@
-import {poetryMarkup,applyPoetry} from './poetry.js?v=2.6.0';
-import {localDate,storeGet,storeSet,randomId} from './core.js?v=2.6.0';
-import {cents,money,checkinStats,pocketBalance,pocketToday,wheelValues} from './daily-core.js?v=2.6.0';
-import * as db from './daily-backend.js?v=2.6.0';
-import {mediaBlob} from './feature-backend.js?v=2.6.0';
+import {poetryMarkup,applyPoetry} from './poetry.js?v=2.6.1';
+import {localDate,storeGet,storeSet,randomId} from './core.js?v=2.6.1';
+import {cents,money,checkinStats,pocketBalance,pocketToday,wheelValues} from './daily-core.js?v=2.6.1';
+import * as db from './daily-backend.js?v=2.6.1';
+import {mediaBlob} from './feature-backend.js?v=2.6.1';
 
 export function initDailySpace({$,state,node,toast,notice,ui}){
+ let lastRefreshAt=0;
  let records=[],pockets=[],transactions=[],leaves=[],selectedPocket='',reading=null,stop=null,epoch=0,serverOffset=0;
  const urls=new Map(),uploads=new WeakMap(),panes={};
  const snap=()=>({room:state.room,userId:state.userId,epoch:state.epoch,localEpoch:epoch});
@@ -18,7 +19,7 @@ export function initDailySpace({$,state,node,toast,notice,ui}){
  function toolbar(title,add){const bar=node('div','daily-toolbar');bar.append(node('h3','',title),button('＋',add,'round-btn'));return bar;}
  // Query selector is kept separate from the app's getElementById helper.
  const grid=document.querySelector('.relation-grid');
- function panel(id,title,symbol,caption){const section=node('section','space-page');section.id=id;section.dataset.spacePanel=title;section.hidden=true;const content=node('div','sheet daily-content');section.append(content);$('spacePages').append(section);ui.registerPanel(id,title);const b=button('',()=>{ui.openFeature(id);void refresh();},'relation-card');b.id=id+'Btn';const text=node('span');text.append(node('b','',title),node('small','',caption));b.append(node('span','feature-symbol',symbol),text,node('i','','›'));grid.append(b);return content;}
+ function panel(id,title,symbol,caption){const section=node('section','space-page');section.id=id;section.dataset.spacePanel=title;section.hidden=true;const content=node('div','sheet daily-content');section.append(content);$('spacePages').append(section);ui.registerPanel(id,title);const b=button('',()=>ui.openFeature(id),'relation-card');b.id=id+'Btn';const text=node('span');text.append(node('b','',title),node('small','',caption));b.append(node('span','feature-symbol',symbol),text,node('i','','›'));grid.append(b);return content;}
  for(const [id,title,symbol,caption,kind] of [['checkinSpace','一起打卡','✓','一人一步，一起坚持','goal'],['ledgerSpace','日常记账','¥','记下日常的花费','ledger'],['pocketSpace','荷包','♡','一点点靠近共同目标','pocket'],['todoSpace','待办','☑','把惦记的事情做完','todo'],['activitySpace','共同活动','◷','书、课程与追剧记录','activity']]){
   const content=panel(id,title,symbol,caption),status=node('p','sheet-note'),editor=node('div','daily-editor'),list=node('div','daily-list');editor.hidden=true;content.append(toolbar(kind==='pocket'?'我们的目标':title,()=>kind==='pocket'?pocketCreate():edit(kind)),status,editor,list);panes[kind]={id,content,status,editor,list};
  }
@@ -30,7 +31,7 @@ export function initDailySpace({$,state,node,toast,notice,ui}){
  function requireAccount(){if(!state.ready||!state.secure){toast('这些共同记录需要在邀请房间里使用。');return false;}return true;}
  async function refresh(){
   if(!state.ready||!state.secure)return;if(reading)return reading;const s=snap();
-  const work=(async()=>{try{const started=Date.now();const [a,b,c,d,clock]=await Promise.all([...['space_entries','pockets','pocket_entries','pocket_leaves'].map(t=>db.listRows(t,s.room)),db.rpc('mailbox_space_clock',{p_room:s.room})]);if(!current(s))return;serverOffset=Date.parse(clock.server_now)-(started+Date.now())/2;records=a;pockets=b;transactions=c;leaves=d;for(const p of Object.values(panes))p.status.textContent='';renderAll();}catch(e){if(current(s))for(const p of Object.values(panes))p.status.textContent=statusMessage(e);}finally{if(current(s))reading=null;}})();reading=work;return work;
+  const work=(async()=>{try{const started=Date.now();const [a,b,c,d,clock]=await Promise.all([...['space_entries','pockets','pocket_entries','pocket_leaves'].map(t=>db.listRows(t,s.room)),db.rpc('mailbox_space_clock',{p_room:s.room})]);if(!current(s))return;lastRefreshAt=Date.now();serverOffset=Date.parse(clock.server_now)-(started+Date.now())/2;records=a;pockets=b;transactions=c;leaves=d;for(const p of Object.values(panes))p.status.textContent='';renderAll();}catch(e){if(current(s))for(const p of Object.values(panes))p.status.textContent=statusMessage(e);}finally{if(current(s))reading=null;}})();reading=work;return work;
  }
  const entries=kind=>records.filter(r=>r.kind===kind).sort((a,b)=>b.event_date.localeCompare(a.event_date)||b.created_at.localeCompare(a.created_at));
  function empty(box,text){if(!box.children.length)box.append(node('p','daily-empty',text));}
@@ -117,8 +118,8 @@ export function initDailySpace({$,state,node,toast,notice,ui}){
  const reminderBox=node('div','daily-reminders');reminderBox.hidden=true;document.querySelector('.relation-days').after(reminderBox);
  function renderAll(){renderDiary();renderGoals();renderLedger();renderTodos();renderActivities();renderPockets();reminders();document.dispatchEvent(new Event('mailbox:daily-render'));}
  function reminders(){const due=entries('todo').filter(r=>r.owner_user_id===state.userId&&!r.data.done&&r.data.remind&&r.event_date<=localDate());const savings=pockets.flatMap(p=>pocketToday(p,transactions.filter(r=>r.pocket_id===p.id),leaves.filter(l=>l.pocket_id===p.id),state.members).filter(m=>!m.done).map(m=>({p,m})));const goals=entries('goal').filter(g=>g.data.remind!==false&&g.event_date<=localDate()&&!checkinStats(records,g,state.userId).today);const items=[...goals.map(g=>({id:'goal-'+g.id,text:'今日打卡：'+g.title,kind:'goal'})),...due.map(r=>({id:'todo-'+r.id,text:r.title,kind:'todo'})),...savings.map(({p,m})=>({id:`pocket-${p.id}-${m.user}`,text:`${name(m.user)}今天还没完成「${p.title}」`,kind:'pocket'}))];reminderBox.replaceChildren();reminderBox.hidden=!items.length;for(const item of items)reminderBox.append(button('○ '+item.text,()=>ui.openFeature(panes[item.kind].id)));document.dispatchEvent(new CustomEvent('mailbox:daily-reminders',{detail:items}));}
- function reset(){epoch++;reading=null;stop?.();stop=null;records=[];pockets=[];transactions=[];leaves=[];selectedPocket='';for(const url of urls.values())URL.revokeObjectURL(url);urls.clear();reminderBox.hidden=true;reminderBox.replaceChildren();for(const p of Object.values(panes)){p.editor.replaceChildren();p.editor.hidden=true;p.list.replaceChildren();p.status.textContent='';}document.dispatchEvent(new Event('mailbox:daily-render'));}
+ function reset(){epoch++;lastRefreshAt=0;reading=null;stop?.();stop=null;records=[];pockets=[];transactions=[];leaves=[];selectedPocket='';for(const url of urls.values())URL.revokeObjectURL(url);urls.clear();reminderBox.hidden=true;reminderBox.replaceChildren();for(const p of Object.values(panes)){p.editor.replaceChildren();p.editor.hidden=true;p.list.replaceChildren();p.status.textContent='';}document.dispatchEvent(new Event('mailbox:daily-render'));}
  function ready(){if(state.secure){const s=snap();stop=db.watch(s.room,()=>{if(current(s))void refresh();});void refresh();}}
- document.addEventListener('mailbox:space-open',()=>{if(state.ready)void refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});setInterval(()=>{if(!document.hidden&&!$('relationSpace').inert)void refresh();},20000);
+ document.addEventListener('mailbox:space-open',()=>{if(state.ready&&Date.now()-lastRefreshAt>15000)void refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});setInterval(()=>{if(!document.hidden&&!$('relationSpace').inert)void refresh();},20000);
  return {reset,ready,refresh,entries:()=>records};
 }
