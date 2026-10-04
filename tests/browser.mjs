@@ -1,3 +1,4 @@
+import {runNavigation} from './navigation.browser.mjs';
 import {runReference} from './reference.browser.mjs';
 import {runAPI} from './api.browser.mjs';
 import {runScene} from './scene.browser.mjs';
@@ -439,7 +440,7 @@ async function setup({
   return { page, context, control, errors, join:async(id)=>{await joinRoom(id);if(startView === "chat")await page.locator("#sceneNavChat").click();} };
 }
 try {
-  if(!process.env.REFERENCE_ONLY&&!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.NAVIGATION_ONLY&&!process.env.REFERENCE_ONLY&&!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -896,7 +897,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.REFERENCE_ONLY)await runReference({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.NAVIGATION_ONLY)await runNavigation({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.REFERENCE_ONLY)await runReference({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.API_ONLY)await runAPI({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SCENE_ONLY)await runScene({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});

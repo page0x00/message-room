@@ -1,6 +1,6 @@
 {
   "name": "little-message-room",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,8 @@
     "test:skins": "SKINS_ONLY=1 node tests/browser.mjs",
     "test:scene": "SCENE_ONLY=1 node tests/browser.mjs",
     "test:api": "API_ONLY=1 node tests/browser.mjs",
-    "test:reference": "REFERENCE_ONLY=1 node tests/browser.mjs"
+    "test:reference": "REFERENCE_ONLY=1 node tests/browser.mjs",
+    "test:navigation": "NAVIGATION_ONLY=1 node tests/browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",

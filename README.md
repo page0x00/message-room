@@ -15,6 +15,8 @@
 
 本轮工作分支：`update/relationship-space-20261001`，main 保持原状。
 
+2.6.1 的[整页切换与操作修复](docs/NAVIGATION_20261004.md)：按视频中的导航方式切换整个主区域；电脑和平板侧栏可收展，手机保留底部导航。减少重复请求和重绘，保留草稿、编辑表单和回忆缩放。附真实界面操作录像。
+
 2.6.0 的[六个功能参考排版与多端交互](docs/UI_REFERENCE_20261004.md)：一起听、荷包、便签墙、线索板、胶片和唱片回忆共用六套主题的布局规则；新增双指缩放、设备比例光圈及有出处的《飞鸟集》轮换，修复首页与功能面板、弹层的焦点冲突。文档附浏览器实截预览和验证范围。
 
 2.5.1 支持[本机直连与多渠道 API 设置](docs/API_SETTINGS.md)：在界面填写 URL、Key 和模型即可直接调用，Key 默认只留当前标签页，可选择记住本机。兼容 OpenAI、Claude、Gemini、DeepSeek、Azure、OpenRouter 和自定义接口，两种模式均支持多套配置、模型列表、详细参数、JSON 高级参数、字段排除和请求预览。本机 API 无需部署函数；小小陪伴的授权与回忆同步需更新 SQL。可选的账号同步模式仍需 API 函数。
@@ -38,7 +40,7 @@ npm run test:browser
 
 | 文件 | 用途 |
 | --- | --- |
-| `index.html`, `styles.css`, `ui-v2.css`, `skins.css`, `reference-ui.css`, `assets/` | 页面、六主题、参考排版及本地窗景 |
+| `index.html`, `styles.css`, `ui-v2.css`, `skins.css`, `reference-ui.css`, `navigation.css`, `assets/` | 页面、六主题、参考排版、整页导航及本地窗景 |
 | `memory-viewport.js`, `poetry.js` | 回忆画布手势、按设备缩放与有出处的轮换诗句 |
 | `app.js`, `core.js`, `backend.js` | 聊天、身份、排序、草稿、Supabase |
 | `ui-v2.js`, `notifications.js`, `sw.js` | 关系空间、联系列表、通知 |

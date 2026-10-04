@@ -1,10 +1,10 @@
-import {initMusicSpace} from './music-space.js?v=2.6.0';
-import {imageHash} from './screenshot-store.js?v=2.6.0';
-import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.6.0';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.6.0';
-import * as api from './backend.js?v=2.6.0';
-import * as data from './feature-backend.js?v=2.6.0';
-import {initScreenshotImport} from './screenshot-import.js?v=2.6.0';
+import {initMusicSpace} from './music-space.js?v=2.6.1';
+import {imageHash} from './screenshot-store.js?v=2.6.1';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.6.1';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.6.1';
+import * as api from './backend.js?v=2.6.1';
+import * as data from './feature-backend.js?v=2.6.1';
+import {initScreenshotImport} from './screenshot-import.js?v=2.6.1';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
@@ -13,7 +13,7 @@ export function initFeatures(ctx){
   const screenshots=initScreenshotImport(ctx);
   let mediaQueue=[];
   let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
-  let calendar=[],calendarBusy=false,calendarEdit=null,eventNonce=randomId();
+  let calendar=[],calendarBusy=false,calendarEdit=null,lastCalendarRefresh=0,eventNonce=randomId();
   let memoir=null,memoirEdits=0,memoirBusy=false;
   let recorder=null,recordStream=null,recordTimer=null,recordRevision=0;
 
@@ -169,6 +169,7 @@ export function initFeatures(ctx){
       }
       box.append(card);
     }
+    document.dispatchEvent(new CustomEvent('mailbox:calendar-change',{detail:{room:state.room,events:[...calendar]}}));
   }
   function daysCard(value){const days=daysBetween(value);$('relationshipDays').textContent=days===null?'—':days<0?`还有 ${-days} 天`:`第 ${days+1} 天`;$('relationshipCaption').textContent=value?`从 ${value} 开始，记住每个普通日子`:'设置相识日期，开始记录';$('relationDays').textContent=days===null?'—':days<0?`还有 ${-days} 天`:`${days+1} 天`;$('relationCaption').textContent=value?`从 ${value} 开始`:'点开纪念日，写下相识的日期';}
   async function refreshCalendar(fillDate=false){
@@ -178,7 +179,8 @@ export function initFeatures(ctx){
       if(s.secure){const [info,rows]=await Promise.all([data.roomDetails(s.room),data.events(s.room)]);if(!current(s))return;calendar=rows;since=info.relationship_since||localDate(info.created_at);}
       else{calendar=storeGet(key('events',s),[]);if(!Array.isArray(calendar))calendar=[];since=storeGet(key('relationship',s),'')||localDate(state.messages[0]?.created_at);}
       if(!current(s))return;daysCard(since);if(fillDate)$('relationshipSince').value=since;
-      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();if(state.spaceView==='wall')onMessages([]);
+      lastCalendarRefresh=Date.now();
+      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();
     }catch(e){if(current(s))$('relationshipNote').textContent=messageError(e);}
     finally{if(current(s))calendarBusy=false;}
   }
@@ -258,13 +260,13 @@ export function initFeatures(ctx){
     stopSubscription?.();stopSubscription=null;mediaController?.abort();mediaController=null;mediaBusy=false;
     if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);media=null;
     for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();
-    calendar=[];calendarBusy=false;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
+    calendar=[];calendarBusy=false;calendarEdit=null;lastCalendarRefresh=0;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
     music.reset();
     screenshots.reset();
     memoir=null;memoirEdits++;memoirBusy=false;$('memoirProgress').textContent='';$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();
   }
   function ready(){void refreshCalendar();void music.ready();if(state.secure){const s=snap();stopSubscription=data.subscribeFeatures(s.room,()=>{if(current(s))void refreshCalendar();},()=>{if(current(s))void music.refresh();});}}
-  document.addEventListener('mailbox:space-open',()=>void refreshCalendar());
+  document.addEventListener('mailbox:space-open',()=>{if(['home','relationshipScrim'].includes(state.spacePanel)&&Date.now()-lastCalendarRefresh>15000)void refreshCalendar();});
   document.addEventListener('mailbox:sheet-close',event=>{if(event.detail.id==='attachmentScrim')endRecording(true);if(event.detail.id==='attachmentScrim'&&mediaBusy)mediaController?.abort();});
   setInterval(()=>{if(document.hidden||!state.ready)return;if($('listenSync').checked||!$('listenScrim').hidden)void music.refresh();if(!$('relationshipScrim').hidden)void refreshCalendar();},10000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ready&&$('listenSync').checked)void music.refresh();});
