@@ -1,5 +1,5 @@
-import {client} from './backend.js?v=2.6.1';
-import {listRows} from './daily-backend.js?v=2.6.1';
+import {client} from './backend.js?v=2.6.2';
+import {listRows} from './daily-backend.js?v=2.6.2';
 const take=r=>{if(r.error)throw r.error;return r.data;};
 export async function readProfile(room,user){return take(await client(true).from('memory_profiles').select('*').eq('room_id',room).eq('owner_user_id',user).maybeSingle());}
 export async function saveProfile(row){if(row.revision){const r=take(await client(true).from('memory_profiles').update({data:row.data,revision:row.revision+1}).eq('room_id',row.room_id).eq('owner_user_id',row.owner_user_id).eq('revision',row.revision).select().maybeSingle());if(!r)throw new Error('另一端刚调整了回忆墙，请刷新后再试。');return r;}return take(await client(true).from('memory_profiles').insert(row).select().single());}

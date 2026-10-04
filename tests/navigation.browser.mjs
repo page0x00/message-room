@@ -16,6 +16,9 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
     assert.equal(await p.evaluate(()=>document.activeElement?.dataset.sceneNav),id,'navigation must not move keyboard focus back to the previous tab');
     if(width<700||height<501)assert.ok(b.y+b.height<=rail.y+1,'bottom navigation stays outside the page');
     assert.equal(await p.locator('#sceneHero').isVisible(),false);assert.equal(await p.locator('.scene-dock').isVisible(),false);
+    assert.equal(await p.locator('#sceneMasthead').isVisible(),false);
+    assert.equal(await p.locator(panel+' .scene-page-header #sceneNotifications').count(),1,'the active page must own the shared settings control');
+    await p.locator('#sceneNotifications').click();await p.locator('#settingsScrim').waitFor();await p.keyboard.press('Escape');assert.equal(await p.locator(panel).isVisible(),true);
    }
    await p.locator('#sceneNavMemory').click();await snapshot('memory-'+width);
   }
@@ -53,7 +56,7 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
  });
  await check('mobile modal close keeps the current page and reduced motion skips transition effects',async()=>{
   await p.setViewportSize({width:390,height:844});await p.locator('#sceneNavMore').click();await p.locator('#spaceSettings').click();assert.equal(await p.locator('#settingsScrim').isVisible(),true);await p.keyboard.press('Escape');assert.equal(await p.locator('#settingsScrim').isVisible(),false);assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'more');assert.equal(await p.locator('#spaceHome').isVisible(),true);
-  await p.locator('#sceneNavMail').click();await p.locator('#homeSettings').click();await p.keyboard.press('Escape');assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'mail');assert.equal(await p.locator('#home').isVisible(),true);
+  await p.locator('#sceneNavMail').click();assert.equal(await p.locator('#themeBtn').count(),0);await p.locator('#sceneNotifications').click();await p.keyboard.press('Escape');assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'mail');assert.equal(await p.locator('#home').isVisible(),true);
   await p.emulateMedia({reducedMotion:'reduce'});await p.locator('#sceneNavChat').click();await p.locator('#sceneNavMemory').click();
   assert.equal(await p.locator('#spacePages').evaluate(e=>e.getAnimations().length),0);assert.equal(await p.locator('#sceneNavHome').isVisible(),true);
   await p.locator('#memoryZoomReset').click();await snapshot('phone');

@@ -1,11 +1,11 @@
-import {initPoetry} from './poetry.js?v=2.6.1';
-import {initAPISettings} from './api-settings.js?v=2.6.1';
-import {noticePanels} from './notice-core.js?v=2.6.1';
-import {initSceneInterface} from './scene-interface.js?v=2.6.1';
-import {initPetSpace} from './pet-space.js?v=2.6.1';
-import {initFilmSpace} from './film-space.js?v=2.6.1';
-import {initMemorySpace} from './memory-space.js?v=2.6.1';
-import {initDailySpace} from './daily-space.js?v=2.6.1';
+import {initPoetry} from './poetry.js?v=2.6.2';
+import {initAPISettings} from './api-settings.js?v=2.6.2';
+import {noticePanels} from './notice-core.js?v=2.6.2';
+import {initSceneInterface} from './scene-interface.js?v=2.6.2';
+import {initPetSpace} from './pet-space.js?v=2.6.2';
+import {initFilmSpace} from './film-space.js?v=2.6.2';
+import {initMemorySpace} from './memory-space.js?v=2.6.2';
+import {initDailySpace} from './daily-space.js?v=2.6.2';
 import {
   parseRoom,
   roomLink,
@@ -21,15 +21,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.6.1";
-import * as api from "./backend.js?v=2.6.1";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.6.1";
-import { initNotifications } from "./notifications.js?v=2.6.1";
-import { initFeatures } from "./features.js?v=2.6.1";
+} from "./core.js?v=2.6.2";
+import * as api from "./backend.js?v=2.6.2";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.6.2";
+import { initNotifications } from "./notifications.js?v=2.6.2";
+import { initFeatures } from "./features.js?v=2.6.2";
 
-import {initMessageCards} from "./message-cards.js?v=2.6.1";
-import {initAccount} from "./account.js?v=2.6.1";
-import {initMessageActions} from "./message-actions.js?v=2.6.1";
+import {initMessageCards} from "./message-cards.js?v=2.6.2";
+import {initAccount} from "./account.js?v=2.6.2";
+import {initMessageActions} from "./message-actions.js?v=2.6.2";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -532,7 +532,7 @@ function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
     if(view==='chat')row.dataset.messageId=message.id;else row.dataset.sourceMessageId=message.id;
     const wrap = node("div", "bubble-wrap");
     wrap.append(node("span", "sender-name", who.name));
-    const bubble = node("div", "bubble");
+    const bubble = node("div", "bubble"+(message.message_type==='image'&&message.media_path?' has-image':''));
     for (const id of message.reply_to) {
       const reference = byId.get(id);
       const referenceButton=
@@ -545,7 +545,7 @@ function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
         );
       referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
-    if(!cards.render(message,bubble)){features.renderMedia(message,bubble,view);bubble.append(node("div","message-text",message.content));}
+    if(!cards.render(message,bubble)){features.renderMedia(message,bubble,view);if(message.content)bubble.append(node("div","message-text",message.content));}
     wrap.append(bubble);
     const meta = node("div", "meta");
     const stamp = new Date(message.created_at);

@@ -1,5 +1,5 @@
-import {applyPoetry} from './poetry.js?v=2.6.1';
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.6.1';
+import {applyPoetry} from './poetry.js?v=2.6.2';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.6.2';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -69,7 +69,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   }
   $('spaceBack').onclick=()=>page();
   function settings(){if(!$('menuScrim').hidden)closeSheet('menuScrim');showSheet('settingsScrim');document.dispatchEvent(new Event('mailbox:settings-open'));}
-  for(const id of ['themeBtn','themeMenuBtn','homeSettings','spaceSettings','notifyMenuBtn'])$(id).onclick=settings;
+  for(const id of ['themeMenuBtn','homeSettings','spaceSettings','notifyMenuBtn'])$(id).onclick=settings;
   document.querySelectorAll('[data-theme-pick]').forEach(button=>button.onclick=()=>setTheme(button.dataset.themePick));
   $('relationHandle').onclick=()=>{page();drawer(true);};$('relationClose').onclick=()=>drawer(false);$('relationBackdrop').onclick=()=>drawer(false);
   document.querySelectorAll('[data-open-view]').forEach(button=>button.onclick=()=>setView(button.dataset.openView));

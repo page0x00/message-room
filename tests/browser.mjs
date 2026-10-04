@@ -448,7 +448,7 @@ try {
     async () => {
       assert.equal(await page.locator(".scrim:visible").count(), 0);
       assert.equal(await page.locator("#joinForm").isVisible(), false);
-      await page.locator("#themeBtn").click();
+      await page.locator("#sceneNotifications").click();
       await page.locator("#settingsScrim [data-theme-pick=warm-light]").click();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
@@ -793,6 +793,8 @@ try {
   });
   await check('image preview loads privately and survives unrelated message refresh',async()=>{
     const buffer=await readFile(resolve(root,'test-results/mobile-chat.png'));await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'moment.png',mimeType:'image/png',buffer});await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);await s.page.locator('.media-card img').waitFor();
+    assert.equal(await s.page.locator('.media-card[data-media-type=image] .media-label').count(),0);
+    const [download]=await Promise.all([s.page.waitForEvent('download'),s.page.getByRole('button',{name:'下载原图',exact:true}).click()]);assert.equal(download.suggestedFilename(),'moment.png');
     await s.page.locator('#menuBtn').click();await s.page.locator('#refreshBtn').click();await s.page.locator('[data-close=menuScrim]').click();assert.equal(await s.page.locator('.media-card img').count(),1);
   });
   await check('voice recording creates an editable playable attachment before any send',async()=>{
