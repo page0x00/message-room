@@ -1,10 +1,10 @@
-import {createMemoryViewport,memoryLayout} from './memory-viewport.js?v=2.6.1';
-import {applyPoetry,poetryMarkup} from './poetry.js?v=2.6.1';
-import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.6.1';
-import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.6.1';
-import * as daily from './daily-backend.js?v=2.6.1';
-import * as db from './memory-backend.js?v=2.6.1';
-import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.6.1';
+import {createMemoryViewport,memoryLayout} from './memory-viewport.js?v=2.6.2';
+import {applyPoetry,poetryMarkup} from './poetry.js?v=2.6.2';
+import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.6.2';
+import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.6.2';
+import * as daily from './daily-backend.js?v=2.6.2';
+import * as db from './memory-backend.js?v=2.6.2';
+import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.6.2';
 
 export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false}){
  const pane=$('wallSpace'),box=$('wallEntries');box.className='memory-viewport';

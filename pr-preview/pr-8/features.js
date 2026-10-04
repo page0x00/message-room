@@ -1,10 +1,10 @@
-import {initMusicSpace} from './music-space.js?v=2.6.1';
-import {imageHash} from './screenshot-store.js?v=2.6.1';
-import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.6.1';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.6.1';
-import * as api from './backend.js?v=2.6.1';
-import * as data from './feature-backend.js?v=2.6.1';
-import {initScreenshotImport} from './screenshot-import.js?v=2.6.1';
+import {initMusicSpace} from './music-space.js?v=2.6.2';
+import {imageHash} from './screenshot-store.js?v=2.6.2';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.6.2';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.6.2';
+import * as api from './backend.js?v=2.6.2';
+import * as data from './feature-backend.js?v=2.6.2';
+import {initScreenshotImport} from './screenshot-import.js?v=2.6.2';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
@@ -130,7 +130,8 @@ export function initFeatures(ctx){
     if(message.import_label)bubble.append(node('div','import-label',`截图摘录 · ${message.import_label}（由留言者导入）`));
     if(!message.media_path)return;
     if(mediaCards.has(cacheId)){bubble.append(mediaCards.get(cacheId));return;}
-    const card=node('div','media-card');card.append(node('span','media-label',(message.media_name||'附件')+' · '+bytesLabel(message.media_size||0)));
+    const card=node('div','media-card');card.dataset.mediaType=message.message_type;
+    if(message.message_type!=='image')card.append(node('span','media-label',(message.media_name||'附件')+' · '+bytesLabel(message.media_size||0)));
     const button=node('button','',message.message_type==='file'?'下载附件':'打开附件');button.type='button';card.append(button);bubble.append(card);mediaCards.set(cacheId,card);
     if(!state.secure||!mediaPathValid(message.media_path,state.room)){button.disabled=true;button.textContent='附件路径不可用';return;}
     button.onclick=async()=>{
@@ -142,7 +143,7 @@ export function initFeatures(ctx){
         if(['image','audio','video'].includes(message.message_type)){
           const element=node(message.message_type==='image'?'img':message.message_type);element.src=cached.url;
           if(message.message_type==='image')element.alt=message.media_name||'留言图片';else{element.controls=true;element.preload='metadata';}
-          const save=node('button','','下载原文件');save.type='button';save.onclick=()=>download(cached.blob,message.media_name||'附件');button.replaceWith(element,save);
+          const image=message.message_type==='image',save=node('button',image?'image-save':'',image?'↓':'下载原文件');save.type='button';save.setAttribute('aria-label',image?'下载原图':'下载原文件');save.title=image?'下载原图':'下载原文件';save.onclick=()=>download(cached.blob,message.media_name||'附件');button.replaceWith(element,save);
         }else{download(cached.blob,message.media_name||'附件');button.textContent='再次下载';button.disabled=false;}
       }catch(e){if(current(s)){button.disabled=false;button.textContent='读取失败，点击重试';fail(e);}}
     };

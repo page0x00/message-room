@@ -1,4 +1,4 @@
-import {normalizeProfile,buildRequest,requestHeaders,responseJSON,probeTask} from './supabase/functions/_shared/ai-providers.js?v=2.6.1';
+import {normalizeProfile,buildRequest,requestHeaders,responseJSON,probeTask} from './supabase/functions/_shared/ai-providers.js?v=2.6.2';
 
 const prefix='mailbox.api.local.v1.';
 const validKey=value=>typeof value==='string'&&!!value.trim()&&value.length<=4096&&!/[\r\n]/.test(value);

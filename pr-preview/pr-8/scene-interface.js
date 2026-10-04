@@ -1,23 +1,26 @@
-import {storeGet,storeSet} from './core.js?v=2.6.1';
-import {applyPoetry} from './poetry.js?v=2.6.1';
+import {storeGet,storeSet} from './core.js?v=2.6.2';
+import {applyPoetry} from './poetry.js?v=2.6.2';
 /* One shared scene; existing controllers own all room data. */
-import {THEMES,setTheme} from './ui-v2.js?v=2.6.1';
+import {THEMES,setTheme} from './ui-v2.js?v=2.6.2';
 const paths={sidebar:'M3 4h18v16H3zM9 4v16M13 9l3 3-3 3',home:'M3 11 12 3l9 8M5 10v11h5v-7h4v7h5V10',chat:'M5 4h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Zm3 7h.01M12 11h.01M16 11h.01',memory:'M6 3h13v18H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm0 0v18M9 6h6',plan:'M4 5h16v16H4zM7 2v6M17 2v6M4 10h16',mail:'M3 5h18v15H3zM3 6l9 7 9-7',more:'M4 12h.01M12 12h.01M20 12h.01',search:'M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15ZM16 16l5 5',bell:'M5 17h14l-2-4V9a5 5 0 0 0-10 0v4l-2 4ZM10 21h4M12 2v2',arrow:'M4 12h16m-6-6 6 6-6 6',folder:'M3 5h7l2 3h9v13H3zM7 13h10',check:'M9 3h6M7 4H4v17h16V4h-3M8 13l3 3 5-7',star:'m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z',planet:'M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0ZM6 9C-3 13 2 19 13 15S25 5 18 7',play:'m9 5 11 7-11 7V5Z',pause:'M9 5v14M16 5v14',prev:'M5 5v14M19 5 8 12l11 7V5Z',next:'M19 5v14M5 5l11 7-11 7V5Z',heart:'M12 21 3 12C-3 4 8-1 12 7c4-8 15-3 9 5l-9 9Z',shuffle:'M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4M3 18h3c2 0 4-3 6-6s4-6 6-6h3m-4-4 4 4-4 4',plus:'M12 4v16M4 12h16',close:'m6 6 12 12M6 18 18 6'};
 const icon=name=>`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[name]||paths.star}"/></svg>`;
 export function initSceneInterface({$,node,state,ui}){
  applyPoetry();
  const shell=document.querySelector('.app-shell');shell.classList.add('scene-shell');shell.dataset.sceneView='home';state.sceneView='home';let chatScroll=null;
  const rail=node('aside','scene-sidebar');rail.id='sceneSidebar';
- rail.innerHTML='<button id="sceneSidebarToggle" type="button" aria-controls="sceneRail" aria-label="收起侧栏">'+icon('sidebar')+'</button><div class="scene-brand"><span>小小留言室。</span><small>A LITTLE SPACE FOR US.</small></div><nav id="sceneRail" class="scene-rail" aria-label="空间导航"></nav><div class="scene-rail-footer"><i></i><p lang="en" data-poem="23" data-poem-part="en"></p><div class="scene-swatches" aria-label="切换主题"></div></div>';
+ rail.innerHTML='<button id="sceneSidebarToggle" type="button" aria-controls="sceneRail" aria-label="收起侧栏">'+icon('sidebar')+'</button><nav id="sceneRail" class="scene-rail" aria-label="空间导航"></nav><div class="scene-rail-footer"><i></i><p lang="en" data-poem="23" data-poem-part="en"></p><div class="scene-swatches" aria-label="切换主题"></div></div>';
  const nav=rail.querySelector('nav');
  for(const [id,label,en] of [['home','首页','Home'],['chat','对话','Chat'],['memory','记忆','Memory'],['plan','日程','Plan'],['mail','信箱','Mailbox'],['more','更多','More']]){const b=node('button');b.id='sceneNav'+id[0].toUpperCase()+id.slice(1);b.type='button';b.dataset.sceneNav=id;b.setAttribute('aria-label',label);b.title=label;b.innerHTML=icon(id)+`<span>${label}<small>${en}</small></span>`;b.onclick=()=>navigate(id);nav.append(b);}
  const names=['Ins · 日间','Ins · 夜间','暖色 · 日间','暖色 · 夜间','雨窗 · 夜间','月光 · 玻璃'];
  for(const [i,theme] of THEMES.entries()){const b=node('button');b.type='button';b.dataset.themePick=theme;b.title=names[i];b.setAttribute('aria-label',names[i]);b.setAttribute('aria-pressed',String(document.documentElement.dataset.theme===theme));b.onclick=()=>setTheme(theme);rail.querySelector('.scene-swatches').append(b);}
  const masthead=node('header','scene-masthead');masthead.id='sceneMasthead';
- masthead.innerHTML='<h1 id="scenePageTitle" class="scene-page-title"></h1><div class="scene-heading"><p data-poem="23"></p><small><a data-poem="23" data-poem-part="source"></a></small></div><div class="scene-header-tools"><div class="scene-search-wrap"><label class="scene-search">'+icon('search')+'<input id="sceneSearch" type="search" placeholder="搜索留言 / 回忆 / 功能…" aria-label="搜索留言与功能" aria-controls="sceneSearchResults" aria-expanded="false" autocomplete="off"></label><div id="sceneSearchResults" class="scene-search-results" hidden></div></div><button id="sceneNotifications" class="scene-icon-button" aria-label="通知与外观">'+icon('bell')+'</button><div class="scene-clock"><span class="scene-orb" aria-hidden="true"></span><time></time><small></small></div></div>';
+ masthead.innerHTML='<div class="scene-header-tools"><div class="scene-search-wrap"><label class="scene-search">'+icon('search')+'<input id="sceneSearch" type="search" placeholder="搜索留言 / 回忆 / 功能…" aria-label="搜索留言与功能" aria-controls="sceneSearchResults" aria-expanded="false" autocomplete="off"></label><div id="sceneSearchResults" class="scene-search-results" hidden></div></div><button id="sceneNotifications" class="scene-icon-button" aria-label="通知与外观">'+icon('bell')+'</button></div><div class="scene-clock"><span class="scene-clock-copy"><time></time><small></small></span><span class="scene-orb" aria-hidden="true"></span></div>';
+ const headerTools=masthead.querySelector('.scene-header-tools');
+ const pageHeaders={chat:$('chatColumn').querySelector('.topbar'),mail:document.querySelector('.home-head'),feature:document.querySelector('.relation-head')};
+ Object.values(pageHeaders).forEach(header=>header.classList.add('scene-page-header'));
  shell.prepend(rail,masthead);
  const hero=node('section','scene-hero');hero.id='sceneHero';hero.setAttribute('aria-label','今日问候');
- hero.innerHTML='<button id="sceneHeroMore" class="scene-icon-button scene-hero-more" aria-label="打开我们的空间">'+icon('more')+'</button><div class="scene-hero-copy"><h2 id="sceneGreeting"></h2><p data-poem="0"></p><i></i></div><div class="scene-hero-foot"><small lang="en" data-poem="0" data-poem-part="en"></small><button id="sceneWrite">留一封信 '+icon('arrow')+'</button></div>';
+ hero.innerHTML='<button id="sceneHeroMore" class="scene-icon-button scene-hero-more" aria-label="打开我们的空间">'+icon('more')+'</button><div class="scene-hero-copy"><h2 id="sceneGreeting" lang="en">Stay awhile,<br/>make yourself at home.</h2><p data-poem="0"></p><i></i></div><div class="scene-hero-foot"><small lang="en" data-poem="0" data-poem-part="en"></small><button id="sceneWrite">留一封信 '+icon('arrow')+'</button></div>';
  const shortcuts=node('nav','scene-shortcuts');shortcuts.setAttribute('aria-label','留住日常');
  for(const [ico,label,caption,selector,target] of [['folder','回忆墙','所有重要的瞬间','[data-open-view="wall"]','wall'],['check','一起打卡','专注此刻的小事','#checkinSpaceBtn','checkin'],['star','共同活动','把生活存起来','#activitySpaceBtn','activity'],['planet','小小陪伴','从日常里慢慢长大','#petSpaceBtn','pet']]){const b=node('button');b.type='button';b.dataset.sceneTarget=target;b.innerHTML=icon(ico)+`<b>${label}</b><small>${caption}</small><span class="scene-shortcut-arrow">${icon('arrow')}</span>`;b.onclick=()=>open(selector);shortcuts.append(b);}
  const dock=node('aside','scene-dock');dock.setAttribute('aria-label','今日与旋律');
@@ -38,7 +41,10 @@ export function initSceneInterface({$,node,state,ui}){
   const route=shell.classList.contains('scene-inbox-open')?'mail':!$('relationSpace').inert?(state.spacePanel==='home'?'more':state.spacePanel):shell.dataset.sceneView;
   shell.dataset.route=route;shell.dataset.routeKind=route==='home'?'home':'page';
   const selected=route==='wallSpace'||route==='diarySpace'?'memory':route==='todoSpace'?'plan':['home','chat','mail'].includes(route)?route:'more';
-  select(selected);$('scenePageTitle').textContent={home:'首页',chat:'对话',mail:'信箱',more:'我们的空间',wallSpace:'回忆',diarySpace:'日记',todoSpace:'日程'}[route]||$(route)?.dataset.spacePanel||'我们的空间';
+  select(selected);
+  const header=route==='home'?masthead:pageHeaders[route]||pageHeaders.feature;
+  const trailing=route==='home'?masthead.querySelector('.scene-clock'):route==='chat'?$('menuBtn'):route==='mail'?$('sceneInboxClose'):$('relationClose');
+  if(headerTools.parentElement!==header)header.insertBefore(headerTools,trailing);
   $('room').inert=route==='mail';
   if(route===activeRoute)return;
   activeRoute=route;motion?.cancel();motion=null;
@@ -64,6 +70,6 @@ export function initSceneInterface({$,node,state,ui}){
  document.addEventListener('mailbox:navigation',closeSearch);document.addEventListener('mailbox:sheet-open',closeSearch);
  $('sceneSearch').addEventListener('input',search);$('sceneSearch').addEventListener('focus',()=>{if($('sceneSearch').value)search();});$('sceneSearch').addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();$('sceneSearchResults').querySelector('button')?.focus();}if(e.key==='Enter')$('sceneSearchResults').querySelector('button')?.click();});document.addEventListener('click',e=>{if(!e.target.closest('.scene-search-wrap'))closeSearch();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.defaultPrevented){closeSearch();if(shell.classList.contains('scene-inbox-open')){inbox(false);$('sceneNavMail').focus();}}});
  document.addEventListener('mailbox:show-chat',()=>{if(state.room)view('chat');});document.addEventListener('mailbox:room-open',()=>{view('home');chatScroll=null;});document.addEventListener('mailbox:room-exit',()=>{view('home');inbox(true);});for(const event of ['mailbox:space-open','mailbox:space-close','mailbox:space-page'])document.addEventListener(event,syncRoute,{capture:true});
- function clock(){const now=new Date(),hour=now.getHours();masthead.querySelector('time').textContent=now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});masthead.querySelector('time').dateTime=now.toISOString();masthead.querySelector('.scene-clock small').textContent=now.toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit',weekday:'short'});$('sceneGreeting').replaceChildren(document.createTextNode(hour>=18||hour<5?'晚安，':hour<12?'早安，':'午后好，'),document.createElement('br'),document.createTextNode('小小留言室。'));}
+ function clock(){const now=new Date();masthead.querySelector('time').textContent=now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});masthead.querySelector('time').dateTime=now.toISOString();masthead.querySelector('.scene-clock small').textContent=now.toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit',weekday:'short'});}
  clock();music();todos();inbox(false);$('chatColumn').inert=true;syncRoute();setInterval(clock,60000);
 }
