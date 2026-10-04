@@ -1,10 +1,10 @@
-import {initMusicSpace} from './music-space.js?v=2.5.1';
-import {imageHash} from './screenshot-store.js?v=2.5.1';
-import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.5.1';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.5.1';
-import * as api from './backend.js?v=2.5.1';
-import * as data from './feature-backend.js?v=2.5.1';
-import {initScreenshotImport} from './screenshot-import.js?v=2.5.1';
+import {initMusicSpace} from './music-space.js?v=2.6.0';
+import {imageHash} from './screenshot-store.js?v=2.6.0';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.6.0';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.6.0';
+import * as api from './backend.js?v=2.6.0';
+import * as data from './feature-backend.js?v=2.6.0';
+import {initScreenshotImport} from './screenshot-import.js?v=2.6.0';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;

@@ -1,3 +1,4 @@
+import {runReference} from './reference.browser.mjs';
 import {runAPI} from './api.browser.mjs';
 import {runScene} from './scene.browser.mjs';
 import {runSkins} from './skins.browser.mjs';
@@ -118,8 +119,9 @@ async function setup({
   notificationFixture = false,
   startView = "chat",
   uploads = [],
+  touch = false,
 } = {}) {
-  const context = await browser.newContext({ viewport, serviceWorkers:"block" });
+  const context = await browser.newContext({ viewport, hasTouch:touch, serviceWorkers:"block" });
   await context.addInitScript(({user}) => {
     localStorage.setItem("device_id", "test-device");
     localStorage.setItem("nickname", "小辞");
@@ -413,7 +415,7 @@ async function setup({
     },
   );
   const page = await context.newPage();
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (error) => {errors.push(error.message);if(process.env.DEBUG_UI)console.error(error.stack);});
   const navigation = await page.goto(
     base + (secure ? `?room=${secureId}#key=${invite}` : ""),
     { waitUntil: "networkidle" },
@@ -437,7 +439,7 @@ async function setup({
   return { page, context, control, errors, join:async(id)=>{await joinRoom(id);if(startView === "chat")await page.locator("#sceneNavChat").click();} };
 }
 try {
-  if(!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.REFERENCE_ONLY&&!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -825,7 +827,7 @@ try {
         for(const view of ['chat','diary','wall']){
           if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'visible'});}
           assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme} ${view} overflow`);assert.ok(await s.page.locator('#messages').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${device} ${theme} ${view} pane overflow`);
-          const pane=await s.page.locator('#messages').boundingBox();assert.ok(pane.height>90,`${device} ${view} missing content`);
+          const pane=await s.page.locator(view==='chat'?'#messages':view==='wall'?'#wallSpace':'#diarySpace').boundingBox();assert.ok(pane?.height>90,`${device} ${view} missing content`);
           if(view==='chat'){const box=await s.page.locator('#composer').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,`${device} ${theme} composer`);}
           if(['phone','tablet-landscape','desktop'].includes(device))await s.page.screenshot({path:resolve(root,`test-results/${device}-${theme}-${view}.png`)});
           if(view!=='chat')await s.page.locator('#relationClose').click();
@@ -894,7 +896,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.API_ONLY)await runAPI({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.REFERENCE_ONLY)await runReference({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.API_ONLY)await runAPI({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SCENE_ONLY)await runScene({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});

@@ -1,4 +1,5 @@
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.5.1';
+import {applyPoetry} from './poetry.js?v=2.6.0';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.6.0';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -6,8 +7,7 @@ export function setTheme(value){
   document.documentElement.dataset.theme=theme;storeSet('theme',theme);
   document.querySelector('meta[name=theme-color]').content={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522','rain-night':'#101e2b','moon-glass':'#111a2c'}[theme];
   document.querySelectorAll('[data-theme-pick]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themePick===theme)));
-  const quote=document.querySelector('.home-art .handwriting');if(quote)quote.textContent=['rain-night','moon-glass'].includes(theme)?'群星不怕显得\n像萤火那样。':'生如夏花，\n死如秋叶。';
-  if(quote)quote.title=['rain-night','moon-glass'].includes(theme)?'泰戈尔《飞鸟集》第 48 则 · 据英文自译':'泰戈尔《飞鸟集》第 82 则 · 据英文自译';
+
 }
 export function contactTarget(value){
   value=String(value||'').trim();
@@ -27,6 +27,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   for(const [id,title] of [['relationshipScrim','纪念日'],['listenScrim','一起听'],['memoirScrim','私人回忆录']])registerPanel(id,title);
   $('diaryTools').append($('viewHeading'),$('diaryFilters'));
   $('viewHeading').hidden=false;$('diaryFilters').hidden=false;$('returnChat').hidden=true;
+  function syncFocus(){const focused=!$('relationSpace').inert&&state.spacePanel&&state.spacePanel!=='home';$('room').classList.toggle('feature-focus',!!focused);for(const selector of ['.scene-hero','.scene-dock','.scene-shortcuts','.scene-dream']){const el=document.querySelector(selector);if(el)el.inert=!!focused;}if($('chatColumn'))$('chatColumn').inert=!!focused||state.sceneView!=='chat';}
   function page(id='home'){
     const panel=id==='home'?null:$(id);if(id!=='home'&&!panel?.dataset.spacePanel)return;
     panels().forEach(el=>el.hidden=el!==panel);
@@ -34,18 +35,18 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     $('spaceHome').hidden=!!panel;$('spacePages').hidden=!panel;$('spaceBack').hidden=!panel;
     $('spaceTitle').textContent=panel?.dataset.spacePanel||'我们的空间';
     state.spaceView=id==='diarySpace'?'diary':id==='wallSpace'?'wall':null;
-    state.spacePanel=id;
+    state.spacePanel=id;syncFocus();
     $('spacePages').scrollTop=0;
     document.dispatchEvent(new CustomEvent('mailbox:space-page',{detail:{panel:id}}));
   }
   function drawer(open){
     if(open&&!state.room)return;
-    $('room').classList.toggle('space-open',open);$('relationSpace').classList.toggle('open',open);$('relationSpace').inert=!open;
+    $('room').classList.toggle('space-open',open);$('relationSpace').classList.toggle('open',open);$('relationSpace').inert=!open;syncFocus();
     $('relationSpace').setAttribute('aria-hidden',String(!open));$('relationHandle').setAttribute('aria-expanded',String(open));$('relationBackdrop').hidden=!open||!compact();
     if(open){if(!previousFocus)previousFocus=document.activeElement;$('relationClose').focus();document.dispatchEvent(new Event('mailbox:space-open'));}
     else{page();document.dispatchEvent(new Event('mailbox:space-close'));if(previousFocus?.isConnected)previousFocus.focus();previousFocus=null;}
   }
-  function openFeature(id){page(id);drawer(true);}
+  function openFeature(id){document.dispatchEvent(new Event('mailbox:navigation'));page(id);drawer(true);}
   $('spaceBack').onclick=()=>page();
   matchMedia('(min-width:700px) and (min-height:501px)').addEventListener('change',()=>{$('relationBackdrop').hidden=$('relationSpace').inert||!compact();});
   function settings(){drawer(false);closeSheet('menuScrim');showSheet('settingsScrim');document.dispatchEvent(new Event('mailbox:settings-open'));}
@@ -56,12 +57,12 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   $('returnChat').onclick=()=>setView('chat');$('writeFromView').onclick=()=>{drawer(false);document.dispatchEvent(new Event('mailbox:show-chat'));$('messageInput').focus();};
   $('backBtn').onclick=()=>state.view==='chat'?home():setView('chat');
   const pane=$('messages');
-  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.selecting||state.view!=='chat'||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
+  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.selecting||state.view!=='chat'||state.sceneView!=='chat'||!$('relationSpace').inert||document.querySelector('.scrim:not([hidden])')||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
   pane.addEventListener('touchcancel',()=>start=null,{passive:true});
   pane.addEventListener('touchend',event=>{const from=start;start=null;const end=event.changedTouches[0];if(!from||!end||state.selecting||window.getSelection()?.isCollapsed===false)return;if(end.clientX-from.x<-85&&Math.abs(end.clientY-from.y)<35&&Date.now()-from.t<600)drawer(true);},{passive:true});
   document.addEventListener('keydown',event=>{
-    if($('relationSpace').inert)return;
-    if(event.key==='Escape'){if(document.querySelector('.scrim:not([hidden])'))return;if(state.spacePanel&&state.spacePanel!=='home')page();else drawer(false);return;}
+    if(event.defaultPrevented||$('relationSpace').inert)return;
+    if(event.key==='Escape'){if(document.querySelector('.scrim:not([hidden])'))return;event.preventDefault();event.stopImmediatePropagation();if(state.spacePanel&&state.spacePanel!=='home')page();else drawer(false);return;}
     if(event.key==='Tab'&&compact()){const controls=[...$('relationSpace').querySelectorAll('button,input,textarea,select,a[href]')].filter(b=>!b.disabled&&b.getClientRects().length);if(event.shiftKey&&document.activeElement===controls[0]){event.preventDefault();controls.at(-1).focus();}else if(!event.shiftKey&&document.activeElement===controls.at(-1)){event.preventDefault();controls[0].focus();}}
   });
   $('addRoomBtn').onclick=()=>showSheet('addRoomScrim');$('composeMore').onclick=()=>showSheet('composeScrim');
@@ -85,7 +86,6 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   let previous;try{previous=localStorage.getItem('theme.v2');}catch{}
   const savedTheme=storeGet('theme',null);
   setTheme(THEMES.includes(savedTheme)?savedTheme:previous||savedTheme||'ins-light');
-  const copies=['今天也辛苦了。\n把想说的话，慢慢留在这里。','把普通的一天，\n留成可以重读的一页。','有些瞬间很轻，\n但我们会记得。','等你有空，\n再拆开这封信。','天色慢下来，\n我们也可以。','今天的风，\n也想分给你一点。','见字如面。\n有空再接着聊。','一首歌的时间，\n刚好留给想念。','不用写成故事，\n小事也值得记录。','晚一点抵达，\n也没有关系。'];
-  const day=localDate();$('dailyCopy').textContent=copies[Math.floor(Date.parse(day+'T00:00:00Z')/86400000)%copies.length];contacts();
+  applyPoetry();contacts();
   return {drawer,settings,openFeature,page,registerPanel};
 }

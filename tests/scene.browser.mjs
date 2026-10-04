@@ -6,7 +6,7 @@ export async function runScene({setup,check,secureId,user,friend,fixture,root}){
  for(const [i,title] of ['一起读两页飞鸟集','记得好好吃晚饭','整理今天的照片','晚风里散步','早点休息'].entries())s.control.daily.space_entries.push({id:'scene-todo-'+i,revision:1,room_id:secureId,owner_user_id:user,kind:'todo',title,body:'',visibility:'shared',event_date:'2026-10-03',created_at:'2026-10-02T20:00:00Z',data:{done:i<2,remind:false}});
  await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
  await p.waitForFunction(()=>document.querySelectorAll('#sceneTodoList .scene-todo').length===5);
- const theme=async t=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.5.1')).setTheme(t),t);
+ const theme=async t=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.6.0')).setTheme(t),t);
  const snapshot=async name=>{await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/scene-'+name+'.png'});};
  await check('all six themes share the reference layout at desktop, short tablet and phone sizes',async()=>{
   assert.equal(await p.locator('#sceneHero').isVisible(),true);
@@ -27,7 +27,7 @@ export async function runScene({setup,check,secureId,user,friend,fixture,root}){
  await check('home, chat, inbox and feature navigation preserve live nodes and the draft',async()=>{
   await p.setViewportSize({width:1440,height:900});await p.locator('#sceneNavChat').click();await p.locator('#messageInput').fill('写到一半，还想慢慢讲给你听。');
   await p.evaluate(()=>{window.sceneAudio=document.querySelector('#listenAudio');window.sceneMessages=document.querySelector('#messages');});
-  await p.locator('#sceneNavHome').click();await p.locator('#sceneNavMemory').click();assert.equal(await p.locator('#wallSpace').isVisible(),true);assert.equal(await p.locator('#sceneHero').isVisible(),true);await p.locator('#relationClose').click();
+  await p.locator('#sceneNavHome').click();await p.locator('#sceneNavMemory').click();assert.equal(await p.locator('#wallSpace').isVisible(),true);assert.equal(await p.locator('#sceneHero').isVisible(),false);await p.locator('#relationClose').click();
   await p.locator('#sceneNavMail').click();assert.equal(await p.locator('#home').isVisible(),true);await p.locator('#sceneInboxClose').click();
   await p.locator('#sceneNavChat').click();assert.equal(await p.locator('#messageInput').inputValue(),'写到一半，还想慢慢讲给你听。');assert.equal(await p.locator('#messages .msg').count(),2);assert.ok(await p.evaluate(()=>window.sceneAudio===document.querySelector('#listenAudio')&&window.sceneMessages===document.querySelector('#messages')));
   await p.locator('#sceneSearch').fill('散步');await p.locator('#sceneSearchResults button').click();assert.equal(await p.locator('#messages .quote-highlight').count(),1);

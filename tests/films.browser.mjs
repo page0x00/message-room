@@ -20,6 +20,9 @@ export async function runFilms({setup,check,secureId,user,friend,fixture,root}){
   await p.locator('#filmSound').selectOption('immersive');await p.waitForTimeout(160);await p.locator('#spacePages').evaluate(e=>e.scrollTop=0);await p.screenshot({path:root+'/test-results/film-photo-phone.png'});
   await p.locator('#filmPrev').click();assert.equal(Number(await p.locator('#filmProjector').getAttribute('data-index')),Math.max(0,i-1));
  });
+ await check('opening a frame shows its original detail, pauses playback and preserves the same frame on return',async()=>{
+  const before=await p.locator('#filmProjector').getAttribute('data-index');await p.locator('#filmDetailOpen').click();await p.locator('#filmDetail').waitFor({state:'visible'});assert.ok((await p.locator('#filmDetail .memory-full-text').first().textContent()).length>0);assert.equal(await p.locator('#filmBgmAudio').evaluate(e=>e.paused),true);assert.equal(await p.locator('#filmProjector').isVisible(),false);await p.locator('#filmDetail').getByRole('button',{name:'‹ 继续看这一幕',exact:true}).click();assert.equal(await p.locator('#filmProjector').getAttribute('data-index'),before);assert.equal(await p.locator('#filmPlay').textContent(),'播放');
+ });
  await check('held rewind traverses backwards and release stops precisely; keyboard click toggles rewind',async()=>{
   for(let n=0;n<3;n++)await p.locator('#filmNext').click();assert.equal(await p.locator('#filmProjector').getAttribute('data-index'),'2');
   const b=await p.locator('#filmRewind').boundingBox();await p.mouse.move(b.x+b.width/2,b.y+b.height/2);await p.mouse.down();await p.waitForTimeout(210);await p.mouse.up();await p.waitForTimeout(40);
@@ -35,7 +38,7 @@ export async function runFilms({setup,check,secureId,user,friend,fixture,root}){
  await check('leaving film panel stops playback and all themes and screen sizes retain usable controls',async()=>{
   await p.locator('#filmPlay').click();await p.locator('#spaceBack').click();assert.equal(await p.locator('#filmProjector').isVisible(),false);assert.equal(await p.locator('#filmBgmAudio').evaluate(e=>e.paused),true);
   await p.locator('#filmSpaceBtn').click();
-  for(const [w,h] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){await p.setViewportSize({width:w,height:h});for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){await p.evaluate(async t=>(await import('./ui-v2.js?v=2.5.1')).setTheme(t),theme);assert.ok(await p.locator('#filmSpace').evaluate(e=>e.scrollWidth<=e.clientWidth+1),theme+' '+w);}}
+  for(const [w,h] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){await p.setViewportSize({width:w,height:h});for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){await p.evaluate(async t=>(await import('./ui-v2.js?v=2.6.0')).setTheme(t),theme);assert.ok(await p.locator('#filmSpace').evaluate(e=>e.scrollWidth<=e.clientWidth+1),theme+' '+w);}}
   await p.locator('#filmPreview').click();await p.locator('#filmProjector').waitFor({state:'visible'});await p.locator('#filmPlay').click();await p.screenshot({path:root+'/test-results/film-tablet.png'});await p.locator('#filmExit').click();
  });
  assert.deepEqual(s.errors,[]);await s.context.close();

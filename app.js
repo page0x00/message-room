@@ -1,10 +1,11 @@
-import {initAPISettings} from './api-settings.js?v=2.5.1';
-import {noticePanels} from './notice-core.js?v=2.5.1';
-import {initSceneInterface} from './scene-interface.js?v=2.5.1';
-import {initPetSpace} from './pet-space.js?v=2.5.1';
-import {initFilmSpace} from './film-space.js?v=2.5.1';
-import {initMemorySpace} from './memory-space.js?v=2.5.1';
-import {initDailySpace} from './daily-space.js?v=2.5.1';
+import {initPoetry} from './poetry.js?v=2.6.0';
+import {initAPISettings} from './api-settings.js?v=2.6.0';
+import {noticePanels} from './notice-core.js?v=2.6.0';
+import {initSceneInterface} from './scene-interface.js?v=2.6.0';
+import {initPetSpace} from './pet-space.js?v=2.6.0';
+import {initFilmSpace} from './film-space.js?v=2.6.0';
+import {initMemorySpace} from './memory-space.js?v=2.6.0';
+import {initDailySpace} from './daily-space.js?v=2.6.0';
 import {
   parseRoom,
   roomLink,
@@ -20,15 +21,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.5.1";
-import * as api from "./backend.js?v=2.5.1";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.5.1";
-import { initNotifications } from "./notifications.js?v=2.5.1";
-import { initFeatures } from "./features.js?v=2.5.1";
+} from "./core.js?v=2.6.0";
+import * as api from "./backend.js?v=2.6.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.6.0";
+import { initNotifications } from "./notifications.js?v=2.6.0";
+import { initFeatures } from "./features.js?v=2.6.0";
 
-import {initMessageCards} from "./message-cards.js?v=2.5.1";
-import {initAccount} from "./account.js?v=2.5.1";
-import {initMessageActions} from "./message-actions.js?v=2.5.1";
+import {initMessageCards} from "./message-cards.js?v=2.6.0";
+import {initAccount} from "./account.js?v=2.6.0";
+import {initMessageActions} from "./message-actions.js?v=2.6.0";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -91,6 +92,7 @@ function showSheet(id) {
   if($(id)?.dataset.spacePanel){ui.openFeature(id);return;}
   focusBeforeSheet = document.activeElement;
   $(id).hidden = false;
+  document.dispatchEvent(new CustomEvent('mailbox:sheet-open',{detail:{id}}));
   $(id).querySelector("input:not([type=file]):not([hidden]),button")?.focus();
 }
 
@@ -1075,6 +1077,7 @@ void notifications.watch();
 const initial = parseRoom(location.href);
 const account=initAccount({$,state,node,toast,showSheet,closeSheet,
   async onIdentity(user,previous){
+    document.dispatchEvent(new CustomEvent('mailbox:account-identity',{detail:{authenticated:!!user}}));
     const target=state.room?{room:state.room,invite:state.invite}:null;
     if(previous && previous!==user?.id){home();state.messages=[];state.members=[];state.profile={};}
     if(previous!==user?.id)apiSettings.identityChanged(previous);
@@ -1089,3 +1092,5 @@ if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);
   void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" });
 }
+
+initPoetry();
