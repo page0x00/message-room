@@ -1,5 +1,5 @@
-import { client, loadMessages } from './backend.js?v=2.5.1';
-import { mediaPathValid } from './feature-core.js?v=2.5.1';
+import { client, loadMessages } from './backend.js?v=2.7.1';
+import { mediaPathValid } from './feature-core.js?v=2.7.1';
 
 function take(result){if(result.error)throw result.error;return result.data;}
 export async function roomDetails(room){return take(await client(true).from('mailbox_rooms').select('room_id,created_at,relationship_since').eq('room_id',room).single());}

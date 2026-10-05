@@ -1,10 +1,11 @@
-import {initMusicSpace} from './music-space.js?v=2.5.1';
-import {imageHash} from './screenshot-store.js?v=2.5.1';
-import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.5.1';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.5.1';
-import * as api from './backend.js?v=2.5.1';
-import * as data from './feature-backend.js?v=2.5.1';
-import {initScreenshotImport} from './screenshot-import.js?v=2.5.1';
+import {initMusicSpace} from './music-space.js?v=2.7.1';
+import {uiIcon} from './ui-icons.js?v=2.7.1';
+import {imageHash} from './screenshot-store.js?v=2.7.1';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.7.1';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.7.1';
+import * as api from './backend.js?v=2.7.1';
+import * as data from './feature-backend.js?v=2.7.1';
+import {initScreenshotImport} from './screenshot-import.js?v=2.7.1';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
@@ -13,7 +14,7 @@ export function initFeatures(ctx){
   const screenshots=initScreenshotImport(ctx);
   let mediaQueue=[];
   let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
-  let calendar=[],calendarBusy=false,calendarEdit=null,eventNonce=randomId();
+  let calendar=[],calendarBusy=false,calendarEdit=null,lastCalendarRefresh=0,eventNonce=randomId();
   let memoir=null,memoirEdits=0,memoirBusy=false;
   let recorder=null,recordStream=null,recordTimer=null,recordRevision=0;
 
@@ -42,8 +43,20 @@ export function initFeatures(ctx){
     if(!open('attachmentScrim'))return;
     $('attachmentStatus').textContent=state.secure?'文件先上传，确认成功后才会生成留言。':'附件需要邀请房间。旧版公开房间继续支持文字留言。';
     mediaControls();
+    return true;
   }
-  $('attachBtn').onclick=attachmentOpen;
+  const tray=node('div','compose-tools');tray.id='composeTools';tray.hidden=true;tray.setAttribute('aria-label','选择发送内容');
+  const choices=node('div','compose-tool-options');tray.append(choices);
+  const collapse=()=>{tray.hidden=true;for(const id of ['attachBtn','composeMore'])$(id).setAttribute('aria-expanded','false');};
+  for(const [id,label,caption,icon,accept] of [['Images','图片','上传照片','image','image/*'],['Video','视频','分享视频','video','video/*'],['Files','文件','上传文档','file',''],['Voice','语音','录制语音','mic',null],['Music','一起听','导入歌曲与歌词','music',null]]){
+    const b=node('button','compose-choice'+(id==='Music'?' compose-music':''));b.type='button';b.id='compose'+id;b.innerHTML=uiIcon(icon)+`<span><b>${label}</b><small>${caption}</small></span>`;
+    b.onclick=()=>{collapse();if(id==='Music'){document.dispatchEvent(new Event('mailbox:music-import'));return;}if(!attachmentOpen())return;if(id==='Voice'){$('recordStart').click();return;}$('attachmentFile').accept=accept;$('attachmentFile').click();};choices.append(b);
+  }
+  const extra=node('div','compose-tool-extra');for(const [label,target] of [['补录日期','dateBtn'],['截图摘录','importBtn']]){const b=node('button','text-btn',label);b.type='button';b.id=target==='dateBtn'?'composeDate':'composeImport';b.onclick=()=>{collapse();$(target).click();};extra.append(b);}tray.append(extra);$('composer').before(tray);
+  for(const id of ['attachBtn','composeMore']){$(id).setAttribute('aria-controls',tray.id);$(id).setAttribute('aria-expanded','false');$(id).onclick=()=>{tray.hidden=!tray.hidden;for(const target of ['attachBtn','composeMore'])$(target).setAttribute('aria-expanded',String(!tray.hidden));};}
+  document.addEventListener('mailbox:navigation',collapse);document.addEventListener('mailbox:room-open',collapse);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!tray.hidden){collapse();e.preventDefault();}});
+  $('attachmentFile').hidden=true;
+  const choose=node('button','btn ghost', '选择文件');choose.type='button';choose.id='attachmentChoose';choose.onclick=()=>$('attachmentFile').click();const oldLabel=$('attachmentFile').parentElement;oldLabel.before(choose);oldLabel.replaceWith($('attachmentFile'));
   async function chooseAttachment(selected){
     if(mediaBusy||!selected)return;const s=snap();
     try{
@@ -130,7 +143,8 @@ export function initFeatures(ctx){
     if(message.import_label)bubble.append(node('div','import-label',`截图摘录 · ${message.import_label}（由留言者导入）`));
     if(!message.media_path)return;
     if(mediaCards.has(cacheId)){bubble.append(mediaCards.get(cacheId));return;}
-    const card=node('div','media-card');card.append(node('span','media-label',(message.media_name||'附件')+' · '+bytesLabel(message.media_size||0)));
+    const card=node('div','media-card');card.dataset.mediaType=message.message_type;
+    if(message.message_type!=='image')card.append(node('span','media-label',(message.media_name||'附件')+' · '+bytesLabel(message.media_size||0)));
     const button=node('button','',message.message_type==='file'?'下载附件':'打开附件');button.type='button';card.append(button);bubble.append(card);mediaCards.set(cacheId,card);
     if(!state.secure||!mediaPathValid(message.media_path,state.room)){button.disabled=true;button.textContent='附件路径不可用';return;}
     button.onclick=async()=>{
@@ -142,7 +156,7 @@ export function initFeatures(ctx){
         if(['image','audio','video'].includes(message.message_type)){
           const element=node(message.message_type==='image'?'img':message.message_type);element.src=cached.url;
           if(message.message_type==='image')element.alt=message.media_name||'留言图片';else{element.controls=true;element.preload='metadata';}
-          const save=node('button','','下载原文件');save.type='button';save.onclick=()=>download(cached.blob,message.media_name||'附件');button.replaceWith(element,save);
+          const image=message.message_type==='image',save=node('button',image?'image-save':'',image?'↓':'下载原文件');save.type='button';save.setAttribute('aria-label',image?'下载原图':'下载原文件');save.title=image?'下载原图':'下载原文件';save.onclick=()=>download(cached.blob,message.media_name||'附件');button.replaceWith(element,save);
         }else{download(cached.blob,message.media_name||'附件');button.textContent='再次下载';button.disabled=false;}
       }catch(e){if(current(s)){button.disabled=false;button.textContent='读取失败，点击重试';fail(e);}}
     };
@@ -169,6 +183,7 @@ export function initFeatures(ctx){
       }
       box.append(card);
     }
+    document.dispatchEvent(new CustomEvent('mailbox:calendar-change',{detail:{room:state.room,events:[...calendar]}}));
   }
   function daysCard(value){const days=daysBetween(value);$('relationshipDays').textContent=days===null?'—':days<0?`还有 ${-days} 天`:`第 ${days+1} 天`;$('relationshipCaption').textContent=value?`从 ${value} 开始，记住每个普通日子`:'设置相识日期，开始记录';$('relationDays').textContent=days===null?'—':days<0?`还有 ${-days} 天`:`${days+1} 天`;$('relationCaption').textContent=value?`从 ${value} 开始`:'点开纪念日，写下相识的日期';}
   async function refreshCalendar(fillDate=false){
@@ -178,7 +193,8 @@ export function initFeatures(ctx){
       if(s.secure){const [info,rows]=await Promise.all([data.roomDetails(s.room),data.events(s.room)]);if(!current(s))return;calendar=rows;since=info.relationship_since||localDate(info.created_at);}
       else{calendar=storeGet(key('events',s),[]);if(!Array.isArray(calendar))calendar=[];since=storeGet(key('relationship',s),'')||localDate(state.messages[0]?.created_at);}
       if(!current(s))return;daysCard(since);if(fillDate)$('relationshipSince').value=since;
-      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();if(state.spaceView==='wall')onMessages([]);
+      lastCalendarRefresh=Date.now();
+      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();
     }catch(e){if(current(s))$('relationshipNote').textContent=messageError(e);}
     finally{if(current(s))calendarBusy=false;}
   }
@@ -258,13 +274,13 @@ export function initFeatures(ctx){
     stopSubscription?.();stopSubscription=null;mediaController?.abort();mediaController=null;mediaBusy=false;
     if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);media=null;
     for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();
-    calendar=[];calendarBusy=false;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
+    calendar=[];calendarBusy=false;calendarEdit=null;lastCalendarRefresh=0;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
     music.reset();
     screenshots.reset();
     memoir=null;memoirEdits++;memoirBusy=false;$('memoirProgress').textContent='';$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();
   }
   function ready(){void refreshCalendar();void music.ready();if(state.secure){const s=snap();stopSubscription=data.subscribeFeatures(s.room,()=>{if(current(s))void refreshCalendar();},()=>{if(current(s))void music.refresh();});}}
-  document.addEventListener('mailbox:space-open',()=>void refreshCalendar());
+  document.addEventListener('mailbox:space-open',()=>{if(['home','relationshipScrim'].includes(state.spacePanel)&&Date.now()-lastCalendarRefresh>15000)void refreshCalendar();});
   document.addEventListener('mailbox:sheet-close',event=>{if(event.detail.id==='attachmentScrim')endRecording(true);if(event.detail.id==='attachmentScrim'&&mediaBusy)mediaController?.abort();});
   setInterval(()=>{if(document.hidden||!state.ready)return;if($('listenSync').checked||!$('listenScrim').hidden)void music.refresh();if(!$('relationshipScrim').hidden)void refreshCalendar();},10000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ready&&$('listenSync').checked)void music.refresh();});
