@@ -1,12 +1,13 @@
-import {initPoetry} from './poetry.js?v=2.7.0';
-import {initThemedControls} from './theme-controls.js?v=2.7.0';
-import {initAPISettings} from './api-settings.js?v=2.7.0';
-import {noticePanels} from './notice-core.js?v=2.7.0';
-import {initSceneInterface} from './scene-interface.js?v=2.7.0';
-import {initPetSpace} from './pet-space.js?v=2.7.0';
-import {initFilmSpace} from './film-space.js?v=2.7.0';
-import {initMemorySpace} from './memory-space.js?v=2.7.0';
-import {initDailySpace} from './daily-space.js?v=2.7.0';
+import {initPoetry} from './poetry.js?v=2.7.1';
+import {initThemedControls} from './theme-controls.js?v=2.7.1';
+import {initViewportLayout} from './viewport-layout.js?v=2.7.1';
+import {initAPISettings} from './api-settings.js?v=2.7.1';
+import {noticePanels} from './notice-core.js?v=2.7.1';
+import {initSceneInterface} from './scene-interface.js?v=2.7.1';
+import {initPetSpace} from './pet-space.js?v=2.7.1';
+import {initFilmSpace} from './film-space.js?v=2.7.1';
+import {initMemorySpace} from './memory-space.js?v=2.7.1';
+import {initDailySpace} from './daily-space.js?v=2.7.1';
 import {
   parseRoom,
   roomLink,
@@ -22,15 +23,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.7.0";
-import * as api from "./backend.js?v=2.7.0";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.7.0";
-import { initNotifications } from "./notifications.js?v=2.7.0";
-import { initFeatures } from "./features.js?v=2.7.0";
+} from "./core.js?v=2.7.1";
+import * as api from "./backend.js?v=2.7.1";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.7.1";
+import { initNotifications } from "./notifications.js?v=2.7.1";
+import { initFeatures } from "./features.js?v=2.7.1";
 
-import {initMessageCards} from "./message-cards.js?v=2.7.0";
-import {initAccount} from "./account.js?v=2.7.0";
-import {initMessageActions} from "./message-actions.js?v=2.7.0";
+import {initMessageCards} from "./message-cards.js?v=2.7.1";
+import {initAccount} from "./account.js?v=2.7.1";
+import {initMessageActions} from "./message-actions.js?v=2.7.1";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -221,7 +222,7 @@ function updateStatus() {
   $("dateBtn").title = state.date ? `显示日期：${state.date}` : "设置显示日期";
 }
 
-async function openRoom(target) {
+async function openRoom(target, {landing='chat'}={}) {
   const valid = parseRoom(target.room);
   if (!valid) {
     toast("房间号格式不正确。");
@@ -271,7 +272,7 @@ async function openRoom(target) {
     : "旧版兼容模式：保留原有公开权限，请勿存放私密内容。";
   render();
   setView("chat");
-  document.dispatchEvent(new Event("mailbox:room-open"));
+  document.dispatchEvent(new CustomEvent("mailbox:room-open", {detail:{landing}}));
   updateStatus();
   const enteredAt=state.navigationRevision||0;
   try {
@@ -1075,6 +1076,7 @@ const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
 const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice,ui});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
 initSceneInterface({$,node,state,ui});
+initViewportLayout();
 initThemedControls();
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
 notifications.onOpen(openNotice);
@@ -1098,7 +1100,7 @@ const account=initAccount({$,state,node,toast,showSheet,closeSheet,
 void account.ready;
 if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);
-  void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" });
+  void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" }, {landing:'home'});
 }
 
 initPoetry();

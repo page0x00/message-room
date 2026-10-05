@@ -1,3 +1,4 @@
+import {memoryControl} from './memory-controls.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 export async function runReference({setup,check,secureId,user,friend,fixture,root}){
@@ -7,7 +8,7 @@ export async function runReference({setup,check,secureId,user,friend,fixture,roo
  const s=await setup({secure:true,touch:true,rows:bodies.map((text,i)=>fixture(i+1,secureId,text,i%2?friend:user,{author_id:i%2?friend:user,display_date:'2026-09-'+(24-Math.floor(i/2)),...(i%3===0?{message_type:'image',media_path:path,media_mime:'image/webp',media_name:'窗边.webp',media_size:photo.length}:{})})),uploads:[[path,{buffer:photo,mime:'image/webp'}]]}),p=s.page;
  const cdp=await s.context.newCDPSession(p);
  const open=async()=>{await p.locator('#relationHandle').click();await p.locator('[data-open-view=wall]').click();await p.locator('.memory-card').first().waitFor();};
- const mode=async value=>{await p.locator(`[data-memory-mode=${value}]`).click();await p.locator('.memory-stage').waitFor();await p.locator('#memoryZoomReset').click();};
+ const mode=async value=>{await memoryControl(p,`[data-memory-mode=${value}]`);await p.locator('.memory-stage').waitFor();await p.locator('#memoryZoomReset').click();};
  const shot=async name=>{await p.locator('#spacePages').evaluate(e=>e.scrollTop=0);await p.evaluate(()=>document.fonts.ready);const bounds=await p.evaluate(()=>{const a=document.querySelector('.memory-viewport'),b=document.querySelector('.memory-stage'),c=document.querySelector('.memory-optics');return {a:a.getBoundingClientRect().toJSON(),b:b.getBoundingClientRect().toJSON(),c:c.getBoundingClientRect().toJSON(),scroll:a.scrollTop};});assert.equal(bounds.scroll,0,'canvas wrapper must never scroll when focusing zoom controls');assert.ok(bounds.b.top>=bounds.a.top&&bounds.c.bottom<=bounds.a.bottom+1,'canvas and optics fit inside the panel');await p.screenshot({path:root+'/test-results/reference-'+name+'.png'});};
  await open();
  await check('cards and beam scale to the available device size, with identical geometry in every skin',async()=>{
@@ -16,13 +17,13 @@ export async function runReference({setup,check,secureId,user,friend,fixture,roo
    await p.setViewportSize({width,height});await mode('notes');await p.waitForTimeout(100);
    let first;
    for(const theme of themes){
-    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.0')).setTheme(t),theme);
+    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.1')).setTheme(t),theme);
     const bounds=await p.evaluate(()=>{const stage=document.querySelector('.memory-stage'),card=document.querySelector('.memory-card');return {width:stage.clientWidth,height:stage.clientHeight,card:card.offsetWidth,columns:Number(stage.style.getPropertyValue('--memory-columns')),radius:parseFloat(stage.style.getPropertyValue('--light-radius'))};});
     assert.ok(bounds.card<250&&bounds.card>110);assert.ok(Math.abs(bounds.radius/Math.min(bounds.width,bounds.height)-.17)<.01);
     if(first)assert.deepEqual(bounds,first,'skin must not change layout');else first=bounds;
    }
    columns.push(first.columns);assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-   await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.0')).setTheme('ins-light'));
+   await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.1')).setTheme('ins-light'));
    await shot('notes-'+width);await mode('board');await shot('board-'+width);await mode('disc');await shot('disc-'+width);
   }
   assert.equal(columns[0],2);assert.ok(columns[1]>columns[0]);assert.ok(columns[2]>columns[1]);
@@ -48,12 +49,12 @@ export async function runReference({setup,check,secureId,user,friend,fixture,roo
   const measure=()=>p.locator('.memory-stage').evaluate(e=>parseFloat(e.style.getPropertyValue('--light-radius'))/Math.min(e.clientWidth,e.clientHeight));
   assert.ok(Math.abs(await measure()-.285)<.005);await p.locator('#memoryZoomIn').click();assert.ok(Math.abs(await measure()-.285)<.005);
   const r=await p.locator('.memory-stage').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r.x+80,y:r.y+100,id:1}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:r.x+150,y:r.y+130,id:1}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-  assert.ok(await p.locator('.memory-stage').evaluate(e=>Math.abs(parseFloat(e.style.getPropertyValue('--light-x'))-150)<2));
+  assert.ok(await p.locator('.memory-stage').evaluate(e=>Math.abs(parseFloat(e.style.getPropertyValue('--light-x'))-(150-e.clientLeft))<2));
   await p.setViewportSize({width:820,height:1180});await p.waitForTimeout(100);assert.ok(Math.abs(await measure()-.285)<.005);assert.equal(await p.locator('#memoryBeam').inputValue(),'57');await shot('flashlight-tablet');await p.locator('#memoryLight').click();
  });
  await check('poetry changes on each new visit, remains stable on theme changes and never replaces stored memories',async()=>{
   const before=await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),original=JSON.stringify(s.control.records);
-  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.0')).setTheme('warm-light'));assert.equal(await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),before);
+  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.1')).setTheme('warm-light'));assert.equal(await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),before);
   await p.reload();await p.waitForFunction(()=>document.querySelector('.scene-hero-copy [data-poem]').dataset.poemId);assert.notEqual(await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),before);assert.equal(JSON.stringify(s.control.records),original);
   assert.equal(await p.locator('#sceneMasthead [data-poem]').count(),0);
  });

@@ -11,7 +11,7 @@ export function createMemoryViewport({stage,surface,initial,onChange=()=>{},onSi
  let scale=initial?.scale||1,x=initial?.x||0,y=initial?.y||0;
  let gesture=null,pinch=null,blocked=false,suppressUntil=0,frame=0,destroyed=false;
  const pointers=new Map(),controller=new AbortController(),options={signal:controller.signal};
- const point=e=>{const r=stage.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
+ const point=e=>{const r=stage.getBoundingClientRect();return {x:e.clientX-r.left-stage.clientLeft,y:e.clientY-r.top-stage.clientTop};};
  const world=p=>({x:(p.x-x)/scale,y:(p.y-y)/scale});
  function paint(){
   if(!stage.isConnected||stage.clientWidth<1||stage.clientHeight<1)return;

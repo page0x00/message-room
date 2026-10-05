@@ -1,3 +1,4 @@
+import {memoryControl} from './memory-controls.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 function audioFile(){const n=8000*45,b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(36+n*2,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(8000,24);b.writeUInt32LE(16000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(Math.sin(i*220/8000)*400),44+i*2);return b;}
@@ -15,7 +16,7 @@ export async function runSkins({setup,check,secureId,user,friend,fixture,root}){
  s.control.daily.pockets.push({id:'skin-pocket',room_id:secureId,owner_user_id:user,title:'我们的旅行基金',target_cents:100000,daily_cents:1000,mode:'daily',qr_path:path,cover_path:null,note:'一点一点，去看更远的风景。',created_at:'2026-09-01T00:00:00Z'});
  s.control.daily.pocket_entries.push({id:'skin-deposit',pocket_id:'skin-pocket',room_id:secureId,owner_user_id:user,kind:'deposit',cents:35800,status:'settled',reason:'把今天的期待存起来。',created_at:new Date().toISOString()});
  await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.0')).setTheme(t),value);
+ const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.1')).setTheme(t),value);
  const shot=async name=>{await p.waitForTimeout(280);await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/skin-'+name+'.png'});};
  await check('each skin loads its photograph and the real handwritten Chinese font',async()=>{
   await p.locator('#relationHandle').click();await p.locator('#listenBtn').click();
@@ -47,11 +48,11 @@ export async function runSkins({setup,check,secureId,user,friend,fixture,root}){
  });
  await check('paper, acrylic and savings treatments show real stored content in all six skins',async()=>{
   await p.setViewportSize({width:390,height:844});
-  for(const t of themes){await theme(t);await p.locator('#relationHandle').click();await p.locator('[data-open-view=wall]').click();await p.locator('[data-memory-mode=notes]').click();await p.waitForFunction(()=>document.querySelector('.memory-card img')?.naturalWidth>0);await shot('notes-'+t);await p.locator('[data-memory-mode=disc]').click();await shot('disc-'+t);await p.locator('#spaceBack').click();await p.locator('#pocketSpaceBtn').click();await p.locator('.pocket-goal-card').waitFor();await shot('pocket-'+t);await p.locator('#relationClose').click();}
+  for(const t of themes){await theme(t);await p.locator('#relationHandle').click();await p.locator('[data-open-view=wall]').click();await memoryControl(p,'[data-memory-mode=notes]');await p.waitForFunction(()=>document.querySelector('.memory-card img')?.naturalWidth>0);await shot('notes-'+t);await memoryControl(p,'[data-memory-mode=disc]');await shot('disc-'+t);await p.locator('#spaceBack').click();await p.locator('#pocketSpaceBtn').click();await p.locator('.pocket-goal-card').waitFor();await shot('pocket-'+t);await p.locator('#relationClose').click();}
   await theme('warm-light');await p.locator('#relationHandle').click();await p.locator('#pocketSpaceBtn').click();await p.getByRole('button',{name:'＋ 存一笔',exact:true}).click();await p.locator('.pocket-quick-amounts').getByRole('button',{name:'+ 50',exact:true}).click();assert.equal(await p.locator('#pocketSpace [name=amount]').inputValue(),'50');await shot('deposit');await p.getByRole('button',{name:'取消',exact:true}).click();
   await p.getByRole('button',{name:'写假条',exact:true}).click();await shot('leave');await p.getByRole('button',{name:'取消',exact:true}).click();
-  await p.locator('#spaceBack').click();await p.locator('[data-open-view=wall]').click();await p.locator('[data-memory-mode=board]').click();await shot('clue-board');
-  await p.locator('[data-memory-mode=notes]').click();await p.locator('#memorySelect').click();await p.locator('#memorySelectAll').click();await p.locator('#memoryFilmAdd').click();await p.locator('#filmFrames img').waitFor();await shot('film-editor');await p.locator('#filmPreview').click();await p.locator('#filmPlay').click();await p.locator('#filmTimeline button').last().click();assert.equal(Number(await p.locator('#filmProjector').getAttribute('data-index')),await p.locator('#filmTimeline button').count()-1);await shot('film-projector');await p.locator('#filmTimeline button').nth(4).click();await p.waitForFunction(()=>document.querySelector('#filmScene img')?.naturalWidth>0);await p.locator('#spacePages').evaluate(e=>e.scrollTop=0);await shot('film-photo');
+  await p.locator('#spaceBack').click();await p.locator('[data-open-view=wall]').click();await memoryControl(p,'[data-memory-mode=board]');await shot('clue-board');
+  await memoryControl(p,'[data-memory-mode=notes]');await memoryControl(p,'#memorySelect');await p.locator('#memorySelectAll').click();await p.locator('#memoryFilmAdd').click();await p.locator('#filmFrames img').waitFor();await shot('film-editor');await p.locator('#filmPreview').click();await p.locator('#filmPlay').click();await p.locator('#filmTimeline button').last().click();assert.equal(Number(await p.locator('#filmProjector').getAttribute('data-index')),await p.locator('#filmTimeline button').count()-1);await shot('film-projector');await p.locator('#filmTimeline button').nth(4).click();await p.waitForFunction(()=>document.querySelector('#filmScene img')?.naturalWidth>0);await p.locator('#spacePages').evaluate(e=>e.scrollTop=0);await shot('film-photo');
  });
  assert.deepEqual(s.errors,[]);await s.context.close();
 }
