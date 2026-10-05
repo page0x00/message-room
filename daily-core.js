@@ -1,4 +1,4 @@
-import {localDate,validDate} from './core.js?v=2.6.2';
+import {localDate,validDate} from './core.js?v=2.7.0';
 export function cents(value){const text=String(value).trim();if(!/^\d{1,8}(\.\d{1,2})?$/.test(text))throw new Error('金额最多保留两位小数。');const [a,b='']=text.split('.');const n=Number(a)*100+Number(b.padEnd(2,'0'));if(!n||n>9999999999)throw new Error('请输入有效金额。');return n;}
 export const money=n=>(Number(n||0)/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
 export function pocketBalance(rows){return rows.filter(r=>r.status==='settled').reduce((n,r)=>n+(r.kind==='deposit'?1:-1)*Number(r.cents),0);}

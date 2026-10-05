@@ -19,7 +19,7 @@ export async function runSpace({setup,check,secureId,user,friend,fixture,root}){
   for(const [device,width,height] of [['phone',390,844],['phone-wide',844,390],['tablet-tall',820,1180],['tablet-wide',1180,820],['pc',1440,900]]){
    await p.setViewportSize({width,height});
    for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){
-    await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.6.2')).setTheme(theme),theme);
+    await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.7.0')).setTheme(theme),theme);
     await p.locator('#relationHandle').click();await p.locator('#relationSpace').waitFor({state:'visible'});
     await p.waitForTimeout(260);
     assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme}: page overflow`);

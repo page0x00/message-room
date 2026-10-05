@@ -6,7 +6,7 @@ export async function runScene({setup,check,secureId,user,friend,fixture,root}){
  for(const [i,title] of ['一起读两页飞鸟集','记得好好吃晚饭','整理今天的照片','晚风里散步','早点休息'].entries())s.control.daily.space_entries.push({id:'scene-todo-'+i,revision:1,room_id:secureId,owner_user_id:user,kind:'todo',title,body:'',visibility:'shared',event_date:'2026-10-03',created_at:'2026-10-02T20:00:00Z',data:{done:i<2,remind:false}});
  await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
  await p.waitForFunction(()=>document.querySelectorAll('#sceneTodoList .scene-todo').length===5);
- const theme=async t=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.6.2')).setTheme(t),t);
+ const theme=async t=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.0')).setTheme(t),t);
  const snapshot=async name=>{await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/scene-'+name+'.png'});};
  await check('all six themes share the reference layout at desktop, short tablet and phone sizes',async()=>{
   assert.equal(await p.locator('#sceneHero').isVisible(),true);

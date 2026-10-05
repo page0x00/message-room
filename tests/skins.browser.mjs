@@ -15,19 +15,18 @@ export async function runSkins({setup,check,secureId,user,friend,fixture,root}){
  s.control.daily.pockets.push({id:'skin-pocket',room_id:secureId,owner_user_id:user,title:'我们的旅行基金',target_cents:100000,daily_cents:1000,mode:'daily',qr_path:path,cover_path:null,note:'一点一点，去看更远的风景。',created_at:'2026-09-01T00:00:00Z'});
  s.control.daily.pocket_entries.push({id:'skin-deposit',pocket_id:'skin-pocket',room_id:secureId,owner_user_id:user,kind:'deposit',cents:35800,status:'settled',reason:'把今天的期待存起来。',created_at:new Date().toISOString()});
  await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.6.2')).setTheme(t),value);
+ const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.0')).setTheme(t),value);
  const shot=async name=>{await p.waitForTimeout(280);await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/skin-'+name+'.png'});};
  await check('each skin loads its photograph and the real handwritten Chinese font',async()=>{
   await p.locator('#relationHandle').click();await p.locator('#listenBtn').click();
-  await p.locator('#listenFile').setInputFiles({name:'晚风的来信.wav',mimeType:'audio/wav',buffer:audioFile()});await p.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);
+  await p.locator('#musicImport').click();await p.locator('#listenFile').setInputFiles({name:'晚风的来信.wav',mimeType:'audio/wav',buffer:audioFile()});await p.waitForFunction(()=>document.querySelector('#musicImportCount').textContent==='1');
   await p.locator('#lyricsFile').setInputFiles({name:'晚风.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]今天的风很轻\n[00:05.00]窗边有一束光\n[00:12.00]还有些话想慢慢讲\n[00:20.00]等你有空再听')});
-  await p.locator('#musicLike').click();await p.waitForFunction(()=>document.querySelectorAll('#trackLikes .music-like-note.is-liked').length===1);
+  await p.waitForFunction(()=>document.querySelector('#musicLyricsStatus').textContent.includes('4 行'));await p.locator('#musicImportSave').click();await p.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await p.locator('#musicLike').click();await p.waitForFunction(()=>document.querySelectorAll('#trackLikes .music-like-note.is-liked').length===1);
   const key=s.control.music.music_tracks[0].track_key;s.control.music.music_likes.push({room_id:secureId,owner_user_id:friend,track_key:key});
   s.control.music.music_tracks[0].artist='一封没有寄出的信';s.control.music.music_tracks[0].genre='轻音乐';
   s.control.music.music_playlists.push({id:'skin-list',room_id:secureId,owner_user_id:user,title:'散步时听',visibility:'shared',track_keys:[key]});
   s.control.musicReport={daily:[{day:'2026-09-16',seconds:22356},{day:'2026-09-20',seconds:5800},{day:'2026-09-24',seconds:14340}],tracks:[{track_key:key,plays:12,seconds:42496,last_played:'2026-09-24T12:00:00Z'}],total_seconds:42496};
   await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await p.waitForFunction(()=>document.querySelectorAll('#trackLikes .music-like-note.is-liked').length===2);
-  await p.locator('#musicImport').evaluate(e=>e.open=false);
   for(const t of themes){await theme(t);await p.evaluate(async()=>{const src=getComputedStyle(document.documentElement).getPropertyValue('--scene').match(/url\(['"]?([^'")]+)/)[1];await new Promise((resolve,reject)=>{const im=new Image();im.onload=resolve;im.onerror=reject;im.src=src;});await document.fonts.load('18px "Mailbox WenKai"','回忆墙');});assert.ok(await p.evaluate(()=>document.fonts.check('18px "Mailbox WenKai"','回忆墙')));await p.locator('#spacePages').evaluate(e=>e.scrollTop=0);await shot('music-'+t);}
   await theme('ins-light');await p.locator('[data-music-page=library]').click();await shot('library');
   await p.locator('[data-music-page=report]').click();await p.locator('#reportDate').fill('2026-09-30');await p.locator('#reportDate').dispatchEvent('change');await p.waitForFunction(()=>document.querySelectorAll('.music-report-tile').length===4);await shot('report');

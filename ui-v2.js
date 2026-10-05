@@ -1,5 +1,5 @@
-import {applyPoetry} from './poetry.js?v=2.6.2';
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.6.2';
+import {applyPoetry} from './poetry.js?v=2.7.0';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.0';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -36,7 +36,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   }
   function page(id='home'){
     const panel=id==='home'?null:$(id);if(id!=='home'&&!panel?.dataset.spacePanel)return false;
-    if(state.spacePanel===id)return false;
+    if(state.spacePanel===id){if(panel&&!$('relationSpace').inert)panel.hidden=false;return false;}
     if(state.spacePanel&&!$('relationSpace').inert)pageOffsets.set(state.spacePanel,$('spacePages').scrollTop);
     panels().forEach(el=>el.hidden=el!==panel);
     $('spaceHome').hidden=!!panel;$('spacePages').hidden=!panel;$('spaceBack').hidden=!panel;
@@ -48,7 +48,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     return true;
   }
   function drawer(open){
-    if(open&&!state.room)return;
+    if(open&&!state.room&&state.spacePanel!=='apiSettingsScrim')return;
     if(open===!$('relationSpace').inert)return;
     const restoreFocus=!open&&$('relationSpace').contains(document.activeElement);
     if(open&&!state.spacePanel)page();
@@ -61,7 +61,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     else{document.dispatchEvent(new Event('mailbox:space-close'));if(restoreFocus&&previousFocus?.isConnected&&!previousFocus.closest('[inert]'))previousFocus.focus({preventScroll:true});previousFocus=null;}
   }
   function openFeature(id){
-    if(!state.room)return;
+    if(!state.room&&id!=='apiSettingsScrim')return;
     document.dispatchEvent(new Event('mailbox:navigation'));
     const wasOpen=!$('relationSpace').inert,changed=page(id);
     drawer(true);

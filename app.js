@@ -1,11 +1,12 @@
-import {initPoetry} from './poetry.js?v=2.6.2';
-import {initAPISettings} from './api-settings.js?v=2.6.2';
-import {noticePanels} from './notice-core.js?v=2.6.2';
-import {initSceneInterface} from './scene-interface.js?v=2.6.2';
-import {initPetSpace} from './pet-space.js?v=2.6.2';
-import {initFilmSpace} from './film-space.js?v=2.6.2';
-import {initMemorySpace} from './memory-space.js?v=2.6.2';
-import {initDailySpace} from './daily-space.js?v=2.6.2';
+import {initPoetry} from './poetry.js?v=2.7.0';
+import {initThemedControls} from './theme-controls.js?v=2.7.0';
+import {initAPISettings} from './api-settings.js?v=2.7.0';
+import {noticePanels} from './notice-core.js?v=2.7.0';
+import {initSceneInterface} from './scene-interface.js?v=2.7.0';
+import {initPetSpace} from './pet-space.js?v=2.7.0';
+import {initFilmSpace} from './film-space.js?v=2.7.0';
+import {initMemorySpace} from './memory-space.js?v=2.7.0';
+import {initDailySpace} from './daily-space.js?v=2.7.0';
 import {
   parseRoom,
   roomLink,
@@ -21,15 +22,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.6.2";
-import * as api from "./backend.js?v=2.6.2";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.6.2";
-import { initNotifications } from "./notifications.js?v=2.6.2";
-import { initFeatures } from "./features.js?v=2.6.2";
+} from "./core.js?v=2.7.0";
+import * as api from "./backend.js?v=2.7.0";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.7.0";
+import { initNotifications } from "./notifications.js?v=2.7.0";
+import { initFeatures } from "./features.js?v=2.7.0";
 
-import {initMessageCards} from "./message-cards.js?v=2.6.2";
-import {initAccount} from "./account.js?v=2.6.2";
-import {initMessageActions} from "./message-actions.js?v=2.6.2";
+import {initMessageCards} from "./message-cards.js?v=2.7.0";
+import {initAccount} from "./account.js?v=2.7.0";
+import {initMessageActions} from "./message-actions.js?v=2.7.0";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -97,10 +98,11 @@ function showSheet(id) {
 }
 
 function closeSheet(id) {
+  if(!$(id)||$(id).hidden)return;
   $(id).hidden = true;
   if($(id)?.dataset.spacePanel)ui.drawer(false);
   document.dispatchEvent(new CustomEvent('mailbox:sheet-close',{detail:{id}}));
-  focusBeforeSheet?.focus();
+  if(focusBeforeSheet?.isConnected&&!focusBeforeSheet.closest('[inert]')&&focusBeforeSheet.getClientRects().length)focusBeforeSheet.focus({preventScroll:true});
   if (id === "noticeScrim" && noticeResolve) {
     noticeResolve(false);
     noticeResolve = null;
@@ -271,6 +273,7 @@ async function openRoom(target) {
   setView("chat");
   document.dispatchEvent(new Event("mailbox:room-open"));
   updateStatus();
+  const enteredAt=state.navigationRevision||0;
   try {
     const uid = await api.authenticate();
     if (epoch !== state.epoch) return;
@@ -342,7 +345,7 @@ async function openRoom(target) {
       );
     rememberRoom();
     void notifications.watch();
-    const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);openNotice(noticePanel);}
+    const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);if(enteredAt===(state.navigationRevision||0))openNotice(noticePanel);}
     render({ bottom: true });
     updateStatus();
   } catch (error) {
@@ -356,7 +359,8 @@ async function openRoom(target) {
       : "";
     $("connectionNote").hidden=false;
     $("connectionNote").textContent = errorText(error) + extra;
-    document.dispatchEvent(new Event('mailbox:show-chat'));
+    if(enteredAt===(state.navigationRevision||0))document.dispatchEvent(new Event('mailbox:show-chat'));
+    else toast('房间连接未完成，可在对话页查看并重试。');
     render();
     updateStatus();
   }
@@ -1068,9 +1072,10 @@ const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,
 const daily=initDailySpace({$,state,node,toast,notice,ui});
 const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
-const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice});
+const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice,ui});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
 initSceneInterface({$,node,state,ui});
+initThemedControls();
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
 notifications.onOpen(openNotice);
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
@@ -1085,11 +1090,12 @@ const account=initAccount({$,state,node,toast,showSheet,closeSheet,
     if(previous!==user?.id)apiSettings.identityChanged(previous);
     state.userId=user?.id||'';
     renderRecent();void notifications.watch();
-    if(target&&user&&previous!==user.id)await openRoom(target);
+    if(target&&user&&previous&&previous!==user.id)await openRoom(target);
   },
   onRooms(rows){const local=recentRooms();if(!storeGet('rooms-imported.'+state.userId,false)){for(const r of storeGet('recent',[]))if(parseRoom(r.room)&&!local.some(x=>x.room===r.room))local.push(r);persist('rooms-imported.'+state.userId,true);}for(const row of rows)if(!local.some(r=>r.room===row.room_id))local.push({room:row.room_id,secure:true,title:'留言室',visited:Date.parse(row.joined_at)});persist('recent',local);renderRecent();}
 });
-await account.ready;
+// Route immediately; authentication and the contact list must not hold navigation.
+void account.ready;
 if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);
   void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" });

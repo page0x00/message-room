@@ -1,13 +1,13 @@
 {
   "name": "little-message-room",
-  "version": "2.6.2",
+  "version": "2.7.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test --test-isolation=none tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:db": "node tests/database.mjs",
-    "check": "node --check message-cards.js && node --check account.js && node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js && node --check screenshot-import.js && node --check ocr-layout.js && node --check import-core.js && node --check screenshot-store.js && node --check message-actions.js && node --check daily-core.js && node --check daily-backend.js && node --check daily-space.js && node --check music-space.js && node --check music-core.js && node --check music-backend.js && node --check memory-core.js && node --check memory-backend.js && node --check memory-space.js && node --check film-space.js && node --check film-audio.js && node --check pet-space.js && node --check notice-core.js && node --check supabase/functions/mailbox-pet/policy.mjs && node --check scene-interface.js && node --check api-settings.js && node --check supabase/functions/_shared/ai-providers.js && node --check supabase/functions/_shared/ai-network.js && node --check supabase/functions/_shared/ai-store.js && node --check supabase/functions/mailbox-api/handler.js && node --check supabase/functions/mailbox-pet/handler.js && node --check local-api.js && node --check direct-pet.js && node --check supabase/functions/_shared/pet-policy.js && node --check poetry.js && node --check memory-viewport.js",
+    "check": "node --check message-cards.js && node --check account.js && node --check app.js && node --check core.js && node --check backend.js && node --check features.js && node --check feature-core.js && node --check feature-backend.js && node --check ocr.js && node --check ui-v2.js && node --check notifications.js && node --check sw.js && node --check local-music.js && node --check screenshot-import.js && node --check ocr-layout.js && node --check import-core.js && node --check screenshot-store.js && node --check message-actions.js && node --check daily-core.js && node --check daily-backend.js && node --check daily-space.js && node --check music-space.js && node --check music-core.js && node --check music-backend.js && node --check memory-core.js && node --check memory-backend.js && node --check memory-space.js && node --check film-space.js && node --check film-audio.js && node --check pet-space.js && node --check notice-core.js && node --check supabase/functions/mailbox-pet/policy.mjs && node --check scene-interface.js && node --check api-settings.js && node --check supabase/functions/_shared/ai-providers.js && node --check supabase/functions/_shared/ai-network.js && node --check supabase/functions/_shared/ai-store.js && node --check supabase/functions/mailbox-api/handler.js && node --check supabase/functions/mailbox-pet/handler.js && node --check local-api.js && node --check direct-pet.js && node --check supabase/functions/_shared/pet-policy.js && node --check poetry.js && node --check memory-viewport.js && node --check theme-controls.js && node --check music-import.js && node --check music-import-core.js && node --check ui-icons.js",
     "build:sql": "node scripts/build-sql.mjs",
     "test:ocr": "node tests/ocr-browser.mjs",
     "test:daily": "DAILY_ONLY=1 node tests/browser.mjs",
@@ -20,7 +20,8 @@
     "test:scene": "SCENE_ONLY=1 node tests/browser.mjs",
     "test:api": "API_ONLY=1 node tests/browser.mjs",
     "test:reference": "REFERENCE_ONLY=1 node tests/browser.mjs",
-    "test:navigation": "NAVIGATION_ONLY=1 node tests/browser.mjs"
+    "test:navigation": "NAVIGATION_ONLY=1 node tests/browser.mjs",
+    "test:workspace": "WORKSPACE_ONLY=1 node tests/browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",

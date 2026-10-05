@@ -15,6 +15,8 @@
 
 本轮工作分支：`update/relationship-space-20261001`，main 保持原状。
 
+2.7.0 的[导入工作台、API 面板与附件栏](docs/UI_WORKSPACES_20261005.md)：音乐改为独立导入页，支持批量音频、试听、封面、歌词与资料编辑；API 使用连接列表和完整配置面板；聊天新增五项附件栏。下拉选择适配六套主题，保存的主题在首屏渲染前恢复，侧栏切换不再等待账号和房间请求。信箱顶部图片及文案已移除。
+
 2.6.2 的[页头与留白调整](docs/UI_DENSITY_20261005.md)：移除侧栏品牌文字和重复页头，搜索与铃铛并入当前页面标题行；首页时钟与圆球横向对齐，卡片向上扩展，并换用本地花体英文。图片气泡隐藏文件信息，缩小内边距，保留原图下载。
 
 2.6.1 的[整页切换与操作修复](docs/NAVIGATION_20261004.md)：按视频中的导航方式切换整个主区域；电脑和平板侧栏可收展，手机保留底部导航。减少重复请求和重绘，保留草稿、编辑表单和回忆缩放。附真实界面操作录像。
@@ -42,7 +44,8 @@ npm run test:browser
 
 | 文件 | 用途 |
 | --- | --- |
-| `index.html`, `styles.css`, `ui-v2.css`, `skins.css`, `reference-ui.css`, `navigation.css`, `assets/` | 页面、六主题、参考排版、整页导航及本地窗景 |
+| `index.html`, `styles.css`, `ui-v2.css`, `skins.css`, `reference-ui.css`, `navigation.css`, `workspace-ui.css`, `assets/` | 页面、六主题、参考排版、整页导航及本地窗景 |
+| `music-import.js`, `music-import-core.js`, `theme-controls.js` | 独立音乐导入、文件标签与歌词检查、主题下拉控件 |
 | `memory-viewport.js`, `poetry.js` | 回忆画布手势、按设备缩放与有出处的轮换诗句 |
 | `app.js`, `core.js`, `backend.js` | 聊天、身份、排序、草稿、Supabase |
 | `ui-v2.js`, `notifications.js`, `sw.js` | 关系空间、联系列表、通知 |
