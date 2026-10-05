@@ -1,10 +1,11 @@
-import {initMusicSpace} from './music-space.js?v=2.6.2';
-import {imageHash} from './screenshot-store.js?v=2.6.2';
-import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.6.2';
-import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.6.2';
-import * as api from './backend.js?v=2.6.2';
-import * as data from './feature-backend.js?v=2.6.2';
-import {initScreenshotImport} from './screenshot-import.js?v=2.6.2';
+import {initMusicSpace} from './music-space.js?v=2.7.0';
+import {uiIcon} from './ui-icons.js?v=2.7.0';
+import {imageHash} from './screenshot-store.js?v=2.7.0';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.7.0';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.7.0';
+import * as api from './backend.js?v=2.7.0';
+import * as data from './feature-backend.js?v=2.7.0';
+import {initScreenshotImport} from './screenshot-import.js?v=2.7.0';
 
 export function initFeatures(ctx){
   const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
@@ -42,8 +43,20 @@ export function initFeatures(ctx){
     if(!open('attachmentScrim'))return;
     $('attachmentStatus').textContent=state.secure?'文件先上传，确认成功后才会生成留言。':'附件需要邀请房间。旧版公开房间继续支持文字留言。';
     mediaControls();
+    return true;
   }
-  $('attachBtn').onclick=attachmentOpen;
+  const tray=node('div','compose-tools');tray.id='composeTools';tray.hidden=true;tray.setAttribute('aria-label','选择发送内容');
+  const choices=node('div','compose-tool-options');tray.append(choices);
+  const collapse=()=>{tray.hidden=true;for(const id of ['attachBtn','composeMore'])$(id).setAttribute('aria-expanded','false');};
+  for(const [id,label,caption,icon,accept] of [['Images','图片','上传照片','image','image/*'],['Video','视频','分享视频','video','video/*'],['Files','文件','上传文档','file',''],['Voice','语音','录制语音','mic',null],['Music','一起听','导入歌曲与歌词','music',null]]){
+    const b=node('button','compose-choice'+(id==='Music'?' compose-music':''));b.type='button';b.id='compose'+id;b.innerHTML=uiIcon(icon)+`<span><b>${label}</b><small>${caption}</small></span>`;
+    b.onclick=()=>{collapse();if(id==='Music'){document.dispatchEvent(new Event('mailbox:music-import'));return;}if(!attachmentOpen())return;if(id==='Voice'){$('recordStart').click();return;}$('attachmentFile').accept=accept;$('attachmentFile').click();};choices.append(b);
+  }
+  const extra=node('div','compose-tool-extra');for(const [label,target] of [['补录日期','dateBtn'],['截图摘录','importBtn']]){const b=node('button','text-btn',label);b.type='button';b.id=target==='dateBtn'?'composeDate':'composeImport';b.onclick=()=>{collapse();$(target).click();};extra.append(b);}tray.append(extra);$('composer').before(tray);
+  for(const id of ['attachBtn','composeMore']){$(id).setAttribute('aria-controls',tray.id);$(id).setAttribute('aria-expanded','false');$(id).onclick=()=>{tray.hidden=!tray.hidden;for(const target of ['attachBtn','composeMore'])$(target).setAttribute('aria-expanded',String(!tray.hidden));};}
+  document.addEventListener('mailbox:navigation',collapse);document.addEventListener('mailbox:room-open',collapse);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!tray.hidden){collapse();e.preventDefault();}});
+  $('attachmentFile').hidden=true;
+  const choose=node('button','btn ghost', '选择文件');choose.type='button';choose.id='attachmentChoose';choose.onclick=()=>$('attachmentFile').click();const oldLabel=$('attachmentFile').parentElement;oldLabel.before(choose);oldLabel.replaceWith($('attachmentFile'));
   async function chooseAttachment(selected){
     if(mediaBusy||!selected)return;const s=snap();
     try{

@@ -1,11 +1,11 @@
-import {screenshotCards,cardPreview} from './message-cards.js?v=2.6.2';
-import {localDate,validDate,randomId,storeGet,errorText} from './core.js?v=2.6.2';
-import {fileInfo,bytesLabel} from './feature-core.js?v=2.6.2';
-import {screenshotTime,sortScreenshots,splitText} from './ocr-layout.js?v=2.6.2';
-import {imageFile,directoryFiles,selectedDrafts,importUnits} from './import-core.js?v=2.6.2';
-import {screenshotRecord,imageHash} from './screenshot-store.js?v=2.6.2';
-import {recognizeScreenshot} from './ocr.js?v=2.6.2';
-import * as api from './backend.js?v=2.6.2';
+import {screenshotCards,cardPreview} from './message-cards.js?v=2.7.0';
+import {localDate,validDate,randomId,storeGet,errorText} from './core.js?v=2.7.0';
+import {fileInfo,bytesLabel} from './feature-core.js?v=2.7.0';
+import {screenshotTime,sortScreenshots,splitText} from './ocr-layout.js?v=2.7.0';
+import {imageFile,directoryFiles,selectedDrafts,importUnits} from './import-core.js?v=2.7.0';
+import {screenshotRecord,imageHash} from './screenshot-store.js?v=2.7.0';
+import {recognizeScreenshot} from './ocr.js?v=2.7.0';
+import * as api from './backend.js?v=2.7.0';
 
 export function initScreenshotImport({$,state,node,toast,showSheet,closeSheet,notice,onMessages}){
   let queue=[],drafts=[],plan=null,files=new Map(),supplements=new Map(),controller=null,upload=null,busy=false,collecting=false,revision=0,loadedScope='',page=0,queuePage=0,saveTimer,previewUrl='';

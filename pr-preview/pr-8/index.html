@@ -6,28 +6,33 @@
 <meta content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <meta content="no-referrer" name="referrer"/>
-<meta content="2.6.2" name="application-version"/>
+<meta content="2.7.0" name="application-version"/>
 <title>小小留言室</title>
+<script>
+// Restore the saved appearance before styles or application modules can paint.
+(()=>{try{const colors={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522','rain-night':'#101e2b','moon-glass':'#111a2c'};let value=JSON.parse(localStorage.getItem('mailbox.theme')||'null');if(!Object.hasOwn(colors,value))value=localStorage.getItem('theme.v2')||value;value=({clean:'ins-light',warm:'warm-light'})[value]||value;if(colors[value]){document.documentElement.dataset.theme=value;document.querySelector('meta[name=theme-color]').content=colors[value];}}catch{}})();
+</script>
 <link rel="preload" href="./assets/fonts/allura.woff" as="font" type="font/woff" crossorigin/>
 
 
 <script src="./vendor/supabase.js?v=2.57.4"></script>
-<link href="./styles.css?v=2.6.2" rel="stylesheet"/><link href="./features.css?v=2.6.2" rel="stylesheet"/><link href="./ui-v2.css?v=2.6.2" rel="stylesheet"/>
-<link href="./daily-space.css?v=2.6.2" rel="stylesheet"/><link href="./space.css?v=2.6.2" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.6.2"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/><link rel="stylesheet" href="music-space.css?v=2.6.2"/>
-<link rel="stylesheet" href="memory-space.css?v=2.6.2"/>
-<link rel="stylesheet" href="film-space.css?v=2.6.2"/>
-<link rel="stylesheet" href="pet-space.css?v=2.6.2"/>
-<link rel="stylesheet" href="skins.css?v=2.6.2"/>
-<link rel="stylesheet" href="scene-layout.css?v=2.6.2"/>
-<link rel="stylesheet" href="api-settings.css?v=2.6.2"/>
-<link rel="stylesheet" href="reference-ui.css?v=2.6.2"/>
-<link rel="stylesheet" href="navigation.css?v=2.6.2"/>
+<link href="./styles.css?v=2.7.0" rel="stylesheet"/><link href="./features.css?v=2.7.0" rel="stylesheet"/><link href="./ui-v2.css?v=2.7.0" rel="stylesheet"/>
+<link href="./daily-space.css?v=2.7.0" rel="stylesheet"/><link href="./space.css?v=2.7.0" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.7.0"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/><link rel="stylesheet" href="music-space.css?v=2.7.0"/>
+<link rel="stylesheet" href="memory-space.css?v=2.7.0"/>
+<link rel="stylesheet" href="film-space.css?v=2.7.0"/>
+<link rel="stylesheet" href="pet-space.css?v=2.7.0"/>
+<link rel="stylesheet" href="skins.css?v=2.7.0"/>
+<link rel="stylesheet" href="scene-layout.css?v=2.7.0"/>
+<link rel="stylesheet" href="api-settings.css?v=2.7.0"/>
+<link rel="stylesheet" href="reference-ui.css?v=2.7.0"/>
+<link rel="stylesheet" href="navigation.css?v=2.7.0"/>
+<link rel="stylesheet" href="workspace-ui.css?v=2.7.0"/>
 </head>
 <body>
 <div class="app-shell">
 <section aria-labelledby="homeTitle" class="screen home active" id="home">
 <header class="home-head"><div><h1 id="homeTitle">信箱</h1></div></header>
-<main class="home-main"><div class="home-art"><p class="handwriting" data-poem="3"></p><p id="dailyCopy" lang="en" data-poem="3" data-poem-part="en"></p></div>
+<main class="home-main">
 <div class="home-tools"><div aria-label="房间筛选" class="room-filters"><button class="active" data-room-filter="all">全部</button><button data-room-filter="pinned">置顶</button><button data-room-filter="unread">未读 <span hidden="" id="totalUnread"></span></button></div><button aria-label="创建或加入" class="round-btn add-room" id="addRoomBtn">＋</button></div>
 <label class="room-search"><span aria-hidden="true">⌕</span><input aria-label="搜索房间和邮箱" id="roomSearch" placeholder="找一封信、一个人" type="search"/></label>
 <section class="recent" id="recentSection"><div class="section-title"><span>最近联系</span><button id="clearRecent" type="button">整理</button></div><div class="room-list" id="roomList"></div><p class="home-empty" id="recentEmpty">还没有留下的房间。<br/>点右上角的 ＋，从第一封信开始。</p></section><div class="contact-list" id="contactList"></div><p class="home-footnote">一些人，一些话，<br/>在这里慢慢沉淀。</p></main>
@@ -223,11 +228,11 @@
 
 <div class="scrim" hidden="" id="addRoomScrim"><section aria-labelledby="addRoomTitle" aria-modal="true" class="sheet feature-sheet" role="dialog"><header class="sheet-head"><h2 id="addRoomTitle">留一个联系的地方</h2><button aria-label="关闭" data-close="addRoomScrim">×</button></header><div class="home-actions"><button class="btn primary" id="createBtn" type="button">创建房间</button><button class="btn ghost" id="joinToggle" type="button">加入已有房间</button></div><form class="join-box" hidden="" id="joinForm"><input aria-label="房间链接或房间号" autocomplete="off" id="roomInput" placeholder="粘贴完整邀请链接或房间号"/><button class="btn primary" type="submit">进入</button></form><details class="save-contact"><summary>收藏链接 / 邮箱</summary><form id="contactForm"><label class="field"><span>备注名称</span><input id="contactName" maxlength="40" placeholder="这是谁的联系方式" required=""/></label><label class="field"><span>网址或邮箱</span><input id="contactAddress" maxlength="2000" placeholder="https://… 或 name@example.com" required=""/></label><button class="btn ghost wide">保存在联系列表</button></form><p class="sheet-note">收藏保存在当前浏览器。邮箱会打开你的邮件应用。</p></details></section></div>
 <div class="scrim" hidden="" id="composeScrim"><section aria-label="发送选项" aria-modal="true" class="sheet menu-sheet" role="dialog"><button id="dateBtn" type="button">补录显示日期</button><button id="importBtn" type="button">从聊天截图导入</button><button id="recordMenuBtn" type="button">语音 / 图片 / 视频 / 文件</button><button data-close="composeScrim" type="button">收起</button></section></div>
-<div class="scrim" hidden="" id="settingsScrim"><section aria-labelledby="settingsTitle" aria-modal="true" class="sheet feature-sheet" role="dialog"><header class="sheet-head"><h2 id="settingsTitle">让这里像你喜欢的样子</h2><button aria-label="关闭" data-close="settingsScrim">×</button></header><p class="section-label">六种色调，同一处日常</p><div class="theme-pills"><button data-theme-pick="ins-light"><span></span><b>Ins Light</b><small>轻白 · 灰绿 · 日光</small></button><button data-theme-pick="ins-dark"><span></span><b>Ins Dark</b><small>炭灰 · 灰绿 · 夜色</small></button><button data-theme-pick="warm-light"><span></span><b>Warm Light</b><small>奶油 · 浅杏 · 信纸</small></button><button data-theme-pick="warm-dark"><span></span><b>Warm Dark</b><small>可可 · 焦糖 · 夜灯</small></button><button data-theme-pick="rain-night" type="button"><span></span><b>雨窗夜话</b><small>雨蓝 · 旧纸 · 暖灯</small></button><button data-theme-pick="moon-glass" type="button"><span></span><b>月色玻璃</b><small>月白 · 深蓝 · 透明层次</small></button></div><p class="section-label">新留言</p><label class="check-field"><input checked="" id="inAppNotify" type="checkbox"/>网页内提示与未读角标</label><label class="check-field"><input id="soundNotify" type="checkbox"/>播放一声轻提示音</label><button class="btn ghost wide" id="notifyBtn" type="button">开启浏览器系统通知</button><button class="btn primary wide" id="pushBtn" type="button">开启当前房间离线推送</button><button class="text-btn" hidden="" id="pushOffBtn" type="button">关闭当前房间离线推送</button><p class="sheet-note" id="notificationStatus" role="status">系统通知仅显示“你有一条新留言”，不显示正文。</p><p class="version-label">小小留言室 · 2.6.2</p></section></div>
+<div class="scrim" hidden="" id="settingsScrim"><section aria-labelledby="settingsTitle" aria-modal="true" class="sheet feature-sheet" role="dialog"><header class="sheet-head"><h2 id="settingsTitle">让这里像你喜欢的样子</h2><button aria-label="关闭" data-close="settingsScrim">×</button></header><p class="section-label">六种色调，同一处日常</p><div class="theme-pills"><button data-theme-pick="ins-light"><span></span><b>Ins Light</b><small>轻白 · 灰绿 · 日光</small></button><button data-theme-pick="ins-dark"><span></span><b>Ins Dark</b><small>炭灰 · 灰绿 · 夜色</small></button><button data-theme-pick="warm-light"><span></span><b>Warm Light</b><small>奶油 · 浅杏 · 信纸</small></button><button data-theme-pick="warm-dark"><span></span><b>Warm Dark</b><small>可可 · 焦糖 · 夜灯</small></button><button data-theme-pick="rain-night" type="button"><span></span><b>雨窗夜话</b><small>雨蓝 · 旧纸 · 暖灯</small></button><button data-theme-pick="moon-glass" type="button"><span></span><b>月色玻璃</b><small>月白 · 深蓝 · 透明层次</small></button></div><p class="section-label">新留言</p><label class="check-field"><input checked="" id="inAppNotify" type="checkbox"/>网页内提示与未读角标</label><label class="check-field"><input id="soundNotify" type="checkbox"/>播放一声轻提示音</label><button class="btn ghost wide" id="notifyBtn" type="button">开启浏览器系统通知</button><button class="btn primary wide" id="pushBtn" type="button">开启当前房间离线推送</button><button class="text-btn" hidden="" id="pushOffBtn" type="button">关闭当前房间离线推送</button><p class="sheet-note" id="notificationStatus" role="status">系统通知仅显示“你有一条新留言”，不显示正文。</p><p class="version-label">小小留言室 · 2.7.0</p></section></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="scrim" id="collectionScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="collectionTitle"><header class="sheet-head"><h2 id="collectionTitle">我的收藏</h2><button data-close="collectionScrim" aria-label="关闭" type="button">×</button></header><p class="sheet-note">仅保存在这台设备和当前身份下。</p><div id="collectionRows"></div></section></div>
 <div class="scrim" id="forwardScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="forwardTitle"><header class="sheet-head"><h2 id="forwardTitle">转发留言</h2><button data-close="forwardScrim" aria-label="关闭" type="button">×</button></header><label class="field"><span>发送到</span><select id="forwardTarget"></select></label><p class="sheet-note" id="forwardNote" role="status"></p><div id="forwardPreview" class="forward-preview"></div><button class="btn primary wide" id="forwardSend" type="button">确认转发</button></section></div>
 <noscript>留言室需要浏览器启用 JavaScript。</noscript>
-<script src="./app.js?v=2.6.2" type="module"></script>
+<script src="./app.js?v=2.7.0" type="module"></script>
 </body>
 </html>
