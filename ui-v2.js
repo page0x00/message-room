@@ -1,4 +1,5 @@
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.5.1';
+import {applyPoetry} from './poetry.js?v=2.7.1';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.1';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -6,8 +7,7 @@ export function setTheme(value){
   document.documentElement.dataset.theme=theme;storeSet('theme',theme);
   document.querySelector('meta[name=theme-color]').content={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522','rain-night':'#101e2b','moon-glass':'#111a2c'}[theme];
   document.querySelectorAll('[data-theme-pick]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themePick===theme)));
-  const quote=document.querySelector('.home-art .handwriting');if(quote)quote.textContent=['rain-night','moon-glass'].includes(theme)?'群星不怕显得\n像萤火那样。':'生如夏花，\n死如秋叶。';
-  if(quote)quote.title=['rain-night','moon-glass'].includes(theme)?'泰戈尔《飞鸟集》第 48 则 · 据英文自译':'泰戈尔《飞鸟集》第 82 则 · 据英文自译';
+
 }
 export function contactTarget(value){
   value=String(value||'').trim();
@@ -16,7 +16,9 @@ export function contactTarget(value){
 }
 export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home}){
   let previousFocus, start;
-  const compact=()=>matchMedia('(max-width:699px), (max-height:500px)').matches;
+  const pageOffsets=new Map();
+  const scrollPane=id=>$(id==='home'?'spaceHome':'spacePages');
+  document.addEventListener('mailbox:room-open',()=>pageOffsets.clear());
   const panels=()=>[...$('spacePages').querySelectorAll(':scope > [data-space-panel]')];
   function registerPanel(id,title){
     const panel=$(id);panel.classList.remove('scrim');panel.classList.add('space-page');panel.dataset.spacePanel=title;panel.hidden=true;
@@ -27,42 +29,60 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   for(const [id,title] of [['relationshipScrim','纪念日'],['listenScrim','一起听'],['memoirScrim','私人回忆录']])registerPanel(id,title);
   $('diaryTools').append($('viewHeading'),$('diaryFilters'));
   $('viewHeading').hidden=false;$('diaryFilters').hidden=false;$('returnChat').hidden=true;
+  function syncFocus(){
+    const focused=!$('relationSpace').inert;
+    $('room').classList.toggle('feature-focus',focused);
+    for(const selector of ['.scene-hero','.scene-dock','.scene-shortcuts','.scene-dream']){const el=document.querySelector(selector);if(el)el.inert=focused;}
+    if($('chatColumn'))$('chatColumn').inert=focused||state.sceneView!=='chat';
+  }
   function page(id='home'){
-    const panel=id==='home'?null:$(id);if(id!=='home'&&!panel?.dataset.spacePanel)return;
+    const panel=id==='home'?null:$(id);if(id!=='home'&&!panel?.dataset.spacePanel)return false;
+    if(state.spacePanel===id){if(panel&&!$('relationSpace').inert)panel.hidden=false;return false;}
+    if(state.spacePanel&&!$('relationSpace').inert)pageOffsets.set(state.spacePanel,scrollPane(state.spacePanel).scrollTop);
     panels().forEach(el=>el.hidden=el!==panel);
-    if(id!=='diarySpace')$('diaryEntries').replaceChildren();if(id!=='wallSpace')$('wallEntries').replaceChildren();
     $('spaceHome').hidden=!!panel;$('spacePages').hidden=!panel;$('spaceBack').hidden=!panel;
     $('spaceTitle').textContent=panel?.dataset.spacePanel||'我们的空间';
     state.spaceView=id==='diarySpace'?'diary':id==='wallSpace'?'wall':null;
-    state.spacePanel=id;
-    $('spacePages').scrollTop=0;
-    document.dispatchEvent(new CustomEvent('mailbox:space-page',{detail:{panel:id}}));
+    const previous=state.spacePanel;state.spacePanel=id;syncFocus();
+    document.dispatchEvent(new CustomEvent('mailbox:space-page',{detail:{panel:id,previous}}));
+    scrollPane(id).scrollTop=pageOffsets.get(id)||0;
+    return true;
   }
   function drawer(open){
-    if(open&&!state.room)return;
+    if(open&&!state.room&&state.spacePanel!=='apiSettingsScrim')return;
+    if(open===!$('relationSpace').inert)return;
+    const restoreFocus=!open&&$('relationSpace').contains(document.activeElement);
+    if(open&&!state.spacePanel)page();
+    if(!open&&state.spacePanel)pageOffsets.set(state.spacePanel,scrollPane(state.spacePanel).scrollTop);
+    panels().forEach(el=>el.hidden=!open||el.id!==state.spacePanel);
     $('room').classList.toggle('space-open',open);$('relationSpace').classList.toggle('open',open);$('relationSpace').inert=!open;
-    $('relationSpace').setAttribute('aria-hidden',String(!open));$('relationHandle').setAttribute('aria-expanded',String(open));$('relationBackdrop').hidden=!open||!compact();
-    if(open){if(!previousFocus)previousFocus=document.activeElement;$('relationClose').focus();document.dispatchEvent(new Event('mailbox:space-open'));}
-    else{page();document.dispatchEvent(new Event('mailbox:space-close'));if(previousFocus?.isConnected)previousFocus.focus();previousFocus=null;}
+    state.spaceView=open?(state.spacePanel==='diarySpace'?'diary':state.spacePanel==='wallSpace'?'wall':null):null;
+    syncFocus();$('relationSpace').setAttribute('aria-hidden',String(!open));$('relationHandle').setAttribute('aria-expanded',String(open));$('relationBackdrop').hidden=true;
+    if(open){previousFocus=document.activeElement;document.dispatchEvent(new Event('mailbox:space-open'));scrollPane(state.spacePanel).scrollTop=pageOffsets.get(state.spacePanel)||0;}
+    else{document.dispatchEvent(new Event('mailbox:space-close'));if(restoreFocus&&previousFocus?.isConnected&&!previousFocus.closest('[inert]'))previousFocus.focus({preventScroll:true});previousFocus=null;}
   }
-  function openFeature(id){page(id);drawer(true);}
+  function openFeature(id){
+    if(!state.room&&id!=='apiSettingsScrim')return;
+    document.dispatchEvent(new Event('mailbox:navigation'));
+    const wasOpen=!$('relationSpace').inert,changed=page(id);
+    drawer(true);
+    if(wasOpen&&changed)document.dispatchEvent(new Event('mailbox:space-open'));
+  }
   $('spaceBack').onclick=()=>page();
-  matchMedia('(min-width:700px) and (min-height:501px)').addEventListener('change',()=>{$('relationBackdrop').hidden=$('relationSpace').inert||!compact();});
-  function settings(){drawer(false);closeSheet('menuScrim');showSheet('settingsScrim');document.dispatchEvent(new Event('mailbox:settings-open'));}
-  for(const id of ['themeBtn','themeMenuBtn','homeSettings','spaceSettings','notifyMenuBtn'])$(id).onclick=settings;
+  function settings(){if(!$('menuScrim').hidden)closeSheet('menuScrim');showSheet('settingsScrim');document.dispatchEvent(new Event('mailbox:settings-open'));}
+  for(const id of ['themeMenuBtn','homeSettings','spaceSettings','notifyMenuBtn'])$(id).onclick=settings;
   document.querySelectorAll('[data-theme-pick]').forEach(button=>button.onclick=()=>setTheme(button.dataset.themePick));
-  $('relationHandle').onclick=()=>drawer(true);$('relationClose').onclick=()=>drawer(false);$('relationBackdrop').onclick=()=>drawer(false);
+  $('relationHandle').onclick=()=>{page();drawer(true);};$('relationClose').onclick=()=>drawer(false);$('relationBackdrop').onclick=()=>drawer(false);
   document.querySelectorAll('[data-open-view]').forEach(button=>button.onclick=()=>setView(button.dataset.openView));
   $('returnChat').onclick=()=>setView('chat');$('writeFromView').onclick=()=>{drawer(false);document.dispatchEvent(new Event('mailbox:show-chat'));$('messageInput').focus();};
   $('backBtn').onclick=()=>state.view==='chat'?home():setView('chat');
   const pane=$('messages');
-  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.selecting||state.view!=='chat'||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
+  pane.addEventListener('touchstart',event=>{start=null;if(event.touches.length!==1||state.selecting||state.view!=='chat'||state.sceneView!=='chat'||!$('relationSpace').inert||document.querySelector('.scrim:not([hidden])')||event.target.closest('button,input,textarea,audio,video,a'))return;start={x:event.touches[0].clientX,y:event.touches[0].clientY,t:Date.now()};},{passive:true});
   pane.addEventListener('touchcancel',()=>start=null,{passive:true});
-  pane.addEventListener('touchend',event=>{const from=start;start=null;const end=event.changedTouches[0];if(!from||!end||state.selecting||window.getSelection()?.isCollapsed===false)return;if(end.clientX-from.x<-85&&Math.abs(end.clientY-from.y)<35&&Date.now()-from.t<600)drawer(true);},{passive:true});
+  pane.addEventListener('touchend',event=>{const from=start;start=null;const end=event.changedTouches[0];if(!from||!end||state.selecting||window.getSelection()?.isCollapsed===false)return;if(end.clientX-from.x<-85&&Math.abs(end.clientY-from.y)<35&&Date.now()-from.t<600){page();drawer(true);}},{passive:true});
   document.addEventListener('keydown',event=>{
-    if($('relationSpace').inert)return;
-    if(event.key==='Escape'){if(document.querySelector('.scrim:not([hidden])'))return;if(state.spacePanel&&state.spacePanel!=='home')page();else drawer(false);return;}
-    if(event.key==='Tab'&&compact()){const controls=[...$('relationSpace').querySelectorAll('button,input,textarea,select,a[href]')].filter(b=>!b.disabled&&b.getClientRects().length);if(event.shiftKey&&document.activeElement===controls[0]){event.preventDefault();controls.at(-1).focus();}else if(!event.shiftKey&&document.activeElement===controls.at(-1)){event.preventDefault();controls[0].focus();}}
+    if(event.defaultPrevented||$('relationSpace').inert)return;
+    if(event.key==='Escape'){if(document.querySelector('.scrim:not([hidden])'))return;event.preventDefault();event.stopImmediatePropagation();if(state.spacePanel&&state.spacePanel!=='home')page();else drawer(false);return;}
   });
   $('addRoomBtn').onclick=()=>showSheet('addRoomScrim');$('composeMore').onclick=()=>showSheet('composeScrim');
   $('recordMenuBtn').onclick=()=>{closeSheet('composeScrim');$('attachBtn').click();};
@@ -85,7 +105,6 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   let previous;try{previous=localStorage.getItem('theme.v2');}catch{}
   const savedTheme=storeGet('theme',null);
   setTheme(THEMES.includes(savedTheme)?savedTheme:previous||savedTheme||'ins-light');
-  const copies=['今天也辛苦了。\n把想说的话，慢慢留在这里。','把普通的一天，\n留成可以重读的一页。','有些瞬间很轻，\n但我们会记得。','等你有空，\n再拆开这封信。','天色慢下来，\n我们也可以。','今天的风，\n也想分给你一点。','见字如面。\n有空再接着聊。','一首歌的时间，\n刚好留给想念。','不用写成故事，\n小事也值得记录。','晚一点抵达，\n也没有关系。'];
-  const day=localDate();$('dailyCopy').textContent=copies[Math.floor(Date.parse(day+'T00:00:00Z')/86400000)%copies.length];contacts();
+  applyPoetry();contacts();
   return {drawer,settings,openFeature,page,registerPanel};
 }

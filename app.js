@@ -1,10 +1,13 @@
-import {initAPISettings} from './api-settings.js?v=2.5.1';
-import {noticePanels} from './notice-core.js?v=2.5.1';
-import {initSceneInterface} from './scene-interface.js?v=2.5.1';
-import {initPetSpace} from './pet-space.js?v=2.5.1';
-import {initFilmSpace} from './film-space.js?v=2.5.1';
-import {initMemorySpace} from './memory-space.js?v=2.5.1';
-import {initDailySpace} from './daily-space.js?v=2.5.1';
+import {initPoetry} from './poetry.js?v=2.7.1';
+import {initThemedControls} from './theme-controls.js?v=2.7.1';
+import {initViewportLayout} from './viewport-layout.js?v=2.7.1';
+import {initAPISettings} from './api-settings.js?v=2.7.1';
+import {noticePanels} from './notice-core.js?v=2.7.1';
+import {initSceneInterface} from './scene-interface.js?v=2.7.1';
+import {initPetSpace} from './pet-space.js?v=2.7.1';
+import {initFilmSpace} from './film-space.js?v=2.7.1';
+import {initMemorySpace} from './memory-space.js?v=2.7.1';
+import {initDailySpace} from './daily-space.js?v=2.7.1';
 import {
   parseRoom,
   roomLink,
@@ -20,15 +23,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.5.1";
-import * as api from "./backend.js?v=2.5.1";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.5.1";
-import { initNotifications } from "./notifications.js?v=2.5.1";
-import { initFeatures } from "./features.js?v=2.5.1";
+} from "./core.js?v=2.7.1";
+import * as api from "./backend.js?v=2.7.1";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.7.1";
+import { initNotifications } from "./notifications.js?v=2.7.1";
+import { initFeatures } from "./features.js?v=2.7.1";
 
-import {initMessageCards} from "./message-cards.js?v=2.5.1";
-import {initAccount} from "./account.js?v=2.5.1";
-import {initMessageActions} from "./message-actions.js?v=2.5.1";
+import {initMessageCards} from "./message-cards.js?v=2.7.1";
+import {initAccount} from "./account.js?v=2.7.1";
+import {initMessageActions} from "./message-actions.js?v=2.7.1";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -91,14 +94,16 @@ function showSheet(id) {
   if($(id)?.dataset.spacePanel){ui.openFeature(id);return;}
   focusBeforeSheet = document.activeElement;
   $(id).hidden = false;
+  document.dispatchEvent(new CustomEvent('mailbox:sheet-open',{detail:{id}}));
   $(id).querySelector("input:not([type=file]):not([hidden]),button")?.focus();
 }
 
 function closeSheet(id) {
+  if(!$(id)||$(id).hidden)return;
   $(id).hidden = true;
   if($(id)?.dataset.spacePanel)ui.drawer(false);
   document.dispatchEvent(new CustomEvent('mailbox:sheet-close',{detail:{id}}));
-  focusBeforeSheet?.focus();
+  if(focusBeforeSheet?.isConnected&&!focusBeforeSheet.closest('[inert]')&&focusBeforeSheet.getClientRects().length)focusBeforeSheet.focus({preventScroll:true});
   if (id === "noticeScrim" && noticeResolve) {
     noticeResolve(false);
     noticeResolve = null;
@@ -217,7 +222,7 @@ function updateStatus() {
   $("dateBtn").title = state.date ? `显示日期：${state.date}` : "设置显示日期";
 }
 
-async function openRoom(target) {
+async function openRoom(target, {landing='chat'}={}) {
   const valid = parseRoom(target.room);
   if (!valid) {
     toast("房间号格式不正确。");
@@ -267,8 +272,9 @@ async function openRoom(target) {
     : "旧版兼容模式：保留原有公开权限，请勿存放私密内容。";
   render();
   setView("chat");
-  document.dispatchEvent(new Event("mailbox:room-open"));
+  document.dispatchEvent(new CustomEvent("mailbox:room-open", {detail:{landing}}));
   updateStatus();
+  const enteredAt=state.navigationRevision||0;
   try {
     const uid = await api.authenticate();
     if (epoch !== state.epoch) return;
@@ -340,7 +346,7 @@ async function openRoom(target) {
       );
     rememberRoom();
     void notifications.watch();
-    const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);openNotice(noticePanel);}
+    const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);if(enteredAt===(state.navigationRevision||0))openNotice(noticePanel);}
     render({ bottom: true });
     updateStatus();
   } catch (error) {
@@ -354,7 +360,8 @@ async function openRoom(target) {
       : "";
     $("connectionNote").hidden=false;
     $("connectionNote").textContent = errorText(error) + extra;
-    document.dispatchEvent(new Event('mailbox:show-chat'));
+    if(enteredAt===(state.navigationRevision||0))document.dispatchEvent(new Event('mailbox:show-chat'));
+    else toast('房间连接未完成，可在对话页查看并重试。');
     render();
     updateStatus();
   }
@@ -530,7 +537,7 @@ function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
     if(view==='chat')row.dataset.messageId=message.id;else row.dataset.sourceMessageId=message.id;
     const wrap = node("div", "bubble-wrap");
     wrap.append(node("span", "sender-name", who.name));
-    const bubble = node("div", "bubble");
+    const bubble = node("div", "bubble"+(message.message_type==='image'&&message.media_path?' has-image':''));
     for (const id of message.reply_to) {
       const reference = byId.get(id);
       const referenceButton=
@@ -543,7 +550,7 @@ function renderProjection(box,view,{ bottom = false, stick = false } = {}) {
         );
       referenceButton.type='button';referenceButton.dataset.referenceId=id;bubble.append(referenceButton);
     }
-    if(!cards.render(message,bubble)){features.renderMedia(message,bubble,view);bubble.append(node("div","message-text",message.content));}
+    if(!cards.render(message,bubble)){features.renderMedia(message,bubble,view);if(message.content)bubble.append(node("div","message-text",message.content));}
     wrap.append(bubble);
     const meta = node("div", "meta");
     const stamp = new Date(message.created_at);
@@ -588,7 +595,9 @@ function setView(view) {
   state.view='chat';$('room').dataset.view='chat';$('composer').hidden=false;
   if(view==='diary'||view==='wall')ui.openFeature(view+'Space');
   else {ui.drawer(false);document.dispatchEvent(new Event('mailbox:show-chat'));}
-  render();
+  if(view==='diary')renderProjection($('diaryEntries'),'diary');
+  else if(view==='wall')memories.render();
+  else renderProjection($('messages'),'chat');
 }
 
 function renderQuotes() {
@@ -1064,9 +1073,11 @@ const features = initFeatures({ $,state,node,toast,persist,showSheet,closeSheet,
 const daily=initDailySpace({$,state,node,toast,notice,ui});
 const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>actions?.hidden(id)});
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
-const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice});
+const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice,ui});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
 initSceneInterface({$,node,state,ui});
+initViewportLayout();
+initThemedControls();
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
 notifications.onOpen(openNotice);
 actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,notice,author,render,setView,saveDraft,dateEditor,recentRooms,onMessages(rows){state.messages=mergeMessages(state.messages,rows);render({stick:true});updateStatus();}});
@@ -1075,17 +1086,21 @@ void notifications.watch();
 const initial = parseRoom(location.href);
 const account=initAccount({$,state,node,toast,showSheet,closeSheet,
   async onIdentity(user,previous){
+    document.dispatchEvent(new CustomEvent('mailbox:account-identity',{detail:{authenticated:!!user}}));
     const target=state.room?{room:state.room,invite:state.invite}:null;
     if(previous && previous!==user?.id){home();state.messages=[];state.members=[];state.profile={};}
     if(previous!==user?.id)apiSettings.identityChanged(previous);
     state.userId=user?.id||'';
     renderRecent();void notifications.watch();
-    if(target&&user&&previous!==user.id)await openRoom(target);
+    if(target&&user&&previous&&previous!==user.id)await openRoom(target);
   },
   onRooms(rows){const local=recentRooms();if(!storeGet('rooms-imported.'+state.userId,false)){for(const r of storeGet('recent',[]))if(parseRoom(r.room)&&!local.some(x=>x.room===r.room))local.push(r);persist('rooms-imported.'+state.userId,true);}for(const row of rows)if(!local.some(r=>r.room===row.room_id))local.push({room:row.room_id,secure:true,title:'留言室',visited:Date.parse(row.joined_at)});persist('recent',local);renderRecent();}
 });
-await account.ready;
+// Route immediately; authentication and the contact list must not hold navigation.
+void account.ready;
 if (initial) {
   const saved = recentRooms().find((r) => r.room === initial.room);
-  void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" });
+  void openRoom({ ...initial, invite: initial.invite || saved?.invite || "" }, {landing:'home'});
 }
+
+initPoetry();

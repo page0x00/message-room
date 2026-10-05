@@ -1,0 +1,160 @@
+/* One header per page; all six themes share the same geometry. */
+@font-face{font-family:Allura;src:url('./assets/fonts/allura.woff') format('woff');font-style:normal;font-weight:400;font-display:swap}
+.scene-shell[data-route-kind=home]{grid-template-rows:44px minmax(0,1fr);padding-top:clamp(14px,2vh,24px);padding-bottom:18px;row-gap:14px}
+.scene-shell .scene-masthead{display:flex;align-items:center;justify-content:flex-end;gap:18px;min-height:44px}
+.scene-hero-copy #sceneGreeting{font-family:Allura,'Snell Roundhand','Segoe Script',cursive;letter-spacing:0;line-height:1.5}
+.scene-shell .scene-header-tools{display:flex;align-items:center;gap:10px;min-width:0;padding:0;flex:0 1 440px;width:48%;color:var(--scene-ink);margin-left:auto}
+.scene-masthead .scene-header-tools{width:min(55%,510px);flex-basis:510px}
+.scene-header-tools button{color:inherit;border:0;background:none;cursor:pointer}
+.scene-header-tools svg{width:24px;height:24px;display:block;flex:none}
+.scene-header-tools .scene-search-wrap{flex:1;min-width:0;padding:0}
+.scene-header-tools .scene-search svg{width:19px;height:19px}
+.scene-header-tools .scene-search:focus-within{outline:1px solid var(--accent);outline-offset:2px}
+.scene-shell .scene-search input:focus-visible{outline:0}
+.scene-shell .scene-header-tools #sceneNotifications{display:grid;margin:0;background:var(--scene-inset);width:44px;height:44px;min-height:44px}
+.scene-shell .scene-clock{display:flex;align-items:center;gap:14px;min-width:0;height:44px;text-align:right;flex:none}
+.scene-clock-copy{display:grid;gap:3px}
+.scene-shell .scene-clock time{font:27px/1 Georgia,serif;display:block}
+.scene-shell .scene-clock small{font:10px/1.15 Georgia,var(--hand);margin:0}
+.scene-shell .scene-orb{width:36px;height:36px;margin:0;flex:none}
+.scene-page-header{gap:10px;position:relative}
+.scene-page-header>div:not(.scene-header-tools){min-width:0;flex:1}
+.scene-page-header h1,.scene-page-header h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scene-page-header #roomInfoBtn{min-width:0;flex:1;overflow:hidden}
+.scene-page-header #roomInfoBtn>span{min-width:0;overflow:hidden}
+.scene-page-header #roomTitle,.scene-page-header #roomStatus{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sceneSidebarToggle{display:grid;place-items:center;width:44px;height:44px;min-height:44px;margin:0 0 10px 4px;border:1px solid var(--scene-edge);border-radius:12px;background:var(--scene-inset);color:var(--scene-ink)}
+#sceneSidebarToggle svg{width:23px;height:23px}
+.scene-sidebar{overflow:hidden}
+.scene-rail{min-height:0;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+.scene-rail button{min-height:48px;flex-shrink:0;touch-action:manipulation}
+.scene-shell[data-route-kind=page]{grid-template-rows:minmax(0,1fr);padding-bottom:18px;row-gap:0}
+.scene-shell[data-route-kind=page] .scene-masthead{display:none}
+.scene-shell[data-route-kind=page] .room-screen,.scene-shell[data-route-kind=page] .room-screen.active{display:block;grid-column:2;grid-row:1;position:relative;overflow:hidden;padding:0;width:100%;height:100%;min-height:0}
+.scene-shell[data-route-kind=page] .room-screen>.scene-hero,.scene-shell[data-route-kind=page] .scene-dock,.scene-shell[data-route-kind=page] .scene-shortcuts,.scene-shell[data-route-kind=page] .scene-dream{display:none}
+.scene-shell[data-route-kind=page] .chat-column{height:100%;width:100%;border-radius:12px;backdrop-filter:none;background:linear-gradient(var(--scene-wash),transparent),var(--scene) center/cover}
+.scene-shell[data-route-kind=page] .room-screen.feature-focus .chat-column{display:none}
+.scene-shell[data-route-kind=page] .room-screen.feature-focus .relation-space.open{position:relative;inset:auto;width:100%;height:100%;border-radius:12px;z-index:30;transform:none;transition:none;box-shadow:none;backdrop-filter:none}
+.scene-shell[data-route-kind=page] .relation-head{border-radius:0}
+.scene-shell[data-route-kind=page] .space-pages{scroll-behavior:auto;overflow-x:hidden}
+.scene-shell[data-route-kind=page] .space-page>.sheet,.scene-shell[data-route-kind=page] #diarySpace{backdrop-filter:none}
+.scene-shell .scene-inbox-backdrop{display:none!important}
+.scene-shell.scene-inbox-open .home,.scene-shell.has-room.scene-inbox-open .home{position:relative;inset:auto;grid-column:2;grid-row:1;width:100%;max-width:none;height:100%;margin:0;border-radius:12px;box-shadow:none;backdrop-filter:none;background:var(--surface);z-index:30}
+.scene-shell.scene-inbox-open .room-screen{display:none!important}
+.scene-shell.scene-inbox-open .home-head{min-height:64px;height:64px;padding:10px 24px}
+.scene-shell.scene-inbox-open .home-art{height:170px;max-width:none;background-position:18% 55%}
+.scene-shell.scene-inbox-open .home-main{overflow-y:auto;overscroll-behavior:contain}
+.scene-shell.scene-inbox-open .room-card small{max-width:none}
+.scene-shell[data-route-kind=page] .space-home{display:block;padding:24px clamp(18px,4cqw,52px)}
+.scene-shell[data-route-kind=page] .space-home[hidden]{display:none}
+.scene-shell[data-route-kind=page] .relation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;border:0;background:none}
+.scene-shell[data-route-kind=page] .relation-grid .relation-card{border:1px solid var(--glass-line);border-radius:8px;background:var(--glass);padding:18px;min-height:90px}
+.scene-shell[data-route-kind=page] .relation-days{padding-top:0}
+.scene-shell[data-route-kind=page] .memory-viewport>.memory-stage{height:auto;flex:1 1 0;min-height:0}
+.scene-shell[data-route-kind=page] .memory-stage{contain:layout paint}
+@media(min-width:700px) and (min-height:501px){
+ :root .scene-shell[data-scene-view]{--nav-width:clamp(146px,11.6vw,184px);grid-template-columns:var(--nav-width) minmax(0,1fr);column-gap:18px}
+ :root .scene-shell[data-scene-view].rail-collapsed{--nav-width:64px}
+ :root .scene-shell[data-scene-view] .scene-sidebar{visibility:visible;grid-column:1;grid-row:1/-1}
+ .scene-shell[data-route-kind=home] .scene-dock{grid-template-rows:minmax(0,1.1fr) minmax(0,.9fr)}
+ .scene-shell.rail-collapsed .scene-rail button span,.scene-shell.rail-collapsed .scene-rail-footer>p,.scene-shell.rail-collapsed .scene-rail-footer>i{display:none}
+ .scene-shell.rail-collapsed .scene-rail button{display:flex;justify-content:center;align-items:center;min-height:52px;padding:10px 0}
+ .scene-shell.rail-collapsed .scene-swatches{display:grid;grid-template-columns:repeat(2,13px);gap:12px;justify-content:center;margin:0}
+ .scene-shell.rail-collapsed .scene-rail-footer{padding-inline:0}
+ .scene-shell.rail-collapsed #sceneSidebarToggle{margin-inline:auto}
+ .scene-shell:not(.rail-collapsed) .scene-rail button{display:flex;gap:14px;justify-content:flex-start;padding-inline:14px;font-size:15px}
+ .scene-shell:not(.rail-collapsed) .scene-rail button small{display:block}
+ .scene-shell.scene-inbox-open .room-list{grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:8px 26px}
+}
+@media(max-width:699px),(max-height:500px){
+ #sceneSidebarToggle{display:none}
+ .scene-shell[data-route-kind=home]{grid-template-rows:44px minmax(0,1fr) calc(64px + env(safe-area-inset-bottom));padding-top:10px;padding-bottom:0;row-gap:10px}
+ .scene-shell .scene-masthead{gap:14px}
+ .scene-shell .scene-clock{gap:10px}
+ .scene-shell .scene-clock time{font-size:24px}
+ .scene-shell .scene-clock small{font-size:9px}
+ .scene-shell .scene-orb{width:32px;height:32px}
+ .scene-shell .scene-header-tools{width:auto;flex:0 0 auto;gap:4px;margin-left:auto}
+ .scene-shell .scene-header-tools .scene-search-wrap{flex:0 0 38px}
+ .scene-shell .scene-header-tools .scene-search-wrap:focus-within{position:absolute;flex:auto;left:10px;right:98px;top:8px;width:auto;z-index:5}
+ .scene-shell .scene-masthead .scene-search-wrap:focus-within{left:0;right:185px;top:0}
+ .scene-shell .scene-header-tools .scene-search-wrap:focus-within .scene-search{height:44px;background:var(--surface)}
+ .scene-shell .scene-search-results{top:49px}
+ .scene-shell[data-route-kind=page]{padding:0;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) calc(64px + env(safe-area-inset-bottom));gap:0}
+ .scene-shell[data-route-kind=page] .room-screen,.scene-shell[data-route-kind=page] .room-screen.active{grid-column:1;grid-row:1}
+ .scene-shell[data-route-kind=page] .room-screen.feature-focus .relation-space.open{position:relative;inset:auto;height:100%;width:100%;border-radius:0;border:0;z-index:30}
+ :root .scene-shell[data-scene-view] .scene-sidebar{visibility:visible;grid-column:1;grid-row:3;margin:0;width:100%;z-index:40}
+ :root .scene-shell[data-route-kind=page] .scene-sidebar{grid-row:2;background:var(--surface);backdrop-filter:none}
+ .scene-shell .scene-page-header{gap:4px;padding:6px 10px!important;min-height:56px;height:56px}
+ .scene-shell.scene-inbox-open .home-head.scene-page-header{min-height:56px;height:56px}
+ .scene-shell[data-route-kind=page] .relation-head h2{font-size:18px!important;letter-spacing:0}
+ .scene-shell .scene-page-header>div:not(.scene-header-tools){flex:1;min-width:0}
+ .scene-shell .scene-page-header>.round-btn{width:32px;flex:0 0 32px}
+ .scene-shell .home-head h1{font-size:21px}
+ .scene-page-header #roomInfoBtn>.avatar{display:none}
+ .scene-page-header #roomStatus{font-size:9px}
+ .scene-shell[data-route-kind=page] .chat-column{border:0;border-radius:0}
+ .scene-shell.scene-inbox-open .home,.scene-shell.has-room.scene-inbox-open .home{grid-column:1;grid-row:1;border-radius:0;border:0;inset:auto;width:100%;height:100%}
+ .scene-shell[data-route-kind=page] .relation-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .scene-shell[data-route-kind=page] .relation-grid .relation-card{padding:12px 10px;gap:8px;min-height:88px}
+ .scene-shell[data-route-kind=page] .relation-card i{display:none}
+ .scene-shell[data-route-kind=page] .relation-card small{font-size:10px;line-height:1.5}
+ .scene-shell[data-route-kind=page] .memory-tools{padding-top:5px;padding-bottom:5px}
+ .scene-shell[data-route-kind=page] .memory-optics{min-height:52px;padding-block:7px}
+}
+@media(max-height:500px){
+ .scene-shell[data-route-kind=home]{grid-template-rows:44px minmax(0,1fr) 54px;row-gap:6px;padding-top:6px}
+ .scene-shell[data-route-kind=page]{grid-template-rows:minmax(0,1fr) 54px}
+ .scene-shell[data-route-kind=page] .scene-masthead{display:none}
+ .scene-shell[data-route-kind=page] .scene-sidebar,.scene-shell[data-route-kind=page] .scene-rail{height:54px}
+ .scene-shell[data-route-kind=page] .scene-page-header{min-height:48px;height:48px;padding-block:2px!important}
+}
+/* Message bubbles fit their content; image controls occupy the image itself. */
+.view-chat .msg{margin:12px 0 16px;gap:8px}
+.view-chat .msg .bubble{padding:7px 11px;line-height:1.55}
+.view-chat .sender-name{margin-bottom:3px}
+.view-chat .msg .bubble.has-image{padding:5px}
+.view-chat .bubble.has-image>.message-text{padding:6px 6px 2px}
+.media-card[data-media-type=image]{position:relative;margin:0;gap:0}
+.media-card[data-media-type=image] img{margin:0}
+.media-card .image-save{position:absolute;right:7px;bottom:7px;min-height:36px;width:36px;padding:0;border-radius:50%;background:var(--glass);box-shadow:0 2px 8px #0002;color:var(--text);font-size:20px;line-height:1}
+
+/* Each page has one bounded scroll area; swiping a feature card scrolls its page. */
+.scene-shell[data-route-kind=page] .room-screen.feature-focus .relation-space.open{display:grid;grid-template-rows:auto minmax(0,1fr)}
+.scene-shell[data-route-kind=page] .space-home,.scene-shell[data-route-kind=page] .space-pages{min-height:0;max-height:100%;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable;touch-action:pan-y pinch-zoom;-webkit-overflow-scrolling:touch}
+.scene-shell[data-route-kind=page] .space-pages:has(#wallSpace:not([hidden])){overflow:hidden;scrollbar-gutter:auto;touch-action:auto}
+.scene-shell[data-route-kind=page] .space-home{padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.scene-shell #spaceHome .relation-card{touch-action:pan-y pinch-zoom}
+
+/* Wall controls live behind a title-bar button, leaving both rows to the canvas. */
+.scene-shell .memory-tools-toggle{flex:none;min-height:36px;padding:6px 14px;border:1px solid var(--scene-edge);border-radius:20px;background:var(--scene-inset);color:var(--text);font:13px var(--hand)}
+.scene-shell .memory-tools-toggle[hidden],#memoryTools[hidden]{display:none}
+.scene-shell[data-route-kind=page] #memoryTools{position:absolute;inset:10px 14px auto auto;width:min(460px,calc(100% - 28px));max-height:calc(100% - 20px);display:block;padding:14px 18px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y pinch-zoom;border:1px solid var(--scene-edge);border-radius:16px;background:var(--glass);box-shadow:0 12px 36px var(--scene-shadow),inset 0 1px var(--scene-shine);backdrop-filter:blur(24px);z-index:12}
+.scene-shell[data-route-kind=page] #memoryTools[hidden]{display:none}
+.memory-tools-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.memory-tools-head b{font:16px var(--hand);color:var(--text)}
+.memory-tools-close{border:0;background:var(--scene-inset);color:var(--text);border-radius:50%;width:32px;height:32px;font-size:22px}
+#memoryTools .memory-modes{display:flex;flex-wrap:wrap;gap:5px}
+#memoryTools .memory-modes button{font-size:14px;min-height:38px}
+#memoryTools .memory-options{display:flex;min-height:38px;margin:8px 0 0;gap:12px}
+#memoryTools .memory-kind-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#memoryTools .memory-kind-filters button{max-width:none;min-height:34px}
+#wallSpace>#memorySelection{order:4;flex:none;justify-content:flex-end;margin:0;padding:6px 18px;background:var(--glass);border-top:1px solid var(--scene-edge)}
+#wallSpace>#memoryStatus:not(:empty){order:5;flex:none;margin:0;padding:6px 18px;background:var(--surface)}
+#wallSpace .memory-editor:not([hidden]),#wallSpace .memory-detail:not([hidden]){min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y pinch-zoom}
+#wallSpace .memory-editor:not([hidden]){flex:0 1 65%;border-bottom:1px solid var(--line)}
+#wallSpace .memory-detail:not([hidden]){flex:1}
+.scene-shell[data-route-kind=page] .memory-optics{flex:none}
+
+/* Keyboard height is a viewport change, not a request for a second navigation bar. */
+:root.keyboard-open .scene-shell[data-scene-view]{position:fixed;inset:var(--viewport-top) 0 auto;width:100%;max-width:none;height:var(--usable-height);min-height:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:0;border:0;border-radius:0}
+:root.keyboard-open .scene-shell .scene-sidebar,:root.keyboard-open .scene-shell .scene-masthead,:root.keyboard-open .pet-buddy{display:none!important}
+:root.keyboard-open .scene-shell .room-screen,:root.keyboard-open .scene-shell .room-screen.active,:root.keyboard-open .scene-shell.scene-inbox-open .home{grid-column:1;grid-row:1;min-height:0;height:100%;border-radius:0}
+:root.keyboard-open .scene-shell .scene-page-header{min-height:44px;height:44px;padding-block:2px!important;border-radius:0}
+:root.keyboard-open .scene-shell .space-page>.sheet{max-width:none;padding-bottom:24px}
+:root.keyboard-open .scene-shell .space-pages,:root.keyboard-open .scene-shell .home-main{scroll-padding-block:12px;scroll-behavior:auto}
+:root.keyboard-open .scene-shell .composer{padding-block:6px}
+:root.keyboard-open .scene-shell .composer textarea{max-height:min(100px,30dvh)}
+:root.keyboard-open .scrim{top:var(--viewport-top);bottom:auto;height:var(--usable-height);padding-block:8px}
+:root.keyboard-open .scrim>.sheet{max-height:100%}
+@media(max-width:699px){.scene-shell .memory-tools-toggle{padding-inline:10px;font-size:12px}.scene-shell #memoryTools{inset-inline:8px;width:calc(100% - 16px)}}

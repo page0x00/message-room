@@ -1,3 +1,7 @@
+import {runWorkspace} from './workspace.browser.mjs';
+import {runTouchLayout} from './touch-layout.browser.mjs';
+import {runNavigation} from './navigation.browser.mjs';
+import {runReference} from './reference.browser.mjs';
 import {runAPI} from './api.browser.mjs';
 import {runScene} from './scene.browser.mjs';
 import {runSkins} from './skins.browser.mjs';
@@ -118,8 +122,9 @@ async function setup({
   notificationFixture = false,
   startView = "chat",
   uploads = [],
+  touch = false,
 } = {}) {
-  const context = await browser.newContext({ viewport, serviceWorkers:"block" });
+  const context = await browser.newContext({ viewport, hasTouch:touch, serviceWorkers:"block" });
   await context.addInitScript(({user}) => {
     localStorage.setItem("device_id", "test-device");
     localStorage.setItem("nickname", "小辞");
@@ -413,7 +418,7 @@ async function setup({
     },
   );
   const page = await context.newPage();
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (error) => {errors.push(error.message);if(process.env.DEBUG_UI)console.error(error.stack);});
   const navigation = await page.goto(
     base + (secure ? `?room=${secureId}#key=${invite}` : ""),
     { waitUntil: "networkidle" },
@@ -437,7 +442,7 @@ async function setup({
   return { page, context, control, errors, join:async(id)=>{await joinRoom(id);if(startView === "chat")await page.locator("#sceneNavChat").click();} };
 }
 try {
-  if(!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.TOUCH_LAYOUT_ONLY&&!process.env.WORKSPACE_ONLY&&!process.env.NAVIGATION_ONLY&&!process.env.REFERENCE_ONLY&&!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -445,7 +450,7 @@ try {
     async () => {
       assert.equal(await page.locator(".scrim:visible").count(), 0);
       assert.equal(await page.locator("#joinForm").isVisible(), false);
-      await page.locator("#themeBtn").click();
+      await page.locator("#sceneNotifications").click();
       await page.locator("#settingsScrim [data-theme-pick=warm-light]").click();
       assert.equal(
         await page.locator("html").getAttribute("data-theme"),
@@ -513,7 +518,7 @@ try {
       await page.locator('[data-message-id="2"] .bubble').click();
       await page.locator('#selectQuote').click();
       await page.locator("#composeMore").click();
-      await page.locator("#dateBtn").click();
+      await page.locator("#composeDate").click();
       await page.locator("#displayDate").fill("2024-09-04");
       await page.locator("#saveDate").click();
       await page.locator("#messageInput").fill("这两句，我都记下了。");
@@ -658,7 +663,7 @@ try {
     const sent=old.control.sends.length;
     await old.page.locator('#relationHandle').click();await old.page.locator('#relationshipBtn').click();await old.page.locator('#legacyEventImport').click();assert.equal(await old.page.locator('#eventTitle').inputValue(),'原来那一天');assert.equal(await old.page.locator('#eventDate').inputValue(),'2020-05-20');assert.equal(await old.page.locator('.event-card').count(),0);await old.page.locator('#relationClose').click();
     await old.page.locator('#relationHandle').click();await old.page.locator('#memoirBtn').click();assert.equal(await old.page.locator('#memoirBody').inputValue(),'上一版只写给自己的内容');await old.page.locator('#relationClose').click();
-    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();assert.equal(await old.page.locator('#listenNotes').inputValue(),'旧的歌词和备注');await old.page.locator('#relationClose').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
+    await old.page.locator('#relationHandle').click();await old.page.locator('#listenBtn').click();await old.page.locator('#musicImport').click();await old.page.locator('#musicLegacyNotes summary').click();assert.equal(await old.page.locator('#musicLegacyText').inputValue(),'旧的歌词和备注');await old.page.locator('#relationClose').click();assert.equal(old.control.sends.length,sent);assert.equal(await old.page.evaluate(()=>localStorage.getItem('memoir.OldRoom1')),'上一版只写给自己的内容');
   });
   await old.page.locator("#backBtn").click();
   await check('signed-out room entry requests login instead of inventing a device identity',async()=>{
@@ -782,27 +787,29 @@ try {
     assert.match(await s.page.locator('.wall-event').textContent(),/第一次听同一首歌/);await s.page.locator('#relationClose').click();
   });
   await check('attachment retry after ambiguous send reuses upload path and message nonce',async()=>{
-    await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('a shared note')});
+    await s.page.locator('#attachBtn').click();await s.page.locator('#composeFiles').click();await s.page.locator('#attachmentFile').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('a shared note')});
     await s.page.locator('#attachmentCaption').fill('一起留在这里');s.control.ambiguousNext=true;
     await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentStatus').textContent.includes('保留'));
     await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);
     assert.equal(s.control.records.filter(r=>r.media_name==='note.txt').length,1);assert.equal(s.control.uploads.size,1);
   });
   await check('image preview loads privately and survives unrelated message refresh',async()=>{
-    const buffer=await readFile(resolve(root,'test-results/mobile-chat.png'));await s.page.locator('#attachBtn').click();await s.page.locator('#attachmentFile').setInputFiles({name:'moment.png',mimeType:'image/png',buffer});await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);await s.page.locator('.media-card img').waitFor();
+    const buffer=await readFile(resolve(root,'test-results/mobile-chat.png'));await s.page.locator('#attachBtn').click();await s.page.locator('#composeFiles').click();await s.page.locator('#attachmentFile').setInputFiles({name:'moment.png',mimeType:'image/png',buffer});await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);await s.page.locator('.media-card img').waitFor();
+    assert.equal(await s.page.locator('.media-card[data-media-type=image] .media-label').count(),0);
+    const [download]=await Promise.all([s.page.waitForEvent('download'),s.page.getByRole('button',{name:'下载原图',exact:true}).click()]);assert.equal(download.suggestedFilename(),'moment.png');
     await s.page.locator('#menuBtn').click();await s.page.locator('#refreshBtn').click();await s.page.locator('[data-close=menuScrim]').click();assert.equal(await s.page.locator('.media-card img').count(),1);
   });
   await check('voice recording creates an editable playable attachment before any send',async()=>{
     await s.page.evaluate(()=>{const ac=new AudioContext(),destination=ac.createMediaStreamDestination(),oscillator=ac.createOscillator();oscillator.connect(destination);oscillator.start();window.testAudio=ac;navigator.mediaDevices.getUserMedia=async()=>destination.stream;});
-    const sends=s.control.sends.length;await s.page.locator('#attachBtn').click();await s.page.locator('#recordStart').click();await s.page.locator('#recordStop').waitFor();await s.page.waitForTimeout(160);await s.page.locator('#recordStop').click();await s.page.locator('#attachmentPreview audio').waitFor();assert.equal(s.control.sends.length,sends);await s.page.locator('[data-close=attachmentScrim]').click();await s.page.evaluate(()=>window.testAudio.close());
+    const sends=s.control.sends.length;await s.page.locator('#attachBtn').click();await s.page.locator('#composeVoice').click();await s.page.locator('#recordStop').waitFor();await s.page.waitForTimeout(160);await s.page.locator('#recordStop').click();await s.page.locator('#attachmentPreview audio').waitFor();assert.equal(s.control.sends.length,sends);await s.page.locator('[data-close=attachmentScrim]').click();await s.page.evaluate(()=>window.testAudio.close());
   });
   await check('OCR recognition produces editable drafts and sends only after explicit confirmation',async()=>{
 
-    const count=s.control.sends.length;await s.page.locator('#composeMore').click();await s.page.locator('#importBtn').click();await s.page.locator('#ocrFile').setInputFiles({name:'chat.png',mimeType:'image/png',buffer:await readFile(resolve(root,'test-results/mobile-chat.png'))});await s.page.waitForFunction(()=>!document.querySelector('#ocrRecognize').disabled&&document.querySelector('#ocrQueueCount').textContent.includes('1 张'));await s.page.locator('#ocrRecognize').click();await s.page.locator('.import-row textarea').waitFor();await s.page.waitForFunction(()=>!document.querySelector('#importSend').disabled);assert.equal(s.control.sends.length,count);
+    const count=s.control.sends.length;await s.page.locator('#composeMore').click();await s.page.locator('#composeImport').click();await s.page.locator('#ocrFile').setInputFiles({name:'chat.png',mimeType:'image/png',buffer:await readFile(resolve(root,'test-results/mobile-chat.png'))});await s.page.waitForFunction(()=>!document.querySelector('#ocrRecognize').disabled&&document.querySelector('#ocrQueueCount').textContent.includes('1 张'));await s.page.locator('#ocrRecognize').click();await s.page.locator('.import-row textarea').waitFor();await s.page.waitForFunction(()=>!document.querySelector('#importSend').disabled);assert.equal(s.control.sends.length,count);
     await s.page.locator('.import-row textarea').fill('修改过的摘录');await s.page.locator('.import-row input[type=file]').setInputFiles({name:'supplement.txt',mimeType:'text/plain',buffer:Buffer.from('original supplement')});await s.page.waitForFunction(()=>document.querySelector('.import-row').textContent.includes('已就绪'));await s.page.locator('#importSend').click();assert.equal(s.control.sends.length,count);await s.page.locator('#noticeConfirm').click();await s.page.waitForFunction(()=>document.querySelector('.import-row').classList.contains('sent'));assert.equal(s.control.sends.at(-1).author_id,user);assert.equal(s.control.sends.at(-1).content,'修改过的摘录');assert.equal(s.control.sends.at(-1).message_payload.entries[0].media_name,'supplement.txt');assert.equal(s.control.sends.at(-1).message_type,'screenshot');assert.equal(s.control.sends.at(-1).message_payload.originals.length,1);await s.page.locator('[data-close=importScrim]').click();
   });
   await check('normal file chooser is multiple without directory mode; scanned batches wait for confirmation',async()=>{
-    await s.page.locator('#attachBtn').click();assert.equal(await s.page.locator('#attachmentFile').getAttribute('webkitdirectory'),null);assert.equal(await s.page.locator('#attachmentFile').getAttribute('multiple'),'');
+    await s.page.locator('#attachBtn').click();await s.page.locator('#composeFiles').click();assert.equal(await s.page.locator('#attachmentFile').getAttribute('webkitdirectory'),null);assert.equal(await s.page.locator('#attachmentFile').getAttribute('multiple'),'');
     const before=s.control.sends.length;await s.page.locator('#attachmentFile').setInputFiles([{name:'clip.mov',mimeType:'video/quicktime',buffer:Buffer.from('video')},{name:'archive.bin',mimeType:'application/octet-stream',buffer:Buffer.from('file')}]);await s.page.waitForFunction(()=>document.querySelectorAll('#attachmentQueue input:checked').length>=2);assert.equal(s.control.sends.length,before);await s.page.locator('#attachmentNew').click();await s.page.locator('#attachmentSend').click();await s.page.waitForFunction(()=>document.querySelector('#attachmentScrim').hidden);assert.ok(s.control.sends.some(r=>r.media_name==='archive.bin'&&r.message_type==='file'));
   });
   await check('screenshot compact card opens original and editable independent detail',async()=>{
@@ -814,7 +821,7 @@ try {
   });
   await check('local audio persists, publishes playback and responds to remote pause',async()=>{
     const samples=8000*8,buffer=Buffer.alloc(44+samples*2);buffer.write('RIFF');buffer.writeUInt32LE(36+samples*2,4);buffer.write('WAVEfmt ',8);buffer.writeUInt32LE(16,16);buffer.writeUInt16LE(1,20);buffer.writeUInt16LE(1,22);buffer.writeUInt32LE(8000,24);buffer.writeUInt32LE(16000,28);buffer.writeUInt16LE(2,32);buffer.writeUInt16LE(16,34);buffer.write('data',36);buffer.writeUInt32LE(samples*2,40);for(let i=0;i<samples;i++)buffer.writeInt16LE(Math.round(Math.sin(i*.1)*1000),44+i*2);
-    await s.page.locator('#relationHandle').click();await s.page.locator('#listenBtn').click();await s.page.locator('#listenFile').setInputFiles({name:'our-song.wav',mimeType:'audio/wav',buffer});await s.page.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await s.page.locator('#lyricsFile').setInputFiles({name:'song.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]这一刻\n[00:02.00]在同一首歌里')});await s.page.locator('#listenShare').click();await s.page.waitForFunction(()=>document.querySelector('#listenSync').checked);assert.equal(s.control.listen.track_key.length,64);const playing=s.page.waitForResponse(r=>r.url().endsWith('/rpc/mailbox_set_listen')&&r.request().postDataJSON().p_playing===true);await s.page.locator('#listenToggle').click();await playing;await s.page.waitForFunction(()=>!document.querySelector('#listenAudio').paused);assert.equal(s.control.listen.is_playing,true);
+    await s.page.locator('#relationHandle').click();await s.page.locator('#listenBtn').click();await s.page.locator('#musicImport').click();await s.page.locator('#listenFile').setInputFiles({name:'our-song.wav',mimeType:'audio/wav',buffer});await s.page.waitForFunction(()=>document.querySelector('#musicImportCount').textContent==='1');await s.page.locator('#lyricsFile').setInputFiles({name:'song.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:00.00]这一刻\n[00:02.00]在同一首歌里')});await s.page.waitForFunction(()=>document.querySelector('#musicLyricsStatus').textContent.includes('2 行'));await s.page.locator('#musicImportSave').click();await s.page.waitForFunction(()=>!document.querySelector('#listenToggle').disabled);await s.page.locator('#listenShare').click();await s.page.waitForFunction(()=>document.querySelector('#listenSync').checked);assert.equal(s.control.listen.track_key.length,64);const playing=s.page.waitForResponse(r=>r.url().endsWith('/rpc/mailbox_set_listen')&&r.request().postDataJSON().p_playing===true);await s.page.locator('#listenToggle').click();await playing;await s.page.waitForFunction(()=>!document.querySelector('#listenAudio').paused);assert.equal(s.control.listen.is_playing,true);
     s.control.listen={...s.control.listen,is_playing:false,position_seconds:2,revision:s.control.listen.revision+1,updated_at:new Date().toISOString()};await s.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await s.page.waitForFunction(()=>document.querySelector('#listenAudio').paused);assert.ok(Math.abs(await s.page.locator('#listenAudio').evaluate(el=>el.currentTime)-2)<.5);await s.page.locator('#relationClose').click();assert.equal(await s.page.locator('#listenMini').isVisible(),true);await s.page.reload();await s.page.locator('#sceneNavChat').click();await s.page.locator('#listenMini').waitFor();assert.match(await s.page.locator('#miniTrack').textContent(),/our-song/);
   });
   await check('four themes across phone, tablet portrait/landscape and desktop have usable chat, drawer, diary, wall',async()=>{
@@ -825,7 +832,7 @@ try {
         for(const view of ['chat','diary','wall']){
           if(view!=='chat'){await s.page.locator('#relationHandle').click();await s.page.locator(`[data-open-view=${view}]`).click();await s.page.locator('#relationSpace').waitFor({state:'visible'});}
           assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${device} ${theme} ${view} overflow`);assert.ok(await s.page.locator('#messages').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${device} ${theme} ${view} pane overflow`);
-          const pane=await s.page.locator('#messages').boundingBox();assert.ok(pane.height>90,`${device} ${view} missing content`);
+          const pane=await s.page.locator(view==='chat'?'#messages':view==='wall'?'#wallSpace':'#diarySpace').boundingBox();assert.ok(pane?.height>90,`${device} ${view} missing content`);
           if(view==='chat'){const box=await s.page.locator('#composer').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,`${device} ${theme} composer`);}
           if(['phone','tablet-landscape','desktop'].includes(device))await s.page.screenshot({path:resolve(root,`test-results/${device}-${theme}-${view}.png`)});
           if(view!=='chat')await s.page.locator('#relationClose').click();
@@ -894,7 +901,11 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.API_ONLY)await runAPI({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.TOUCH_LAYOUT_ONLY)await runTouchLayout({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.WORKSPACE_ONLY)await runWorkspace({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.NAVIGATION_ONLY)await runNavigation({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.REFERENCE_ONLY)await runReference({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.API_ONLY)await runAPI({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SCENE_ONLY)await runScene({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.SKINS_ONLY)await runSkins({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.COMPANION_ONLY)await runCompanions({setup,check,secureId,user,friend,fixture,root});
