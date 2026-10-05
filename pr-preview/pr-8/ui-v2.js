@@ -1,5 +1,5 @@
-import {applyPoetry} from './poetry.js?v=2.7.0';
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.0';
+import {applyPoetry} from './poetry.js?v=2.7.1';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.1';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -17,6 +17,7 @@ export function contactTarget(value){
 export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,setView,renderRecent,home}){
   let previousFocus, start;
   const pageOffsets=new Map();
+  const scrollPane=id=>$(id==='home'?'spaceHome':'spacePages');
   document.addEventListener('mailbox:room-open',()=>pageOffsets.clear());
   const panels=()=>[...$('spacePages').querySelectorAll(':scope > [data-space-panel]')];
   function registerPanel(id,title){
@@ -37,14 +38,14 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   function page(id='home'){
     const panel=id==='home'?null:$(id);if(id!=='home'&&!panel?.dataset.spacePanel)return false;
     if(state.spacePanel===id){if(panel&&!$('relationSpace').inert)panel.hidden=false;return false;}
-    if(state.spacePanel&&!$('relationSpace').inert)pageOffsets.set(state.spacePanel,$('spacePages').scrollTop);
+    if(state.spacePanel&&!$('relationSpace').inert)pageOffsets.set(state.spacePanel,scrollPane(state.spacePanel).scrollTop);
     panels().forEach(el=>el.hidden=el!==panel);
     $('spaceHome').hidden=!!panel;$('spacePages').hidden=!panel;$('spaceBack').hidden=!panel;
     $('spaceTitle').textContent=panel?.dataset.spacePanel||'我们的空间';
     state.spaceView=id==='diarySpace'?'diary':id==='wallSpace'?'wall':null;
     const previous=state.spacePanel;state.spacePanel=id;syncFocus();
     document.dispatchEvent(new CustomEvent('mailbox:space-page',{detail:{panel:id,previous}}));
-    $('spacePages').scrollTop=pageOffsets.get(id)||0;
+    scrollPane(id).scrollTop=pageOffsets.get(id)||0;
     return true;
   }
   function drawer(open){
@@ -52,12 +53,12 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     if(open===!$('relationSpace').inert)return;
     const restoreFocus=!open&&$('relationSpace').contains(document.activeElement);
     if(open&&!state.spacePanel)page();
-    if(!open&&state.spacePanel)pageOffsets.set(state.spacePanel,$('spacePages').scrollTop);
+    if(!open&&state.spacePanel)pageOffsets.set(state.spacePanel,scrollPane(state.spacePanel).scrollTop);
     panels().forEach(el=>el.hidden=!open||el.id!==state.spacePanel);
     $('room').classList.toggle('space-open',open);$('relationSpace').classList.toggle('open',open);$('relationSpace').inert=!open;
     state.spaceView=open?(state.spacePanel==='diarySpace'?'diary':state.spacePanel==='wallSpace'?'wall':null):null;
     syncFocus();$('relationSpace').setAttribute('aria-hidden',String(!open));$('relationHandle').setAttribute('aria-expanded',String(open));$('relationBackdrop').hidden=true;
-    if(open){previousFocus=document.activeElement;document.dispatchEvent(new Event('mailbox:space-open'));$('spacePages').scrollTop=pageOffsets.get(state.spacePanel)||0;}
+    if(open){previousFocus=document.activeElement;document.dispatchEvent(new Event('mailbox:space-open'));scrollPane(state.spacePanel).scrollTop=pageOffsets.get(state.spacePanel)||0;}
     else{document.dispatchEvent(new Event('mailbox:space-close'));if(restoreFocus&&previousFocus?.isConnected&&!previousFocus.closest('[inert]'))previousFocus.focus({preventScroll:true});previousFocus=null;}
   }
   function openFeature(id){

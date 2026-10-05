@@ -1,4 +1,4 @@
-import {parseLyrics} from './feature-core.js?v=2.7.0';
+import {parseLyrics} from './feature-core.js?v=2.7.1';
 export function titleFromFilename(name){const clean=String(name||'').replace(/\.[^.]+$/,'').replace(/_/g,' ').trim();const parts=clean.split(/\s+-\s+/);return parts.length===2?{artist:parts[0],name:parts[1]}:{artist:'',name:clean};}
 const ascii=b=>new TextDecoder('latin1').decode(b);
 const uint=b=>b.reduce((n,v)=>n*256+v,0);

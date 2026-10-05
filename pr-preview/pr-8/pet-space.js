@@ -1,7 +1,7 @@
-import {localConnections} from './local-api.js?v=2.7.0';
-import {generateDirectPet} from './direct-pet.js?v=2.7.0';
-import {client} from './backend.js?v=2.7.0';
-import {localDate} from './core.js?v=2.7.0';
+import {localConnections} from './local-api.js?v=2.7.1';
+import {generateDirectPet} from './direct-pet.js?v=2.7.1';
+import {client} from './backend.js?v=2.7.1';
+import {localDate} from './core.js?v=2.7.1';
 
 export function initPetSpace({$,state,node,toast,notice,ui}){
  const pane=node('section','space-page');pane.id='petSpace';pane.hidden=true;
