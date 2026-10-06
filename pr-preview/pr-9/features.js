@@ -1,0 +1,292 @@
+import {initMusicSpace} from './music-space.js?v=2.7.1';
+import {uiIcon} from './ui-icons.js?v=2.7.1';
+import {imageHash} from './screenshot-store.js?v=2.7.1';
+import {localDate,validDate,storeGet,randomId,errorText} from './core.js?v=2.7.1';
+import {fileInfo,bytesLabel,mediaPathValid,daysBetween,eventCountdown,memoirText} from './feature-core.js?v=2.7.1';
+import * as api from './backend.js?v=2.7.1';
+import * as data from './feature-backend.js?v=2.7.1';
+import {initScreenshotImport} from './screenshot-import.js?v=2.7.1';
+
+export function initFeatures(ctx){
+  const {$,state,node,toast,persist,showSheet,closeSheet,notice,author,onMessages}=ctx;
+  const music=initMusicSpace(ctx);
+  const eventHome=node('div','space-event-preview');document.querySelector('.relation-days').after(eventHome);
+  const screenshots=initScreenshotImport(ctx);
+  let mediaQueue=[];
+  let stopSubscription=null,media=null,mediaController=null,mediaBusy=false,mediaUrls=new Map(),mediaCards=new Map();
+  let calendar=[],calendarBusy=false,calendarEdit=null,lastCalendarRefresh=0,eventNonce=randomId();
+  let memoir=null,memoirEdits=0,memoirBusy=false;
+  let recorder=null,recordStream=null,recordTimer=null,recordRevision=0;
+
+  const snap=()=>({room:state.room,secure:state.secure,userId:state.userId,epoch:state.epoch,name:state.profile.myName});
+  const current=s=>state.room===s.room&&state.epoch===s.epoch;
+  const key=(kind,s=snap())=>`${kind}.${s.room}.${s.userId}`;
+  // The immediately preceding release stored these utilities under raw room keys.
+  // Recover to editable local fields; never publish old private values automatically.
+  const oldLocal=kind=>{try{return localStorage.getItem(kind+'.'+state.room)||'';}catch{return '';}};
+  function oldEvent(){try{const value=JSON.parse(oldLocal('anniversary'));return validDate(value?.date)?value:null;}catch{return null;}}
+  const messageError=e=>e?.code==='40001'?'另一端刚修改了内容，请重新读取后再保存；本机草稿已保留。':/[\u4e00-\u9fff]/.test(e?.message||'')?e.message:errorText(e);
+  const fail=e=>{if(e?.name!=='AbortError')toast(messageError(e));};
+  const requireRoom=()=>{if(!state.ready){toast('请先进入已连接的房间。');return false;}return true;};
+  function open(id){if(!requireRoom())return false;closeSheet('menuScrim');showSheet(id);return true;}
+  function download(blob,name){const link=node('a');const url=URL.createObjectURL(blob);link.href=url;link.download=name.replace(/[\\/\x00-\x1f]/g,'_');document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+
+  // Attachment transactions keep the same nonce, file and caption across retries.
+  function mediaControls(){
+    $('attachmentSend').disabled=!mediaQueue.some(x=>x.selected&&!x.sent)||mediaBusy||!state.secure;
+    $('attachmentSend').textContent=media?.attempted?'重试上传并发送':'上传并发送';
+    $('attachmentFile').disabled=mediaBusy;
+    $('attachmentCaption').disabled=mediaBusy||Boolean(media?.attempted);
+    $('attachmentCancel').disabled=!mediaBusy;
+  }
+  function attachmentOpen(){
+    if(!open('attachmentScrim'))return;
+    $('attachmentStatus').textContent=state.secure?'文件先上传，确认成功后才会生成留言。':'附件需要邀请房间。旧版公开房间继续支持文字留言。';
+    mediaControls();
+    return true;
+  }
+  const tray=node('div','compose-tools');tray.id='composeTools';tray.hidden=true;tray.setAttribute('aria-label','选择发送内容');
+  const choices=node('div','compose-tool-options');tray.append(choices);
+  const collapse=()=>{tray.hidden=true;for(const id of ['attachBtn','composeMore'])$(id).setAttribute('aria-expanded','false');};
+  for(const [id,label,caption,icon,accept] of [['Images','图片','上传照片','image','image/*'],['Video','视频','分享视频','video','video/*'],['Files','文件','上传文档','file',''],['Voice','语音','录制语音','mic',null],['Music','一起听','导入歌曲与歌词','music',null]]){
+    const b=node('button','compose-choice'+(id==='Music'?' compose-music':''));b.type='button';b.id='compose'+id;b.innerHTML=uiIcon(icon)+`<span><b>${label}</b><small>${caption}</small></span>`;
+    b.onclick=()=>{collapse();if(id==='Music'){document.dispatchEvent(new Event('mailbox:music-import'));return;}if(!attachmentOpen())return;if(id==='Voice'){$('recordStart').click();return;}$('attachmentFile').accept=accept;$('attachmentFile').click();};choices.append(b);
+  }
+  const extra=node('div','compose-tool-extra');for(const [label,target] of [['补录日期','dateBtn'],['截图摘录','importBtn']]){const b=node('button','text-btn',label);b.type='button';b.id=target==='dateBtn'?'composeDate':'composeImport';b.onclick=()=>{collapse();$(target).click();};extra.append(b);}tray.append(extra);$('composer').before(tray);
+  for(const id of ['attachBtn','composeMore']){$(id).setAttribute('aria-controls',tray.id);$(id).setAttribute('aria-expanded','false');$(id).onclick=()=>{tray.hidden=!tray.hidden;for(const target of ['attachBtn','composeMore'])$(target).setAttribute('aria-expanded',String(!tray.hidden));};}
+  document.addEventListener('mailbox:navigation',collapse);document.addEventListener('mailbox:room-open',collapse);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!tray.hidden){collapse();e.preventDefault();}});
+  $('attachmentFile').hidden=true;
+  const choose=node('button','btn ghost', '选择文件');choose.type='button';choose.id='attachmentChoose';choose.onclick=()=>$('attachmentFile').click();const oldLabel=$('attachmentFile').parentElement;oldLabel.before(choose);oldLabel.replaceWith($('attachmentFile'));
+  async function chooseAttachment(selected){
+    if(mediaBusy||!selected)return;const s=snap();
+    try{
+      const info=fileInfo(selected);
+      if(!current(s))return;
+      if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);
+      const nonce=randomId();media={file:selected,info,nonce,path:`${state.room}/${state.userId}/${nonce}`,url:URL.createObjectURL(selected),attempted:false,caption:''};
+      paintAttachment();
+    }catch(e){fail(e);}
+  }
+  function paintAttachment(){
+    if(!media)return;const {info}=media;
+    $('attachmentCaption').value=media.caption||'';
+    $('attachmentPreview').replaceChildren(node('p','',info.name+' · '+bytesLabel(info.size)));
+    if(['image','audio','video'].includes(info.type)){
+      media.url ||= URL.createObjectURL(media.file);
+      const element=node(info.type==='image'?'img':info.type);element.src=media.url;
+      if(info.type==='image')element.alt='附件预览';else{element.controls=true;element.preload='metadata';}
+      $('attachmentPreview').append(element);
+    }
+    $('attachmentProgress').hidden=true;mediaControls();
+  }
+  const processedKey=()=>`files-processed.${state.room}.${state.userId}`;
+  function queueRender(){
+    $('attachmentQueue').replaceChildren();
+    for(const item of mediaQueue){const row=node('div','attachment-queue-row'),label=node('label'),check=node('input');check.type='checkbox';check.checked=item.selected;check.disabled=mediaBusy||item.sent;check.onchange=()=>{item.selected=check.checked;mediaControls();};label.append(check,node('span','',item.file.name));row.append(label,node('small','',item.sent?'已发送':item.processed?'已导入过':bytesLabel(item.file.size)));const preview=node('button','text-btn','预览');preview.disabled=mediaBusy;preview.onclick=()=>void previewItem(item);row.append(preview);$('attachmentQueue').append(row);}
+    $('attachmentCount').textContent=`${mediaQueue.filter(x=>x.selected&&!x.sent).length} / ${mediaQueue.length} 个待发送`;mediaControls();
+  }
+  async function previewItem(item){if(mediaBusy)return;if(media&&!media.attempted)media.caption=$('attachmentCaption').value;if(!item.pending){await chooseAttachment(item.file);item.pending=media;}else{media=item.pending;paintAttachment();}}
+  async function addAttachmentFiles(source){if(mediaBusy)return;const s=snap(),known=storeGet(processedKey(),{});$('attachmentStatus').textContent='扫描文件…';
+    try{for await(const item of source){const file=item.file||item;try{fileInfo(file);}catch(e){toast(e.message);continue;}const hash=await imageHash(file);if(!current(s))return;if(mediaQueue.some(x=>x.hash===hash))continue;mediaQueue.push({file,hash,selected:!known[hash],processed:!!known[hash],sent:false});}
+      queueRender();const first=mediaQueue.find(x=>x.selected&&!x.sent);if(first)await previewItem(first);$('attachmentStatus').textContent='扫描完成。勾选文件并确认后才上传。';
+    }catch(e){fail(e);}}
+  $('attachmentFile').onchange=()=>void addAttachmentFiles([...$('attachmentFile').files]);
+  async function* walkFiles(handle){for await(const entry of handle.values()){if(entry.kind==='directory')yield* walkFiles(entry);else yield await entry.getFile();}}
+  $('attachmentFolder').onclick=async()=>{if(window.showDirectoryPicker){try{await addAttachmentFiles(walkFiles(await window.showDirectoryPicker({mode:'read'})));}catch(e){if(e.name!=='AbortError')$('attachmentFile').click();}}else if('webkitdirectory' in $('attachmentDirectory')&&!/Android/i.test(navigator.userAgent)){$('attachmentDirectory').value='';$('attachmentDirectory').click();}else{toast('当前浏览器不支持目录，已打开多文件选择。');$('attachmentFile').click();}};
+  $('attachmentDirectory').onchange=()=>void addAttachmentFiles([...$('attachmentDirectory').files]);
+  for(const [id,fn] of [['attachmentAll',()=>true],['attachmentInvert',x=>!x.selected],['attachmentNew',x=>!x.processed]])$(id).onclick=()=>{for(const x of mediaQueue)if(!x.sent)x.selected=fn(x);queueRender();};
+  function endRecording(discard=false){
+    if(discard)recordRevision++;
+    clearTimeout(recordTimer);recordTimer=null;
+    if(recorder&&recorder.state!=='inactive')recorder.stop();
+    recordStream?.getTracks().forEach(track=>track.stop());recordStream=null;
+    $('recordStart').disabled=false;$('recordStop').hidden=true;
+  }
+  $('recordStart').onclick=async()=>{
+    if(!state.secure){toast('语音留言需要邀请房间。');return;}
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){toast('当前浏览器无法直接录音，可以选择已有的音频文件。');return;}
+    const s=snap(),revision=++recordRevision;$('recordStart').disabled=true;
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      if(!current(s)||revision!==recordRevision||$('attachmentScrim').hidden){stream.getTracks().forEach(track=>track.stop());return;}
+      recordStream=stream;const mime=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'].find(type=>MediaRecorder.isTypeSupported(type));
+      recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);const chunks=[];let size=0;
+      recorder.ondataavailable=event=>{if(event.data.size){chunks.push(event.data);size+=event.data.size;if(size>19*1024*1024)endRecording();}};
+      recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());if(revision!==recordRevision||!current(s))return;const type=(recorder.mimeType||mime||'audio/webm').split(';')[0];const file=new File(chunks,`语音-${Date.now()}.${type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm'}`,{type});void addAttachmentFiles([file]);$('recordStatus').textContent='语音已录好，试听后再发送。';};
+      recorder.onerror=()=>{endRecording(true);$('recordStatus').textContent='录音中断，请重新录制或选择已有音频。';};
+      recorder.start(1000);$('recordStop').hidden=false;$('recordStatus').textContent='正在录音，最长 3 分钟。结束后可以试听。';recordTimer=setTimeout(()=>endRecording(),180000);
+    }catch(e){endRecording(true);$('recordStatus').textContent=e.name==='NotAllowedError'?'没有获得麦克风权限，可以在网站设置中开启。':'录音未能开始，请检查麦克风。';}
+  };
+  $('recordStop').onclick=()=>endRecording();
+  $('attachmentCancel').onclick=()=>mediaController?.abort();
+  $('attachmentSend').onclick=async()=>{
+    const selected=mediaQueue.filter(x=>x.selected&&!x.sent);
+    if(!selected.length||mediaBusy||!state.secure||!requireRoom())return;
+    const s=snap(),controller=new AbortController(),caption=$('attachmentCaption').value.trim();mediaController=controller;mediaBusy=true;mediaControls();
+    $('attachmentProgress').hidden=false;$('attachmentProgress').value=0;
+    try{for(const item of selected){
+      if(!current(s)||controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
+      if(!item.pending){const nonce=randomId();item.pending={file:item.file,info:fileInfo(item.file),nonce,path:`${s.room}/${s.userId}/${nonce}`,caption,date:state.date||null,quotes:[...state.quotes]};}
+      const pending=item.pending;media=pending;if(!pending.attempted){pending.caption=caption;pending.date=state.date||null;pending.quotes=[...state.quotes];}pending.attempted=true;
+      await api.uploadMedia(pending.path,pending.file,pending.info.mime,progress=>{if(current(s)){$('attachmentProgress').value=Math.round(progress*100);$('attachmentStatus').textContent=`${item.file.name} · ${Math.round(progress*100)}%`; }},controller.signal);
+      if(!current(s)||controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
+      const message=await api.sendMessage({room_id:s.room,sender:s.userId,author_id:s.userId,sender_name:s.name,client_nonce:pending.nonce,content:pending.caption,message_type:pending.info.type,media_path:pending.path,media_name:pending.info.name,media_mime:pending.info.mime,media_size:pending.info.size,display_date:pending.date,reply_to:pending.quotes},true);
+      item.sent=true;item.selected=false;const known=storeGet(processedKey(),{});known[item.hash]=Date.now();persist(processedKey(),known);
+      if(current(s))onMessages([message]);if(pending.url){URL.revokeObjectURL(pending.url);pending.url='';}
+    }
+    if(current(s)){media=null;$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();$('attachmentStatus').textContent='已发送';closeSheet('attachmentScrim');toast(`已发送 ${selected.length} 个附件。`);}
+    }catch(e){if(current(s))$('attachmentStatus').textContent=e.name==='AbortError'?'已停止，已完成的文件不会重发。':messageError(e)+' 未完成的文件和附言已保留，可重试。';}
+    finally{if(current(s)){mediaBusy=false;mediaController=null;queueRender();}}
+  };
+  function renderMedia(message,bubble,view='chat'){
+    const cacheId=message.id+':'+view;
+    if(message.import_label)bubble.append(node('div','import-label',`截图摘录 · ${message.import_label}（由留言者导入）`));
+    if(!message.media_path)return;
+    if(mediaCards.has(cacheId)){bubble.append(mediaCards.get(cacheId));return;}
+    const card=node('div','media-card');card.dataset.mediaType=message.message_type;
+    if(message.message_type!=='image')card.append(node('span','media-label',(message.media_name||'附件')+' · '+bytesLabel(message.media_size||0)));
+    const button=node('button','',message.message_type==='file'?'下载附件':'打开附件');button.type='button';card.append(button);bubble.append(card);mediaCards.set(cacheId,card);
+    if(!state.secure||!mediaPathValid(message.media_path,state.room)){button.disabled=true;button.textContent='附件路径不可用';return;}
+    button.onclick=async()=>{
+      const s=snap();button.disabled=true;button.textContent='正在读取……';
+      try{
+        let cached=mediaUrls.get(message.media_path);
+        if(!cached){const blob=await data.mediaBlob(s.room,message.media_path);if(!current(s))return;cached={blob,url:URL.createObjectURL(blob)};mediaUrls.set(message.media_path,cached);}
+        if(!current(s))return;
+        if(['image','audio','video'].includes(message.message_type)){
+          const element=node(message.message_type==='image'?'img':message.message_type);element.src=cached.url;
+          if(message.message_type==='image')element.alt=message.media_name||'留言图片';else{element.controls=true;element.preload='metadata';}
+          const image=message.message_type==='image',save=node('button',image?'image-save':'',image?'↓':'下载原文件');save.type='button';save.setAttribute('aria-label',image?'下载原图':'下载原文件');save.title=image?'下载原图':'下载原文件';save.onclick=()=>download(cached.blob,message.media_name||'附件');button.replaceWith(element,save);
+        }else{download(cached.blob,message.media_name||'附件');button.textContent='再次下载';button.disabled=false;}
+      }catch(e){if(current(s)){button.disabled=false;button.textContent='读取失败，点击重试';fail(e);}}
+    };
+    if(message.message_type==='image'){button.dataset.autoload='true';mediaObserver.observe(button);}
+  }
+  const mediaObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){mediaObserver.unobserve(entry.target);if(entry.target.isConnected)entry.target.click();}},{root:null,rootMargin:'250px'});
+
+  // Shared dates, with an explicitly local mode for legacy rooms.
+  function renderCalendar(){
+    const box=$('eventList');box.replaceChildren();eventHome.replaceChildren();
+    const legacy=oldEvent();$('legacyEventImport').hidden=!legacy||calendar.some(row=>row.event_date===legacy.date&&row.title===(legacy.name||'纪念日'));
+    if(!calendar.length)box.append(node('p','sheet-note','还没有纪念日，先记下一件小事吧。'));
+    const rows=calendar.map(event=>({...event,next:eventCountdown(event)})).sort((a,b)=>(a.next?.days??0)-(b.next?.days??0));
+    for(const event of rows.slice(0,3)){const item=node('button','text-btn',`${event.title} · ${event.event_date}`);item.onclick=()=>{$('relationshipBtn').click();};eventHome.append(item);}
+    for(const event of rows){
+      const card=node('article','event-card'),detail=node('div');detail.append(node('strong','',event.title),node('small','',event.event_date+(event.repeat_yearly?' · 每年纪念':'')));if(event.note)detail.append(node('small','',event.note));card.append(detail);
+      const days=event.next?.days;card.append(node('span','countdown',days===0?'就是今天':days>0?`还有 ${days} 天`:`已过 ${Math.abs(days||0)} 天`));
+      if(!state.secure||event.owner_user_id===state.userId){
+        const edit=node('button','','修改');edit.type='button';edit.onclick=()=>{$('eventEditor').open=true;$('eventNote').value=event.note||'';$('eventRemind').checked=event.remind!==false;calendarEdit=event.id;$('eventTitle').value=event.title;$('eventDate').value=event.event_date;$('eventYearly').checked=event.repeat_yearly;$('eventSave').textContent='保存修改';$('eventTitle').focus();};
+        const remove=node('button','','删除');remove.type='button';remove.onclick=async()=>{
+          const s=snap();if(!(await notice('删除这一天？',`“${event.title}”将从纪念日列表移除，留言不受影响。`,'删除',true))||!current(s))return;
+          try{if(s.secure)await data.deleteEvent(s.room,event.id);if(!current(s))return;calendar=calendar.filter(row=>row.id!==event.id);if(!s.secure)persist(key('events',s),calendar);renderCalendar();}catch(e){fail(e);}
+        };card.append(edit,remove);
+      }
+      box.append(card);
+    }
+    document.dispatchEvent(new CustomEvent('mailbox:calendar-change',{detail:{room:state.room,events:[...calendar]}}));
+  }
+  function daysCard(value){const days=daysBetween(value);$('relationshipDays').textContent=days===null?'—':days<0?`还有 ${-days} 天`:`第 ${days+1} 天`;$('relationshipCaption').textContent=value?`从 ${value} 开始，记住每个普通日子`:'设置相识日期，开始记录';$('relationDays').textContent=days===null?'—':days<0?`还有 ${-days} 天`:`${days+1} 天`;$('relationCaption').textContent=value?`从 ${value} 开始`:'点开纪念日，写下相识的日期';}
+  async function refreshCalendar(fillDate=false){
+    if(!state.ready||calendarBusy)return;calendarBusy=true;const s=snap();
+    try{
+      let since;
+      if(s.secure){const [info,rows]=await Promise.all([data.roomDetails(s.room),data.events(s.room)]);if(!current(s))return;calendar=rows;since=info.relationship_since||localDate(info.created_at);}
+      else{calendar=storeGet(key('events',s),[]);if(!Array.isArray(calendar))calendar=[];since=storeGet(key('relationship',s),'')||localDate(state.messages[0]?.created_at);}
+      if(!current(s))return;daysCard(since);if(fillDate)$('relationshipSince').value=since;
+      lastCalendarRefresh=Date.now();
+      $('relationshipNote').textContent=s.secure?'房间成员共享相识日期与纪念日；各自只能修改自己创建的纪念日。':'旧版房间：日期与纪念日仅保存在本机。';renderCalendar();
+    }catch(e){if(current(s))$('relationshipNote').textContent=messageError(e);}
+    finally{if(current(s))calendarBusy=false;}
+  }
+  $('relationshipBtn').onclick=()=>{if(open('relationshipScrim'))void refreshCalendar(true);};
+  $('legacyEventImport').onclick=()=>{const saved=oldEvent();if(!saved)return;$('eventEditor').open=true;calendarEdit=null;$('eventTitle').value=(saved.name||'纪念日').slice(0,120);$('eventDate').value=saved.date;$('eventYearly').checked=false;$('eventSave').textContent='记下这一天';$('eventTitle').focus();toast('已找回到编辑区，确认保存后才加入纪念日列表。');};
+  $('relationshipForm').onsubmit=async event=>{
+    event.preventDefault();const value=$('relationshipSince').value;if(!validDate(value)){toast('请选择有效日期。');return;}const s=snap(),button=event.submitter;button.disabled=true;
+    try{if(s.secure)await data.setRelationship(s.room,value);else if(!persist(key('relationship',s),value))return;if(current(s)){daysCard(value);$('relationshipEditor').open=false;toast('相识日期已保存。');}}
+    catch(e){if(current(s))fail(e);}finally{button.disabled=false;}
+  };
+  $('eventForm').onsubmit=async event=>{
+    event.preventDefault();if($('eventSave').disabled)return;
+    const s=snap(),title=$('eventTitle').value.trim(),date=$('eventDate').value;if(!title||!validDate(date))return;
+    const row={id:calendarEdit||eventNonce,room_id:s.room,owner_user_id:s.userId,title,event_date:date,repeat_yearly:$('eventYearly').checked,note:$('eventNote').value,remind:$('eventRemind').checked};
+    const edit=calendarEdit;$('eventSave').disabled=true;
+    try{
+      let saved=row;
+      if(s.secure)saved=edit?await data.updateEvent(row):await data.saveEvent(row);
+      if(!current(s))return;
+      const next=[...calendar.filter(item=>item.id!==row.id),saved];
+      if(!s.secure&&!persist(key('events',s),next))return;
+      calendar=next;calendarEdit=null;eventNonce=randomId();$('eventForm').reset();$('eventSave').textContent='记下这一天';$('eventEditor').open=false;renderCalendar();toast('这一天已经记下了。');
+    }catch(e){if(current(s))fail(e);}finally{$('eventSave').disabled=false;}
+  };
+  // Local audio persists in IndexedDB. Only its identity and transport state sync.
+  // Memoirs are private projections, never inserted back into the conversation.
+  function freshMemoir(){const end=new Date(),start=new Date();start.setDate(start.getDate()-30);return {id:randomId(),revision:0,title:'',body:'',range_start:localDate(start),range_end:localDate(end)};}
+  function readMemoirFields(){return {...memoir,title:$('memoirTitle').value,body:$('memoirBody').value,range_start:$('memoirStart').value,range_end:$('memoirEnd').value};}
+  function keepMemoir(){if(!state.room||!memoir)return;memoir=readMemoirFields();memoirEdits++;persist(key('memoirDraft'),memoir);}
+  function fillMemoir(value){memoir=value||freshMemoir();memoirEdits++;$('memoirTitle').value=memoir.title;$('memoirBody').value=memoir.body;$('memoirStart').value=memoir.range_start;$('memoirEnd').value=memoir.range_end;$('memoirDelete').hidden=!memoir.revision;persist(key('memoirDraft'),memoir);}
+  function memoirControls(){for(const id of ['memoirSave','memoirGenerate','memoirNew','memoirDelete'])$(id).disabled=memoirBusy;}
+  async function listMemoirs(){const s=snap();try{
+    const list=s.secure?await data.listMemoirs(s.room):storeGet(key('memoirs',s),[]);if(!current(s))return;
+    $('memoirList').replaceChildren();
+    for(const item of (Array.isArray(list)?list:[])){
+      const button=node('button','memoir-card');button.type='button';button.append(node('span','',item.title),node('small','',`${item.range_start} — ${item.range_end}`));button.onclick=async()=>{
+        if(memoirBusy)return;const here=snap();if($('memoirBody').value&&!(await notice('打开已保存的回忆录？','当前草稿若还没保存，可以先导出。打开会替换编辑区。','打开',true)))return;if(!current(here))return;
+        try{const value=here.secure?await data.loadMemoir(here.room,item.id):item;if(current(here))fillMemoir(value);}catch(e){if(current(here))fail(e);}
+      };$('memoirList').append(button);
+    }
+  }catch(e){if(current(s))$('memoirNote').textContent=messageError(e)+' 编辑区的本机草稿仍可导出。';}}
+  $('memoirBtn').onclick=()=>{if(!open('memoirScrim'))return;const draft=storeGet(key('memoirDraft'),null),legacy=oldLocal('memoir');fillMemoir(draft?.id?draft:legacy?{...freshMemoir(),title:'从本机找回的一页',body:legacy.slice(0,200000)}:freshMemoir());$('memoirNote').textContent=state.secure?'回忆录只对当前身份可见，房间内的其他成员无法读取；未保存的编辑也会暂存在本机。':'旧版房间：回忆录只保存在本机，可导出 Markdown 备份。';void listMemoirs();memoirControls();};
+  for(const id of ['memoirTitle','memoirBody','memoirStart','memoirEnd'])$(id).oninput=keepMemoir;
+  $('memoirNew').onclick=async()=>{const s=snap();if($('memoirBody').value&&!(await notice('开始新的一篇？','请先保存或导出当前编辑内容。','开始新篇',true)))return;if(current(s))fillMemoir(freshMemoir());};
+  $('memoirGenerate').onclick=async()=>{
+    if(memoirBusy)return;const s=snap(),start=$('memoirStart').value,end=$('memoirEnd').value;
+    if(!validDate(start)||!validDate(end)||start>end){toast('请选择有效的起止日期。');return;}
+    if($('memoirBody').value&&!(await notice('重新整理正文？','这会用日期范围内的留言原文替换编辑区正文，不改变原始留言。','整理原文',true)))return;
+    if(!current(s))return;const edits=memoirEdits;memoirBusy=true;memoirControls();
+    try{const rows=await data.allMessages(s.room,s.secure,count=>{if(current(s))$('memoirProgress').textContent=`正在读取历史留言：${count} 条`;},()=>!current(s)||$('memoirScrim').hidden);
+      if(!current(s))return;const result=memoirText(rows,start,end,row=>author(row).name);
+      if(edits!==memoirEdits){toast('读取期间你修改了草稿，已保留你的编辑，请重新整理。');return;}
+      $('memoirBody').value=result.body;if(!$('memoirTitle').value)$('memoirTitle').value=`我们的日子 · ${start}`;keepMemoir();$('memoirProgress').textContent=`已整理 ${result.count} 条原文，可继续改写，然后保存。`;
+    }catch(e){if(current(s))$('memoirProgress').textContent=e.name==='AbortError'?'整理已取消。':messageError(e);}finally{if(current(s)){memoirBusy=false;memoirControls();}}
+  };
+  $('memoirSave').onclick=async()=>{
+    if(memoirBusy||!memoir)return;keepMemoir();const s=snap(),value={...memoir},edits=memoirEdits;
+    if(!value.title.trim()||!validDate(value.range_start)||!validDate(value.range_end)||value.range_start>value.range_end){toast('请填写标题和有效的起止日期。');return;}
+    memoirBusy=true;memoirControls();
+    try{
+      let saved;
+      if(s.secure)saved=await data.saveMemoir({id:value.id,revision:value.revision,title:value.title.trim(),body:value.body,range_start:value.range_start,range_end:value.range_end,room_id:s.room,owner_user_id:s.userId});
+      else{saved={...value,revision:(value.revision||0)+1,updated_at:new Date().toISOString()};const list=storeGet(key('memoirs',s),[]);if(!persist(key('memoirs',s),[saved,...list.filter(row=>row.id!==saved.id)]))return;}
+      if(!current(s))return;
+      const unchanged=edits===memoirEdits;
+      if(unchanged)fillMemoir(saved);else{memoir={...readMemoirFields(),revision:saved.revision};persist(key('memoirDraft'),memoir);}
+      $('memoirDelete').hidden=false;$('memoirNote').textContent=unchanged?'回忆录已保存。':'已保存提交时的内容，随后输入的文字仍在草稿里。';toast('回忆录已保存，原始留言没有改动。');await listMemoirs();
+    }catch(e){if(current(s))$('memoirNote').textContent=messageError(e);}finally{if(current(s)){memoirBusy=false;memoirControls();}}
+  };
+  $('memoirExport').onclick=()=>{if(!$('memoirBody').value){toast('先写一点内容再导出吧。');return;}download(new Blob([`# ${$('memoirTitle').value||'回忆录'}\n\n${$('memoirBody').value}`],{type:'text/markdown;charset=utf-8'}),($('memoirTitle').value||'回忆录').slice(0,80)+'.md');};
+  $('memoirDelete').onclick=async()=>{if(!memoir?.revision||memoirBusy)return;const s=snap(),value={...memoir};if(!(await notice('删除这篇回忆录？',`“${value.title}”会被删除，原始聊天不会受影响。需要留存时请先导出。`,'删除回忆录',true))||!current(s))return;
+    try{if(s.secure)await data.deleteMemoir(s.room,value.id,value.revision);else if(!persist(key('memoirs',s),storeGet(key('memoirs',s),[]).filter(row=>row.id!==value.id)))return;if(current(s)){fillMemoir(freshMemoir());await listMemoirs();toast('回忆录已删除。');}}catch(e){if(current(s))fail(e);}
+  };
+
+  function roomChanged(){for(const x of mediaQueue)if(x.pending?.url)URL.revokeObjectURL(x.pending.url);mediaQueue=[];
+    endRecording(true);mediaObserver.disconnect();daysCard('');eventHome.replaceChildren();
+    stopSubscription?.();stopSubscription=null;mediaController?.abort();mediaController=null;mediaBusy=false;
+    if(media?.url&&!mediaQueue.some(x=>x.pending===media))URL.revokeObjectURL(media.url);media=null;
+    for(const value of mediaUrls.values())URL.revokeObjectURL(value.url);mediaUrls.clear();mediaCards.clear();
+    calendar=[];calendarBusy=false;calendarEdit=null;lastCalendarRefresh=0;eventNonce=randomId();$('eventForm').reset();$('eventSave').disabled=false;$('eventSave').textContent='记下这一天';
+    music.reset();
+    screenshots.reset();
+    memoir=null;memoirEdits++;memoirBusy=false;$('memoirProgress').textContent='';$('attachmentFile').value='';$('attachmentCaption').value='';$('attachmentPreview').replaceChildren();
+  }
+  function ready(){void refreshCalendar();void music.ready();if(state.secure){const s=snap();stopSubscription=data.subscribeFeatures(s.room,()=>{if(current(s))void refreshCalendar();},()=>{if(current(s))void music.refresh();});}}
+  document.addEventListener('mailbox:space-open',()=>{if(['home','relationshipScrim'].includes(state.spacePanel)&&Date.now()-lastCalendarRefresh>15000)void refreshCalendar();});
+  document.addEventListener('mailbox:sheet-close',event=>{if(event.detail.id==='attachmentScrim')endRecording(true);if(event.detail.id==='attachmentScrim'&&mediaBusy)mediaController?.abort();});
+  setInterval(()=>{if(document.hidden||!state.ready)return;if($('listenSync').checked||!$('listenScrim').hidden)void music.refresh();if(!$('relationshipScrim').hidden)void refreshCalendar();},10000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ready&&$('listenSync').checked)void music.refresh();});
+  function renderWall(container){
+    for(const event of calendar){const card=node('article','msg wall-event'),bubble=node('div','bubble');bubble.append(node('small','','纪念的一天'),node('strong','',event.title),node('time','wall-date',event.event_date));card.append(bubble);container.append(card);}
+    if(music.song){const card=node('article','msg wall-event'),bubble=node('div','bubble');bubble.append(node('small','','一起听过的歌'),node('strong','',music.song.name));card.append(bubble);container.append(card);}
+  }
+  return {roomChanged,ready,renderMedia,renderWall};
+}
