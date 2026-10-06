@@ -10,7 +10,13 @@ export function initSceneInterface({$,node,state,ui}){
  const rail=node('aside','scene-sidebar');rail.id='sceneSidebar';
  rail.innerHTML='<button id="sceneSidebarToggle" type="button" aria-controls="sceneRail" aria-label="收起侧栏">'+icon('sidebar')+'</button><nav id="sceneRail" class="scene-rail" aria-label="空间导航"></nav><div class="scene-rail-footer"><i></i><p lang="en" data-poem="23" data-poem-part="en"></p><div class="scene-swatches" aria-label="切换主题"></div></div>';
  const nav=rail.querySelector('nav');
- for(const [id,label,en] of [['home','首页','Home'],['chat','对话','Chat'],['memory','记忆','Memory'],['plan','日程','Plan'],['mail','信箱','Mailbox'],['more','更多','More']]){const b=node('button');b.id='sceneNav'+id[0].toUpperCase()+id.slice(1);b.type='button';b.dataset.sceneNav=id;b.setAttribute('aria-label',label);b.title=label;b.innerHTML=icon(id)+`<span>${label}<small>${en}</small></span>`;b.onclick=()=>navigate(id);nav.append(b);}
+ let touchNavId='',touchNavAt=0;
+ for(const [id,label,en] of [['home','首页','Home'],['chat','对话','Chat'],['memory','记忆','Memory'],['plan','日程','Plan'],['mail','信箱','Mailbox'],['more','更多','More']]){const b=node('button');b.id='sceneNav'+id[0].toUpperCase()+id.slice(1);b.type='button';b.dataset.sceneNav=id;b.setAttribute('aria-label',label);b.title=label;b.innerHTML=icon(id)+`<span>${label}<small>${en}</small></span>`;b.onclick=()=>{if(touchNavId===id&&performance.now()-touchNavAt<650)return;navigate(id);};nav.append(b);}
+ let navPointer=null;
+ const navAt=(x,y)=>[...nav.querySelectorAll('[data-scene-nav]')].find(button=>{const r=button.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;});
+ document.addEventListener('pointerdown',event=>{if(!['touch','pen'].includes(event.pointerType)||document.querySelector('.scrim:not([hidden])'))return;const button=navAt(event.clientX,event.clientY);navPointer=button?{id:button.dataset.sceneNav,x:event.clientX,y:event.clientY,pointerId:event.pointerId}:null;},true);
+ document.addEventListener('pointerup',event=>{const start=navPointer;navPointer=null;if(!start||start.pointerId!==event.pointerId||Math.hypot(event.clientX-start.x,event.clientY-start.y)>14||document.querySelector('.scrim:not([hidden])'))return;const button=navAt(event.clientX,event.clientY);if(!button||button.dataset.sceneNav!==start.id)return;touchNavId=start.id;touchNavAt=performance.now();navigate(start.id);},true);
+ document.addEventListener('pointercancel',()=>navPointer=null,true);
  const names=['Ins · 日间','Ins · 夜间','暖色 · 日间','暖色 · 夜间','雨窗 · 夜间','月光 · 玻璃'];
  for(const [i,theme] of THEMES.entries()){const b=node('button');b.type='button';b.dataset.themePick=theme;b.title=names[i];b.setAttribute('aria-label',names[i]);b.setAttribute('aria-pressed',String(document.documentElement.dataset.theme===theme));b.onclick=()=>setTheme(theme);rail.querySelector('.scene-swatches').append(b);}
  const masthead=node('header','scene-masthead');masthead.id='sceneMasthead';
