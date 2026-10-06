@@ -1,6 +1,6 @@
-import {uiIcon} from './ui-icons.js?v=2.7.1';
-import {readTrackInfo,inspectLyrics,titleFromFilename} from './music-import-core.js?v=2.7.1';
-import {bytesLabel} from './feature-core.js?v=2.7.1';
+import {uiIcon} from './ui-icons.js?v=2.7.2';
+import {readTrackInfo,inspectLyrics,titleFromFilename} from './music-import-core.js?v=2.7.2';
+import {bytesLabel} from './feature-core.js?v=2.7.2';
 
 export function initMusicImport({$,node,state,toast,sheet,onSave,onCancel,onPreview,getLegacyNote=()=>''}){
  const page=node('section','music-import-page');page.id='musicImportPage';page.hidden=true;page.setAttribute('aria-label','导入歌曲与歌词');

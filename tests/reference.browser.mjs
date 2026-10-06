@@ -17,13 +17,13 @@ export async function runReference({setup,check,secureId,user,friend,fixture,roo
    await p.setViewportSize({width,height});await mode('notes');await p.waitForTimeout(100);
    let first;
    for(const theme of themes){
-    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.1')).setTheme(t),theme);
+    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.2')).setTheme(t),theme);
     const bounds=await p.evaluate(()=>{const stage=document.querySelector('.memory-stage'),card=document.querySelector('.memory-card');return {width:stage.clientWidth,height:stage.clientHeight,card:card.offsetWidth,columns:Number(stage.style.getPropertyValue('--memory-columns')),radius:parseFloat(stage.style.getPropertyValue('--light-radius'))};});
     assert.ok(bounds.card<250&&bounds.card>110);assert.ok(Math.abs(bounds.radius/Math.min(bounds.width,bounds.height)-.17)<.01);
     if(first)assert.deepEqual(bounds,first,'skin must not change layout');else first=bounds;
    }
    columns.push(first.columns);assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-   await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.1')).setTheme('ins-light'));
+   await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.2')).setTheme('ins-light'));
    await shot('notes-'+width);await mode('board');await shot('board-'+width);await mode('disc');await shot('disc-'+width);
   }
   assert.equal(columns[0],2);assert.ok(columns[1]>columns[0]);assert.ok(columns[2]>columns[1]);
@@ -54,7 +54,7 @@ export async function runReference({setup,check,secureId,user,friend,fixture,roo
  });
  await check('poetry changes on each new visit, remains stable on theme changes and never replaces stored memories',async()=>{
   const before=await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),original=JSON.stringify(s.control.records);
-  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.1')).setTheme('warm-light'));assert.equal(await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),before);
+  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.2')).setTheme('warm-light'));assert.equal(await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),before);
   await p.reload();await p.waitForFunction(()=>document.querySelector('.scene-hero-copy [data-poem]').dataset.poemId);assert.notEqual(await p.locator('.scene-hero-copy [data-poem]').getAttribute('data-poem-id'),before);assert.equal(JSON.stringify(s.control.records),original);
   assert.equal(await p.locator('#sceneMasthead [data-poem]').count(),0);
  });

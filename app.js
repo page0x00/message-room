@@ -1,13 +1,13 @@
-import {initPoetry} from './poetry.js?v=2.7.1';
-import {initThemedControls} from './theme-controls.js?v=2.7.1';
-import {initViewportLayout} from './viewport-layout.js?v=2.7.1';
-import {initAPISettings} from './api-settings.js?v=2.7.1';
-import {noticePanels} from './notice-core.js?v=2.7.1';
-import {initSceneInterface} from './scene-interface.js?v=2.7.1';
-import {initPetSpace} from './pet-space.js?v=2.7.1';
-import {initFilmSpace} from './film-space.js?v=2.7.1';
-import {initMemorySpace} from './memory-space.js?v=2.7.1';
-import {initDailySpace} from './daily-space.js?v=2.7.1';
+import {initPoetry} from './poetry.js?v=2.7.2';
+import {initThemedControls} from './theme-controls.js?v=2.7.2';
+import {initViewportLayout} from './viewport-layout.js?v=2.7.2';
+import {initAPISettings} from './api-settings.js?v=2.7.2';
+import {noticePanels} from './notice-core.js?v=2.7.2';
+import {initSceneInterface} from './scene-interface.js?v=2.7.2';
+import {initPetSpace} from './pet-space.js?v=2.7.2';
+import {initFilmSpace} from './film-space.js?v=2.7.2';
+import {initMemorySpace} from './memory-space.js?v=2.7.2';
+import {initDailySpace} from './daily-space.js?v=2.7.2';
 import {
   parseRoom,
   roomLink,
@@ -23,15 +23,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.7.1";
-import * as api from "./backend.js?v=2.7.1";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.7.1";
-import { initNotifications } from "./notifications.js?v=2.7.1";
-import { initFeatures } from "./features.js?v=2.7.1";
+} from "./core.js?v=2.7.2";
+import * as api from "./backend.js?v=2.7.2";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.7.2";
+import { initNotifications } from "./notifications.js?v=2.7.2";
+import { initFeatures } from "./features.js?v=2.7.2";
 
-import {initMessageCards} from "./message-cards.js?v=2.7.1";
-import {initAccount} from "./account.js?v=2.7.1";
-import {initMessageActions} from "./message-actions.js?v=2.7.1";
+import {initMessageCards} from "./message-cards.js?v=2.7.2";
+import {initAccount} from "./account.js?v=2.7.2";
+import {initMessageActions} from "./message-actions.js?v=2.7.2";
 let actions;
 
 const $ = (id) => document.getElementById(id);
@@ -157,6 +157,7 @@ function rememberRoom() {
   const last=state.messages.at(-1),friend=state.members.find(m=>m.user_id!==state.userId);
   const record={...existing,room:state.room,invite:state.invite||existing.invite||'',title:state.profile.otherName||friend?.display_name||'留言室',avatar:state.profile.otherAvatar||friend?.avatar_data||'',secure:state.secure,visited:Date.now(),preview:last?.content||last?.media_name||'写下第一句话吧',lastAt:last?.created_at||existing.lastAt};
   persist('recent',[record,...recentRooms().filter(r=>r.room!==state.room)].slice(0,40));renderRecent();
+  storeSet('activeRoom.'+state.userId,state.room);
 }
 function renderRecent() {
   let records=recentRooms();const query=$('roomSearch').value.trim().toLowerCase();
@@ -349,6 +350,7 @@ async function openRoom(target, {landing='chat'}={}) {
     const noticeUrl=new URL(location.href),noticePanel=noticePanels[noticeUrl.searchParams.get('notice')];if(noticePanel){noticeUrl.searchParams.delete('notice');history.replaceState(null,'',noticeUrl);if(enteredAt===(state.navigationRevision||0))openNotice(noticePanel);}
     render({ bottom: true });
     updateStatus();
+    document.dispatchEvent(new Event('mailbox:room-ready'));
   } catch (error) {
     if (epoch !== state.epoch) return;
     state.stop?.();
@@ -443,8 +445,9 @@ async function loadOlder() {
   }
 }
 
-function home() {
+function home({forgetRoom=true}={}) {
   saveDraft();
+  if(forgetRoom&&state.userId)storeSet('activeRoom.'+state.userId,'');
   ui.drawer(false);
   document.querySelector(".app-shell").classList.remove("has-room");
   ++state.epoch;
@@ -920,6 +923,7 @@ $("clearRecent").onclick = async () => {
     )
   ) {
     persist("recent", []);
+    storeSet('activeRoom.'+state.userId,'');
     renderRecent();
     void notifications.watch();
   }
@@ -1075,7 +1079,7 @@ const memories=initMemorySpace({$,state,node,toast,notice,ui,isHidden:id=>action
 const films=initFilmSpace({$,state,node,toast,notice,ui,memories});
 const apiSettings=initAPISettings({$,state,node,showSheet,closeSheet,notice,ui});
 const pet=initPetSpace({$,state,node,toast,notice,ui});
-initSceneInterface({$,node,state,ui});
+const scene=initSceneInterface({$,node,state,ui});
 initViewportLayout();
 initThemedControls();
 function openNotice(panel){if(panel==='listenScrim')$('listenBtn').click();else if(panel==='relationshipScrim')$('relationshipBtn').click();else if(panel)ui.openFeature(panel);}
@@ -1084,15 +1088,27 @@ actions=initMessageActions({$,state,node,toast,persist,showSheet,closeSheet,noti
 renderRecent();
 void notifications.watch();
 const initial = parseRoom(location.href);
+let restoreHome=true;
+document.addEventListener('mailbox:navigation',()=>{restoreHome=false;});
+function restoreLastRoom(){
+  if(initial||state.room||!state.userId||!restoreHome&&!scene.hasPendingRoom())return;
+  const local=recentRooms(),saved=storeGet('activeRoom.'+state.userId,null);
+  // Older releases did not store the active room. Only migrate a room actually
+  // visited on this browser (with a preview), never pick a server membership.
+  const room=saved===null?local.find(r=>typeof r.preview==='string'):local.find(r=>r.room===saved);
+  if(room)void openRoom(room,{landing:'home'});
+}
+document.addEventListener('mailbox:resume-room',restoreLastRoom);
 const account=initAccount({$,state,node,toast,showSheet,closeSheet,
   async onIdentity(user,previous){
     document.dispatchEvent(new CustomEvent('mailbox:account-identity',{detail:{authenticated:!!user}}));
     const target=state.room?{room:state.room,invite:state.invite}:null;
-    if(previous && previous!==user?.id){home();state.messages=[];state.members=[];state.profile={};}
+    if(previous && previous!==user?.id){home({forgetRoom:false});state.messages=[];state.members=[];state.profile={};}
     if(previous!==user?.id)apiSettings.identityChanged(previous);
     state.userId=user?.id||'';
     renderRecent();void notifications.watch();
     if(target&&user&&previous&&previous!==user.id)await openRoom(target);
+    else restoreLastRoom();
   },
   onRooms(rows){const local=recentRooms();if(!storeGet('rooms-imported.'+state.userId,false)){for(const r of storeGet('recent',[]))if(parseRoom(r.room)&&!local.some(x=>x.room===r.room))local.push(r);persist('rooms-imported.'+state.userId,true);}for(const row of rows)if(!local.some(r=>r.room===row.room_id))local.push({room:row.room_id,secure:true,title:'留言室',visited:Date.parse(row.joined_at)});persist('recent',local);renderRecent();}
 });
@@ -1104,3 +1120,5 @@ if (initial) {
 }
 
 initPoetry();
+document.documentElement.dataset.appState='ready';
+document.dispatchEvent(new Event('mailbox:ready'));

@@ -16,7 +16,7 @@ export async function runSkins({setup,check,secureId,user,friend,fixture,root}){
  s.control.daily.pockets.push({id:'skin-pocket',room_id:secureId,owner_user_id:user,title:'我们的旅行基金',target_cents:100000,daily_cents:1000,mode:'daily',qr_path:path,cover_path:null,note:'一点一点，去看更远的风景。',created_at:'2026-09-01T00:00:00Z'});
  s.control.daily.pocket_entries.push({id:'skin-deposit',pocket_id:'skin-pocket',room_id:secureId,owner_user_id:user,kind:'deposit',cents:35800,status:'settled',reason:'把今天的期待存起来。',created_at:new Date().toISOString()});
  await p.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.1')).setTheme(t),value);
+ const theme=async value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.2')).setTheme(t),value);
  const shot=async name=>{await p.waitForTimeout(280);await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/skin-'+name+'.png'});};
  await check('each skin loads its photograph and the real handwritten Chinese font',async()=>{
   await p.locator('#relationHandle').click();await p.locator('#listenBtn').click();

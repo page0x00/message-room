@@ -1,6 +1,6 @@
 {
   "name": "little-message-room",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,7 +22,8 @@
     "test:reference": "REFERENCE_ONLY=1 node tests/browser.mjs",
     "test:navigation": "NAVIGATION_ONLY=1 node tests/browser.mjs",
     "test:workspace": "WORKSPACE_ONLY=1 node tests/browser.mjs",
-    "test:touch": "TOUCH_LAYOUT_ONLY=1 node tests/browser.mjs"
+    "test:touch": "TOUCH_LAYOUT_ONLY=1 node tests/browser.mjs",
+    "test:startup": "STARTUP_ONLY=1 node tests/browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",

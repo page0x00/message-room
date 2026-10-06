@@ -1,3 +1,4 @@
+import {runStartup} from './startup.browser.mjs';
 import {runWorkspace} from './workspace.browser.mjs';
 import {runTouchLayout} from './touch-layout.browser.mjs';
 import {runNavigation} from './navigation.browser.mjs';
@@ -442,7 +443,7 @@ async function setup({
   return { page, context, control, errors, join:async(id)=>{await joinRoom(id);if(startView === "chat")await page.locator("#sceneNavChat").click();} };
 }
 try {
-  if(!process.env.TOUCH_LAYOUT_ONLY&&!process.env.WORKSPACE_ONLY&&!process.env.NAVIGATION_ONLY&&!process.env.REFERENCE_ONLY&&!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
+  if(!process.env.STARTUP_ONLY&&!process.env.TOUCH_LAYOUT_ONLY&&!process.env.WORKSPACE_ONLY&&!process.env.NAVIGATION_ONLY&&!process.env.REFERENCE_ONLY&&!process.env.API_ONLY&&!process.env.SCENE_ONLY&&!process.env.SKINS_ONLY&&!process.env.INTERACTIONS_ONLY&&!process.env.SPACE_ONLY&&!process.env.DAILY_ONLY&&!process.env.MUSIC_ONLY&&!process.env.MEMORY_ONLY&&!process.env.FILM_ONLY&&!process.env.COMPANION_ONLY){
   const t = await setup();
   const { page, control } = t;
   await check(
@@ -901,7 +902,8 @@ try {
   assert.deepEqual(p.errors, []);
   await p.context.close();
   }
-  if(process.env.TOUCH_LAYOUT_ONLY)await runTouchLayout({setup,check,secureId,user,friend,fixture,root});
+  if(process.env.STARTUP_ONLY)await runStartup({setup,check,secureId,user,friend,fixture,root});
+  else if(process.env.TOUCH_LAYOUT_ONLY)await runTouchLayout({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.WORKSPACE_ONLY)await runWorkspace({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.NAVIGATION_ONLY)await runNavigation({setup,check,secureId,user,friend,fixture,root});
   else if(process.env.REFERENCE_ONLY)await runReference({setup,check,secureId,user,friend,fixture,root});
