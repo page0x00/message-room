@@ -1,34 +1,66 @@
 <!DOCTYPE html>
 
-<html data-theme="ins-light" lang="zh-CN">
+<html data-theme="ins-light" data-app-state="loading" lang="zh-CN">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <meta content="no-referrer" name="referrer"/>
-<meta content="2.7.1" name="application-version"/>
+<meta content="2.7.2" name="application-version"/>
 <title>小小留言室</title>
+<style>
+/* Never expose the legacy markup while the current scene is being assembled. */
+html:not([data-app-state="ready"]) .app-shell{visibility:hidden;pointer-events:none}
+html[data-app-state="ready"] #appStartup{display:none}
+html{background:var(--startup-bg,#fdfdfb)}
+.app-startup{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;background-color:var(--startup-bg,#fdfdfb);background-image:var(--scene,none);background-position:center;background-size:cover;color:var(--text,#4e5045);text-align:center;font:16px/1.6 var(--font,system-ui,sans-serif)}
+.app-startup-card{display:grid;justify-items:center;gap:12px;margin:24px;padding:28px 36px;border:1px solid var(--scene-edge,#ddd);border-radius:20px;background:var(--glass,#fbfaf5e8);box-shadow:0 12px 36px var(--scene-shadow,#0001)}
+.app-startup p{margin:0}.app-startup button{color:inherit;background:var(--scene-inset,#fff);border:1px solid var(--line,#ccc);padding:10px 22px;border-radius:24px;font:inherit;cursor:pointer}
+.app-startup button[hidden]{display:none}.startup-mark{width:22px;height:22px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:startup-turn 1.1s linear infinite}
+html[data-app-state="error"] .startup-mark{animation:none;border-style:dashed}
+@keyframes startup-turn{to{transform:rotate(1turn)}}
+@media(prefers-reduced-motion:reduce){.startup-mark{animation:none}}
+</style>
 <script>
-// Restore the saved appearance before styles or application modules can paint.
-(()=>{try{const colors={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522','rain-night':'#101e2b','moon-glass':'#111a2c'};let value=JSON.parse(localStorage.getItem('mailbox.theme')||'null');if(!Object.hasOwn(colors,value))value=localStorage.getItem('theme.v2')||value;value=({clean:'ins-light',warm:'warm-light'})[value]||value;if(colors[value]){document.documentElement.dataset.theme=value;document.querySelector('meta[name=theme-color]').content=colors[value];}}catch{}})();
+// Resolve appearance once, before the first paint. A corrupt preference must not
+// hide a valid legacy theme or make the app choose another theme on startup.
+(()=>{
+ const root=document.documentElement;
+ const colors={'ins-light':'#fdfdfb','ins-dark':'#20242b','warm-light':'#fff8f0','warm-dark':'#2d2522','rain-night':'#101e2b','moon-glass':'#111a2c'};
+ const normalize=value=>({clean:'ins-light',warm:'warm-light'})[value]||value;
+ let saved,legacy;
+ try{saved=JSON.parse(localStorage.getItem('mailbox.theme')||'null');}catch{}
+ try{legacy=normalize(localStorage.getItem('theme.v2'));}catch{}
+ const theme=Object.hasOwn(colors,saved)?saved:Object.hasOwn(colors,legacy)?legacy:Object.hasOwn(colors,normalize(saved))?normalize(saved):'ins-light';
+ root.dataset.theme=theme;root.style.setProperty('--startup-bg',colors[theme]);document.querySelector('meta[name=theme-color]').content=colors[theme];
+ let issue='';
+ function status(message){if(root.dataset.appState==='ready')return;issue=message;root.dataset.appState='error';const text=document.getElementById('startupStatus'),retry=document.getElementById('startupRetry');if(text)text.textContent=message;if(retry)retry.hidden=false;}
+ const timer=setTimeout(()=>status('加载较慢，你可以继续等待，或重新加载。'),8000);
+ function failed(event){if(event.target?.tagName==='SCRIPT'||event instanceof ErrorEvent)status('页面未能加载完成，请检查网络后重试。');}
+ window.addEventListener('error',failed,true);
+ document.addEventListener('DOMContentLoaded',()=>{document.getElementById('startupRetry').onclick=()=>location.reload();if(issue)status(issue);},{once:true});
+ document.addEventListener('mailbox:ready',()=>{clearTimeout(timer);window.removeEventListener('error',failed,true);},{once:true});
+})();
 </script>
+<link rel="modulepreload" href="./app.js?v=2.7.2"/>
 <link rel="preload" href="./assets/fonts/allura.woff" as="font" type="font/woff" crossorigin/>
 
 
 <script src="./vendor/supabase.js?v=2.57.4"></script>
-<link href="./styles.css?v=2.7.1" rel="stylesheet"/><link href="./features.css?v=2.7.1" rel="stylesheet"/><link href="./ui-v2.css?v=2.7.1" rel="stylesheet"/>
-<link href="./daily-space.css?v=2.7.1" rel="stylesheet"/><link href="./space.css?v=2.7.1" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.7.1"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/><link rel="stylesheet" href="music-space.css?v=2.7.1"/>
-<link rel="stylesheet" href="memory-space.css?v=2.7.1"/>
-<link rel="stylesheet" href="film-space.css?v=2.7.1"/>
-<link rel="stylesheet" href="pet-space.css?v=2.7.1"/>
-<link rel="stylesheet" href="skins.css?v=2.7.1"/>
-<link rel="stylesheet" href="scene-layout.css?v=2.7.1"/>
-<link rel="stylesheet" href="api-settings.css?v=2.7.1"/>
-<link rel="stylesheet" href="reference-ui.css?v=2.7.1"/>
-<link rel="stylesheet" href="navigation.css?v=2.7.1"/>
-<link rel="stylesheet" href="workspace-ui.css?v=2.7.1"/>
+<link href="./styles.css?v=2.7.2" rel="stylesheet"/><link href="./features.css?v=2.7.2" rel="stylesheet"/><link href="./ui-v2.css?v=2.7.2" rel="stylesheet"/>
+<link href="./daily-space.css?v=2.7.2" rel="stylesheet"/><link href="./space.css?v=2.7.2" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.7.2"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/><link rel="stylesheet" href="music-space.css?v=2.7.2"/>
+<link rel="stylesheet" href="memory-space.css?v=2.7.2"/>
+<link rel="stylesheet" href="film-space.css?v=2.7.2"/>
+<link rel="stylesheet" href="pet-space.css?v=2.7.2"/>
+<link rel="stylesheet" href="skins.css?v=2.7.2"/>
+<link rel="stylesheet" href="scene-layout.css?v=2.7.2"/>
+<link rel="stylesheet" href="api-settings.css?v=2.7.2"/>
+<link rel="stylesheet" href="reference-ui.css?v=2.7.2"/>
+<link rel="stylesheet" href="navigation.css?v=2.7.2"/>
+<link rel="stylesheet" href="workspace-ui.css?v=2.7.2"/>
 </head>
 <body>
+<div id="appStartup" class="app-startup" role="status" aria-live="polite"><div class="app-startup-card"><span class="startup-mark" aria-hidden="true"></span><p id="startupStatus">正在打开你的空间…</p><button id="startupRetry" type="button" hidden>重新加载</button><noscript>请允许此网站运行 JavaScript，然后重新加载。</noscript></div></div>
 <div class="app-shell">
 <section aria-labelledby="homeTitle" class="screen home active" id="home">
 <header class="home-head"><div><h1 id="homeTitle">信箱</h1></div></header>
@@ -233,6 +265,6 @@
 <div class="scrim" id="collectionScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="collectionTitle"><header class="sheet-head"><h2 id="collectionTitle">我的收藏</h2><button data-close="collectionScrim" aria-label="关闭" type="button">×</button></header><p class="sheet-note">仅保存在这台设备和当前身份下。</p><div id="collectionRows"></div></section></div>
 <div class="scrim" id="forwardScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="forwardTitle"><header class="sheet-head"><h2 id="forwardTitle">转发留言</h2><button data-close="forwardScrim" aria-label="关闭" type="button">×</button></header><label class="field"><span>发送到</span><select id="forwardTarget"></select></label><p class="sheet-note" id="forwardNote" role="status"></p><div id="forwardPreview" class="forward-preview"></div><button class="btn primary wide" id="forwardSend" type="button">确认转发</button></section></div>
 <noscript>留言室需要浏览器启用 JavaScript。</noscript>
-<script src="./app.js?v=2.7.1" type="module"></script>
+<script src="./app.js?v=2.7.2" type="module"></script>
 </body>
 </html>

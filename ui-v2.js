@@ -1,5 +1,5 @@
-import {applyPoetry} from './poetry.js?v=2.7.1';
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.1';
+import {applyPoetry} from './poetry.js?v=2.7.2';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.2';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;
@@ -49,7 +49,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     return true;
   }
   function drawer(open){
-    if(open&&!state.room&&state.spacePanel!=='apiSettingsScrim')return;
+    if(open&&!state.room&&state.spacePanel&& !['home','apiSettingsScrim'].includes(state.spacePanel))return;
     if(open===!$('relationSpace').inert)return;
     const restoreFocus=!open&&$('relationSpace').contains(document.activeElement);
     if(open&&!state.spacePanel)page();
@@ -62,7 +62,7 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
     else{document.dispatchEvent(new Event('mailbox:space-close'));if(restoreFocus&&previousFocus?.isConnected&&!previousFocus.closest('[inert]'))previousFocus.focus({preventScroll:true});previousFocus=null;}
   }
   function openFeature(id){
-    if(!state.room&&id!=='apiSettingsScrim')return;
+    if(!state.room&&id!=='apiSettingsScrim'){document.dispatchEvent(new CustomEvent('mailbox:room-required',{detail:{panel:id}}));return;}
     document.dispatchEvent(new Event('mailbox:navigation'));
     const wasOpen=!$('relationSpace').inert,changed=page(id);
     drawer(true);
@@ -102,9 +102,9 @@ export function initInterface({$,state,node,toast,persist,showSheet,closeSheet,s
   }
   $('contactForm').onsubmit=event=>{event.preventDefault();const address=$('contactAddress').value.trim(),name=$('contactName').value.trim();if(!contactTarget(address)){toast('请输入 http(s) 网址或有效邮箱。');return;}const old=storeGet('contacts',[]);if(!persist('contacts',[{id:randomId(),address,name},...(Array.isArray(old)?old:[]).filter(c=>c.address!==address)].slice(0,100)))return;$('contactForm').reset();closeSheet('addRoomScrim');contacts();toast('联系方式已留下。');};
   $('roomSearch').addEventListener('input',contacts);
-  let previous;try{previous=localStorage.getItem('theme.v2');}catch{}
-  const savedTheme=storeGet('theme',null);
-  setTheme(THEMES.includes(savedTheme)?savedTheme:previous||savedTheme||'ins-light');
+  // The head script already resolved storage and legacy theme names before paint.
+  // Reuse that choice rather than resolving it differently after modules load.
+  setTheme(document.documentElement.dataset.theme);
   applyPoetry();contacts();
   return {drawer,settings,openFeature,page,registerPanel};
 }
