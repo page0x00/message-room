@@ -3,6 +3,16 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
  const s=await setup({secure:true,startView:'home',touch:true,viewport:{width:1280,height:800},rows:Array.from({length:85},(_,i)=>fixture(i+1,secureId,'一起留下的第 '+(i+1)+' 条回忆。',i%2?friend:user,{author_id:i%2?friend:user}))}),p=s.page;
  await p.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));
  const snapshot=async name=>{await p.evaluate(()=>document.fonts.ready);await p.screenshot({animations:'disabled',path:root+'/test-results/navigation-'+name+'.png'});};
+ await check('real touch taps reach the navigation rail',async()=>{
+  for(const [width,height] of [[390,844],[820,1180],[1280,800],[844,390]]){
+   await p.setViewportSize({width,height});
+   for(const id of ['home','chat','memory','plan','mail','more']){
+    const target=p.locator('[data-scene-nav='+id+']');
+    await target.tap();
+    assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),id==='memory'?'wallSpace':id==='plan'?'todoSpace':id,'touch tap must navigate to '+id);
+   }
+  }
+ });
  await check('navigation swaps the full main area and remains reachable on phone, tablet and desktop',async()=>{
   for(const [width,height] of [[390,844],[820,1180],[1280,800],[844,390]]){
    await p.setViewportSize({width,height});
