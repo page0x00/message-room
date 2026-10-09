@@ -1,5 +1,5 @@
-import {localConnections,directModel,localFingerprint} from './local-api.js?v=2.7.3';
-import {instructions,schema,validatePet} from './supabase/functions/_shared/pet-policy.js?v=2.7.3';
+import {localConnections,directModel,localFingerprint} from './local-api.js?v=2.7.4';
+import {instructions,schema,validatePet} from './supabase/functions/_shared/pet-policy.js?v=2.7.4';
 
 export async function generateDirectPet({sb,user,room,signal,current=()=>true,connections=localConnections,call=directModel}){
  const connection=connections.active(user);if(!connection)throw new Error('请先保存并启用本机 API 连接。');

@@ -1,7 +1,7 @@
-import {applyPoetry} from './poetry.js?v=2.7.3';
-import {localConnections,directModel,directModels} from './local-api.js?v=2.7.3';
-import {client} from './backend.js?v=2.7.3';
-import {providers,protocols,parameters,normalizeProfile,buildRequest,probeTask} from './supabase/functions/_shared/ai-providers.js?v=2.7.3';
+import {applyPoetry} from './poetry.js?v=2.7.4';
+import {localConnections,directModel,directModels} from './local-api.js?v=2.7.4';
+import {client} from './backend.js?v=2.7.4';
+import {providers,protocols,parameters,normalizeProfile,buildRequest,probeTask} from './supabase/functions/_shared/ai-providers.js?v=2.7.4';
 
 export function initAPISettings({$,state,node,showSheet,closeSheet,notice,ui}){
  const scrim=node('div','scrim');scrim.id='apiSettingsScrim';scrim.hidden=true;
