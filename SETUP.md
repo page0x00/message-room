@@ -1,4 +1,4 @@
-# 小小留言室 2.7.5 · 开通步骤
+# 小小留言室 2.7.6 · 开通步骤
 
 更新 GitHub Pages 会更新前端，**不会自动修改 Supabase**。当前环境没有线上数据库管理员权限，以下操作需要项目所有者执行。旧 `messages` 不删除、不清空。
 
@@ -7,7 +7,7 @@
 1. Supabase → SQL Editor，打开仓库的 [`supabase/INSTALL.sql`](supabase/INSTALL.sql)，复制整份 SQL 执行一次。它把当前全部增量 migration 合成一个事务，可重复执行；已有旧留言会保留，已有邀请房间也不会重建。若执行失败，整个事务回滚。也可以按文件名顺序分别执行 `supabase/migrations/` 下的全部 SQL。
 2. Authentication → Sign In / Providers，启用 **Email**；需要访客时同时启用 **Anonymous Sign-Ins** 与 **Manual Linking**。保持项目现有的验证码等安全设置；如已强制 CAPTCHA，当前还需要补接该组件，不要关闭它来绕过。
 
-已经安装旧版的项目，请先核对迁移记录，再执行 `main` 中完整的 `INSTALL.sql`，或依次执行所有尚未执行的 migration。2.7.0–2.7.5 的界面修复没有新增 SQL；已完成之前全部迁移的项目无需为本轮界面更新重跑数据库安装。
+已经安装旧版的项目，请先核对迁移记录，再执行 `main` 中完整的 `INSTALL.sql`，或依次执行所有尚未执行的 migration。2.7.0–2.7.6 的界面修复没有新增 SQL；已完成之前全部迁移的项目无需为本轮界面更新重跑数据库安装。
 
 刷新网页，点首页 `＋` 新建邀请房间，把完整链接交给朋友。已有邀请成员可从最近列表返回；旧链接继续收发文字。
 
@@ -68,7 +68,7 @@ npm run test:browser
 
 端侧重点：两种身份文字/多引用/附件互发、真实录音、共同歌曲进度和自动播放限制、长截图中文识别质量、关闭页面后的推送送达/点击跳回原房间。iPhone/iPad 通常需将网页添加到主屏幕后使用 Web Push；不同浏览器及系统省电设置会影响后台通知。
 
-当前版本为 **2.7.5**，源码在 `main`。`Publish main to Pages branch` 工作流将 `main` 同步至 `gh-pages` 并保留 `pr-preview/`，随后由 GitHub Pages 发布 `gh-pages` 根目录。维护现有工作流，不要把旧预览分支当作正式部署源。JS/CSS 入口带版本参数，Service Worker 只处理通知，不缓存页面、消息或媒体。直接访问 [正式页面](https://page0x00.github.io/message-room/)。
+当前版本为 **2.7.6**，源码在 `main`。`Publish main to Pages branch` 工作流将 `main` 同步至 `gh-pages` 并保留 `pr-preview/`，随后由 GitHub Pages 发布 `gh-pages` 根目录。维护现有工作流，不要把旧预览分支当作正式部署源。JS/CSS 入口带版本参数，Service Worker 只处理通知，不缓存页面、消息或媒体。直接访问 [正式页面](https://page0x00.github.io/message-room/)。
 
 若需要回退，恢复前端 Git 提交即可，不反向删除数据表、不清空消息、不关闭 RLS。独立 SQL 文件按顺序升级；不要在已升级功能的线上单独重跑旧的 Auth migration 而不接着执行功能 migration。
 

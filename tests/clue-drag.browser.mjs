@@ -3,8 +3,9 @@ import {readFile} from 'node:fs/promises';
 import {memoryControl} from './memory-controls.mjs';
 export async function runClueDrag({setup,check,secureId,user,fixture,root}){
  const photo=await readFile(root+'/assets/skins/warm-day.webp'),path=secureId+'/'+user+'/00000000-0000-4000-a000-000000000091';
- const s=await setup({secure:true,startView:'home',touch:true,viewport:{width:1280,height:730},rows:[fixture(1,secureId,'一张便签',user,{author_id:user,display_date:'2026-09-20'}),fixture(2,secureId,'照片',user,{author_id:user,message_type:'image',media_path:path,media_mime:'image/webp',media_name:'窗边.webp',media_size:photo.length})],uploads:[[path,{buffer:photo,mime:'image/webp'}]]}),p=s.page;
+ const s=await setup({secure:true,startView:'home',touch:true,viewport:{width:1280,height:730},rows:[fixture(1,secureId,'长一点的回忆文字，用来检查便签的排版。'.repeat(12),user,{author_id:user,display_date:'2026-09-20'}),fixture(2,secureId,'',user,{author_id:user,message_type:'image',media_path:path,media_mime:'image/webp',media_name:'窗边.webp',media_size:photo.length})],uploads:[[path,{buffer:photo,mime:'image/webp'}]]}),p=s.page;
  await p.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));
+ s.control.memoryProfiles.push({room_id:secureId,owner_user_id:user,data:{annotations:{'message:2':{back:'背面的补充记录，用来检查翻面后的排版。'.repeat(12),tags:['照片','补充记录']}}},revision:1});
  await p.locator('#sceneNavMemory').tap();await memoryControl(p,'[data-memory-mode=board]');
  const cdp=await s.context.newCDPSession(p);
  const drag=async(from,to)=>{
@@ -30,6 +31,43 @@ export async function runClueDrag({setup,check,secureId,user,fixture,root}){
   assert.ok((x?gap.right:gap.left)<18&& (y?gap.bottom:gap.top)<18,JSON.stringify({x,y,gap,frame:f,card:moved}));
   assert.ok(Object.values(gap).every(n=>n>=-1),'rotated card must stay inside the visible frame: '+JSON.stringify(gap));
  };
+ await check('photo and note footers stay inside the paper on both faces, across themes, sizes and zoom',async()=>{
+  const geometry=card=>card.evaluate(el=>{
+   const padding=parseFloat(getComputedStyle(el).paddingBottom);
+   return {height:el.offsetHeight,buttons:[...el.querySelectorAll('.memory-card-actions button')].map(b=>{
+    let x=0,y=0;for(let e=b;e&&e!==el;e=e.offsetParent){x+=e.offsetLeft;y+=e.offsetTop;}
+    return {label:b.textContent,inside:x>=0&&y>=0&&x+b.offsetWidth<=el.clientWidth+1&&y+b.offsetHeight<=el.clientHeight-padding+1};
+   })};
+  });
+  for(const [width,height] of [[820,1180],[390,844],[1280,730]]){
+   await p.setViewportSize({width,height});await p.waitForTimeout(180);
+   for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){
+    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.6')).setTheme(t),theme);
+    for(const mode of ['board','notes']){
+     await memoryControl(p,`[data-memory-mode=${mode}]`);await p.locator('#memoryZoomReset').tap();
+     await picture.locator('img').evaluate(img=>img.complete&&img.naturalWidth?null:new Promise(resolve=>img.addEventListener('load',resolve,{once:true})));
+     for(const zoom of [100,50]){
+      if(zoom===50)await halfway();
+      for(const card of [note,picture]){
+       const front=await geometry(card),label=`${theme} ${width} ${mode} ${zoom}% ${await card.getAttribute('data-memory-id')}`;
+       assert.ok(front.buttons.every(b=>b.inside),label+' front '+JSON.stringify(front));
+       await card.getByRole('button',{name:'翻面',exact:true}).tap();
+       const back=await geometry(card);
+       assert.ok(back.buttons.every(b=>b.inside),label+' back '+JSON.stringify(back));
+       assert.equal(back.height,front.height,label+' keeps its paper size when flipped');
+       await card.getByRole('button',{name:'翻面',exact:true}).tap();
+       assert.equal(await p.locator('#memoryDetail').isVisible(),false,label+' repeated flips stay on the board');
+      }
+      if(width===820&&theme==='ins-dark'&&mode==='board'&&zoom===100)await p.screenshot({path:root+'/test-results/card-actions-tablet.png'});
+     }
+    }
+   }
+  }
+  await memoryControl(p,'[data-memory-mode=board]');await p.locator('#memoryZoomReset').tap();
+  await picture.getByRole('button',{name:'翻面',exact:true}).focus();await p.keyboard.press('Enter');
+  assert.equal(await picture.evaluate(el=>el.classList.contains('flipped')),true);assert.equal(await p.locator('#memoryDetail').isVisible(),false);
+  await p.keyboard.press('Enter');assert.equal(await picture.evaluate(el=>el.classList.contains('flipped')),false);
+ });
  await check('at 50% both note and photo can reach the visible panel edges, outside the old central canvas',async()=>{
   await halfway();
   assert.equal(await p.locator('#memoryZoomReset').textContent(),'50%');

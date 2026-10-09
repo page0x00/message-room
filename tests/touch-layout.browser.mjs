@@ -49,12 +49,12 @@ export async function runTouchLayout({setup,check,secureId,user,fixture,root}){
   await p.setViewportSize({width:1280,height:680});await p.locator('#sceneNavMemory').tap();await p.locator('.memory-card').first().waitFor();
   const stage=await p.locator('.memory-stage').boundingBox(),header=await p.locator('.relation-head').boundingBox();assert.ok(stage.y<=header.y+header.height+2);assert.equal(await p.locator('#memoryTools').isHidden(),true);
   for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){
-   await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.7.5')).setTheme(theme),theme);await tools();
+   await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.7.6')).setTheme(theme),theme);await tools();
    const expanded=await p.locator('.memory-stage').boundingBox();assert.deepEqual(expanded,stage,'opening tools must not shrink the wall');
    const colors=await p.locator('#memoryTools').evaluate(e=>({background:getComputedStyle(e).backgroundColor,text:getComputedStyle(e).color}));assert.notEqual(colors.background,colors.text);
    await p.locator('[aria-label="收起回忆工具"]').tap();
   }
-  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.5')).setTheme('warm-dark'));await tools();await shot('wall-tools');await p.locator('[aria-label="收起回忆工具"]').tap();await mode('disc');await shot('wall-disc');await mode('board');await shot('wall-board');
+  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.6')).setTheme('warm-dark'));await tools();await shot('wall-tools');await p.locator('[aria-label="收起回忆工具"]').tap();await mode('disc');await shot('wall-disc');await mode('board');await shot('wall-board');
  });
  await check('a clue card reaches all four visible panel corners after resize and zoom and retains its position',async()=>{
   const card=p.locator('[data-memory-id="message:1"]');
