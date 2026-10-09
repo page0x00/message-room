@@ -3,6 +3,16 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
  const s=await setup({secure:true,startView:'home',touch:true,viewport:{width:1280,height:800},rows:Array.from({length:85},(_,i)=>fixture(i+1,secureId,'一起留下的第 '+(i+1)+' 条回忆。',i%2?friend:user,{author_id:i%2?friend:user}))}),p=s.page;
  await p.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));
  const snapshot=async name=>{await p.evaluate(()=>document.fonts.ready);await p.screenshot({animations:'disabled',path:root+'/test-results/navigation-'+name+'.png'});};
+ await check('touch fallback still routes when another layer intercepts the visible sidebar',async()=>{
+  await p.setViewportSize({width:820,height:1180});
+  await p.locator('#sceneNavChat').click();
+  const target=await p.locator('#sceneNavMemory').boundingBox();
+  assert.ok(target);
+  await p.evaluate(({x,y,w,h})=>{const blocker=document.createElement('div');blocker.id='navTouchBlocker';Object.assign(blocker.style,{position:'fixed',left:x+'px',top:y+'px',width:w+'px',height:h+'px',zIndex:'9999',background:'transparent'});document.body.append(blocker);},{x:target.x,y:target.y,w:target.width,h:target.height});
+  await p.touchscreen.tap(target.x+target.width/2,target.y+target.height/2);
+  await p.waitForFunction(()=>document.querySelector('.scene-shell')?.dataset.route==='wallSpace');
+  await p.locator('#navTouchBlocker').evaluate(el=>el.remove());
+ });
  await check('navigation swaps the full main area and remains reachable on phone, tablet and desktop',async()=>{
   for(const [width,height] of [[390,844],[820,1180],[1280,800],[844,390]]){
    await p.setViewportSize({width,height});
