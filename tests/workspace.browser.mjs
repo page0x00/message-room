@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 function wav(){const n=8000*12,b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(36+n*2,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(8000,24);b.writeUInt32LE(16000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(Math.sin(i*.2)*12000),44+i*2);return b;}
 export async function runWorkspace({setup,check,root,secureId,user}){
  const s=await setup({secure:true,touch:true,viewport:{width:1536,height:1260}}),p=s.page;
- const theme=value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.4')).setTheme(t),value);
+ const theme=value=>p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.5')).setTheme(t),value);
  const shot=async name=>{await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:root+'/test-results/workspace-'+name+'.png',animations:'disabled'});};
  const stored=()=>p.evaluate(async({secureId,user})=>(await import('./local-music.js')).musicStore('library.'+secureId+'.'+user),{secureId,user});
  await theme('warm-dark');

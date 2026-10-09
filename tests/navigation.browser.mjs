@@ -3,6 +3,7 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
  const s=await setup({secure:true,startView:'home',touch:true,viewport:{width:1280,height:800},rows:Array.from({length:85},(_,i)=>fixture(i+1,secureId,'一起留下的第 '+(i+1)+' 条回忆。',i%2?friend:user,{author_id:i%2?friend:user}))}),p=s.page;
  await p.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));
  const snapshot=async name=>{await p.evaluate(()=>document.fonts.ready);await p.screenshot({animations:'disabled',path:root+'/test-results/navigation-'+name+'.png'});};
+ const settleRail=()=>p.locator('.scene-shell').evaluate(async shell=>{await Promise.all(shell.getAnimations().map(a=>a.finished.catch(()=>{})));await new Promise(requestAnimationFrame);});
  await check('touch navigation works when the browser omits click, and a normal tap activates exactly once',async()=>{
   await p.evaluate(()=>{
    window.suppressSidebarClick=e=>e.preventDefault();
@@ -12,6 +13,7 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
   for(const [id,route] of [['Chat','chat'],['Memory','wallSpace'],['Plan','todoSpace'],['Mail','mail'],['More','more'],['Home','home']]){
    await p.locator('#sceneNav'+id).tap();
    assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),route,'pointerup must not depend on a compatibility click: '+id);
+   assert.equal(await p.locator('#sceneNav'+id).evaluate(el=>getComputedStyle(el).outlineStyle),'none','touch selection must not leave a clipped focus ring');
   }
   await p.evaluate(()=>document.querySelector('#sceneSidebar').removeEventListener('touchstart',window.suppressSidebarClick));
   const before=await p.evaluate(()=>window.sceneViewChanges);
@@ -42,6 +44,7 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
   await p.locator('#sceneNavMore').tap();assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'more');
   await p.locator('#sceneNavChat').focus();await p.keyboard.press('Enter');assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'chat');
   await p.locator('#sceneNavHome').focus();await p.keyboard.press('Space');assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'home');
+  assert.equal(await p.locator('#sceneNavHome').evaluate(el=>getComputedStyle(el).outlineStyle),'solid','keyboard focus must stay visible');
   await cdp.detach();
  });
  await check('content layers cannot steal sidebar taps in any theme on phone, tablet or desktop',async()=>{
@@ -79,17 +82,25 @@ export async function runNavigation({setup,check,secureId,user,friend,fixture,ro
    await p.locator('#sceneNavMemory').click();await snapshot('memory-'+width);
   }
  });
- await check('the collapsible sidebar resizes the whole page, retains its preference and exposes accessible icon navigation',async()=>{
+ await check('the sidebar animates without blocking navigation, retains its preference and exposes accessible icon navigation',async()=>{
   await p.setViewportSize({width:1280,height:800});
   if(await p.locator('.scene-shell').evaluate(e=>e.classList.contains('rail-collapsed')))await p.locator('#sceneSidebarToggle').click();
+  await settleRail();
   const expanded=await p.locator('#relationSpace').boundingBox();await p.getByRole('button',{name:'收起侧栏',exact:true}).click();
+  const during=await p.evaluate(async()=>{await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);return {x:document.querySelector('#relationSpace').getBoundingClientRect().x,moving:document.querySelector('.scene-shell').getAnimations().some(a=>a.playState==='running')};});
+  assert.ok(during.moving,'a toggle must have a real in-progress layout transition');
+  await settleRail();
   const collapsed=await p.locator('#relationSpace').boundingBox();assert.ok(collapsed.width-expanded.width>75);assert.ok(collapsed.x<expanded.x);
+  assert.ok(during.x>collapsed.x&&during.x<expanded.x,'content must move through intermediate positions');
   assert.equal(await p.getByRole('button',{name:'展开侧栏',exact:true}).getAttribute('aria-expanded'),'false');
   await p.getByRole('button',{name:'对话',exact:true}).click();await p.locator('#messageInput').fill('切换回来仍然保留的草稿');
   await p.reload();await p.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));
   assert.equal(await p.locator('.scene-shell').evaluate(e=>e.classList.contains('rail-collapsed')),true);
+  assert.equal(await p.locator('.scene-shell').evaluate(e=>e.getAnimations().length),0,'restored sidebar preference must not animate on startup');
   await p.locator('#sceneNavMemory').click();await snapshot('collapsed');
   await p.getByRole('button',{name:'展开侧栏',exact:true}).click();await snapshot('expanded');
+  await p.evaluate(async()=>{document.querySelector('#sceneSidebarToggle').click();await new Promise(requestAnimationFrame);document.querySelector('#sceneSidebarToggle').click();document.querySelector('#sceneNavChat').click();});
+  await settleRail();assert.equal(await p.locator('.scene-shell').getAttribute('data-route'),'chat');assert.equal(await p.locator('#sceneSidebarToggle').getAttribute('aria-expanded'),'true');
  });
  await check('rapid taps keep live message and memory nodes, zoom, drafts and editors without redundant data reloads',async()=>{
   await p.locator('#sceneNavMemory').click();await p.locator('.memory-card').first().waitFor();

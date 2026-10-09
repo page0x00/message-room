@@ -1,8 +1,8 @@
-import {storeGet,storeSet} from './core.js?v=2.7.4';
-import {applyPoetry} from './poetry.js?v=2.7.4';
-import {initSidebarControls} from './sidebar-controls.js?v=2.7.4';
+import {storeGet,storeSet} from './core.js?v=2.7.5';
+import {applyPoetry} from './poetry.js?v=2.7.5';
+import {initSidebarControls} from './sidebar-controls.js?v=2.7.5';
 /* One shared scene; existing controllers own all room data. */
-import {THEMES,setTheme} from './ui-v2.js?v=2.7.4';
+import {THEMES,setTheme} from './ui-v2.js?v=2.7.5';
 const paths={sidebar:'M3 4h18v16H3zM9 4v16M13 9l3 3-3 3',home:'M3 11 12 3l9 8M5 10v11h5v-7h4v7h5V10',chat:'M5 4h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Zm3 7h.01M12 11h.01M16 11h.01',memory:'M6 3h13v18H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm0 0v18M9 6h6',plan:'M4 5h16v16H4zM7 2v6M17 2v6M4 10h16',mail:'M3 5h18v15H3zM3 6l9 7 9-7',more:'M4 12h.01M12 12h.01M20 12h.01',search:'M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15ZM16 16l5 5',bell:'M5 17h14l-2-4V9a5 5 0 0 0-10 0v4l-2 4ZM10 21h4M12 2v2',arrow:'M4 12h16m-6-6 6 6-6 6',folder:'M3 5h7l2 3h9v13H3zM7 13h10',check:'M9 3h6M7 4H4v17h16V4h-3M8 13l3 3 5-7',star:'m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z',planet:'M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0ZM6 9C-3 13 2 19 13 15S25 5 18 7',play:'m9 5 11 7-11 7V5Z',pause:'M9 5v14M16 5v14',prev:'M5 5v14M19 5 8 12l11 7V5Z',next:'M19 5v14M5 5l11 7-11 7V5Z',heart:'M12 21 3 12C-3 4 8-1 12 7c4-8 15-3 9 5l-9 9Z',shuffle:'M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4M3 18h3c2 0 4-3 6-6s4-6 6-6h3m-4-4 4 4-4 4',plus:'M12 4v16M4 12h16',close:'m6 6 12 12M6 18 18 6'};
 const icon=name=>`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[name]||paths.star}"/></svg>`;
 export function initSceneInterface({$,node,state,ui}){
@@ -43,8 +43,8 @@ export function initSceneInterface({$,node,state,ui}){
  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
  const narrowRail=matchMedia('(min-width:700px) and (max-width:979px)');
  let sidebarPreference=storeGet('scene.sidebar.compact',null);
- function sidebar(){const collapsed=sidebarPreference??narrowRail.matches;shell.classList.toggle('rail-collapsed',collapsed);$('sceneSidebarToggle').setAttribute('aria-expanded',String(!collapsed));$('sceneSidebarToggle').setAttribute('aria-label',collapsed?'展开侧栏':'收起侧栏');$('sceneSidebarToggle').title=collapsed?'展开侧栏':'收起侧栏';}
- $('sceneSidebarToggle').onclick=()=>{sidebarPreference=!shell.classList.contains('rail-collapsed');storeSet('scene.sidebar.compact',sidebarPreference);sidebar();};narrowRail.addEventListener('change',sidebar);sidebar();
+ function sidebar(animate=false){const collapsed=sidebarPreference??narrowRail.matches;shell.classList.toggle('rail-motion',animate&&!reduced.matches);shell.classList.toggle('rail-collapsed',collapsed);$('sceneSidebarToggle').setAttribute('aria-expanded',String(!collapsed));$('sceneSidebarToggle').setAttribute('aria-label',collapsed?'展开侧栏':'收起侧栏');$('sceneSidebarToggle').title=collapsed?'展开侧栏':'收起侧栏';}
+ $('sceneSidebarToggle').onclick=()=>{sidebarPreference=!shell.classList.contains('rail-collapsed');storeSet('scene.sidebar.compact',sidebarPreference);sidebar(true);};narrowRail.addEventListener('change',()=>sidebar());sidebar();
  function select(id){nav.querySelectorAll('button').forEach(b=>{if(b.dataset.sceneNav===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});}
  function syncRoute(){
   const route=shell.classList.contains('scene-inbox-open')?'mail':!$('relationSpace').inert?(state.spacePanel==='home'?'more':state.spacePanel):shell.dataset.sceneView;

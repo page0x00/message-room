@@ -8,6 +8,7 @@ export function initSidebarControls(rail){
  function usable(button){return button&&rail.contains(button)&&!button.disabled&&!button.closest('[inert]')&&button.getClientRects().length&&!blocked();}
  function cancel(){if(pressed)handled={button:pressed.button,at:performance.now()};pressed=null;}
  document.addEventListener('pointerdown',event=>{
+  if(rail.contains(event.target))rail.dataset.inputMode='pointer';
   if(!['touch','pen'].includes(event.pointerType)){handled=null;return;}
   pointers.add(event.pointerId);
   if(pointers.size!==1||!event.isPrimary){cancel();return;}
@@ -35,6 +36,9 @@ export function initSidebarControls(rail){
   // detail=0 is a keyboard/accessibility/programmatic click, including the
   // activation above. Suppress only the browser's follow-up pointer click.
   if(event.detail>0&&handled?.button===buttonFor(event.target)&&performance.now()-handled.at<800){event.preventDefault();event.stopImmediatePropagation();handled=null;}
+ },true);
+ document.addEventListener('keydown',event=>{
+  if(!event.metaKey&&!event.ctrlKey&&!event.altKey&&event.key!=='Shift')rail.dataset.inputMode='keyboard';
  },true);
  window.addEventListener('blur',()=>{cancel();pointers.clear();});
 }

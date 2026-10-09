@@ -1,8 +1,8 @@
-import {poetryMarkup,applyPoetry} from './poetry.js?v=2.7.4';
-import {localDate,storeGet,storeSet,randomId} from './core.js?v=2.7.4';
-import {cents,money,checkinStats,pocketBalance,pocketToday,wheelValues} from './daily-core.js?v=2.7.4';
-import * as db from './daily-backend.js?v=2.7.4';
-import {mediaBlob} from './feature-backend.js?v=2.7.4';
+import {poetryMarkup,applyPoetry} from './poetry.js?v=2.7.5';
+import {localDate,storeGet,storeSet,randomId} from './core.js?v=2.7.5';
+import {cents,money,checkinStats,pocketBalance,pocketToday,wheelValues} from './daily-core.js?v=2.7.5';
+import * as db from './daily-backend.js?v=2.7.5';
+import {mediaBlob} from './feature-backend.js?v=2.7.5';
 
 export function initDailySpace({$,state,node,toast,notice,ui}){
  let lastRefreshAt=0;
