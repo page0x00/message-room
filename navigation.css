@@ -33,6 +33,11 @@
 .scene-sidebar{overflow:hidden}
 .scene-rail{min-height:0;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
 .scene-rail button{min-height:48px;flex-shrink:0;touch-action:manipulation}
+/* A touch-selected item uses its theme highlight, not a clipped focus ring.
+   Keyboard focus stays visible inside the button, clear of the rail's clip. */
+.scene-sidebar button{-webkit-tap-highlight-color:transparent}
+.scene-shell .scene-sidebar .scene-rail button:focus-visible,.scene-shell #sceneSidebarToggle:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.scene-shell .scene-sidebar[data-input-mode=pointer] .scene-rail button:focus,.scene-shell .scene-sidebar[data-input-mode=pointer] #sceneSidebarToggle:focus{outline:none}
 .scene-shell[data-route-kind=page]{grid-template-rows:minmax(0,1fr);padding-bottom:18px;row-gap:0}
 .scene-shell[data-route-kind=page] .scene-masthead{display:none}
 .scene-shell[data-route-kind=page] .room-screen,.scene-shell[data-route-kind=page] .room-screen.active{display:block;grid-column:2;grid-row:1;position:relative;overflow:hidden;padding:0;width:100%;height:100%;min-height:0}
@@ -62,14 +67,29 @@
  :root .scene-shell[data-scene-view].rail-collapsed{--nav-width:64px}
  :root .scene-shell[data-scene-view] .scene-sidebar{visibility:visible;grid-column:1;grid-row:1/-1}
  .scene-shell[data-route-kind=home] .scene-dock{grid-template-rows:minmax(0,1.1fr) minmax(0,.9fr)}
- .scene-shell.rail-collapsed .scene-rail button span,.scene-shell.rail-collapsed .scene-rail-footer>p,.scene-shell.rail-collapsed .scene-rail-footer>i{display:none}
- .scene-shell.rail-collapsed .scene-rail button{display:flex;justify-content:center;align-items:center;min-height:52px;padding:10px 0}
+ .scene-shell .scene-rail button{display:grid;grid-template-columns:28px minmax(0,1fr);justify-content:start;align-items:center;gap:14px;min-height:64px;padding:10px 14px;font-size:15px}
+ .scene-shell .scene-rail button>span{display:block;min-width:0;overflow:hidden;white-space:nowrap;opacity:1;visibility:visible;transform:translateX(0)}
+ .scene-shell .scene-rail button small{display:block}
+ .scene-shell.rail-collapsed .scene-rail button{gap:0;padding-inline:18px}
+ .scene-shell.rail-collapsed .scene-rail button>span{opacity:0;visibility:hidden;transform:translateX(-6px)}
+ .scene-shell .scene-rail-footer>p,.scene-shell .scene-rail-footer>i{overflow:hidden;max-height:240px;opacity:1;visibility:visible}
+ .scene-shell.rail-collapsed .scene-rail-footer>p,.scene-shell.rail-collapsed .scene-rail-footer>i{max-height:0;margin-block:0;opacity:0;visibility:hidden}
  .scene-shell.rail-collapsed .scene-swatches{display:grid;grid-template-columns:repeat(2,13px);gap:12px;justify-content:center;margin:0}
  .scene-shell.rail-collapsed .scene-rail-footer{padding-inline:0}
- .scene-shell.rail-collapsed #sceneSidebarToggle{margin-inline:auto}
- .scene-shell:not(.rail-collapsed) .scene-rail button{display:flex;gap:14px;justify-content:flex-start;padding-inline:14px;font-size:15px}
- .scene-shell:not(.rail-collapsed) .scene-rail button small{display:block}
+ .scene-shell.rail-collapsed #sceneSidebarToggle{margin-inline:10px 0}
  .scene-shell.scene-inbox-open .room-list{grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:8px 26px}
+}
+@media(min-width:700px) and (min-height:501px) and (prefers-reduced-motion:no-preference){
+ /* Enable only after a deliberate toggle: saved layouts never slide on load.
+    CSS transitions reverse from the current position on repeated taps. */
+ .scene-shell.rail-motion{transition:grid-template-columns 280ms cubic-bezier(.22,1,.36,1)}
+ .scene-shell.rail-motion .scene-rail button{transition:padding 280ms cubic-bezier(.22,1,.36,1),gap 280ms cubic-bezier(.22,1,.36,1)}
+ .scene-shell.rail-motion .scene-rail button>span{transition:opacity 180ms ease,transform 240ms ease,visibility 0s}
+ .scene-shell.rail-motion.rail-collapsed .scene-rail button>span{transition:opacity 120ms ease,transform 180ms ease,visibility 0s 120ms}
+ .scene-shell.rail-motion #sceneSidebarToggle{transition:margin 280ms cubic-bezier(.22,1,.36,1)}
+ .scene-shell.rail-motion .scene-rail-footer{transition:padding 280ms ease}
+ .scene-shell.rail-motion .scene-rail-footer>p,.scene-shell.rail-motion .scene-rail-footer>i{transition:opacity 160ms ease,max-height 280ms ease,margin 280ms ease,visibility 0s}
+ .scene-shell.rail-motion.rail-collapsed .scene-rail-footer>p,.scene-shell.rail-motion.rail-collapsed .scene-rail-footer>i{transition:opacity 120ms ease,max-height 280ms ease,margin 280ms ease,visibility 0s 120ms}
 }
 @media(max-width:699px),(max-height:500px){
  #sceneSidebarToggle{display:none}

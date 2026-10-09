@@ -1,10 +1,10 @@
-import {createMemoryViewport,memoryLayout} from './memory-viewport.js?v=2.7.4';
-import {applyPoetry,poetryMarkup} from './poetry.js?v=2.7.4';
-import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.7.4';
-import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.7.4';
-import * as daily from './daily-backend.js?v=2.7.4';
-import * as db from './memory-backend.js?v=2.7.4';
-import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.7.4';
+import {createMemoryViewport,memoryLayout} from './memory-viewport.js?v=2.7.5';
+import {applyPoetry,poetryMarkup} from './poetry.js?v=2.7.5';
+import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.7.5';
+import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.7.5';
+import * as daily from './daily-backend.js?v=2.7.5';
+import * as db from './memory-backend.js?v=2.7.5';
+import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.7.5';
 
 export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false}){
  const pane=$('wallSpace'),box=$('wallEntries');box.className='memory-viewport';
@@ -135,7 +135,14 @@ export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false
  document.addEventListener('mailbox:space-open',()=>{if(state.spacePanel==='wallSpace'){render();if(Date.now()-lastRefreshAt>15000)void refresh();}});const suspend=()=>{cancelAnimationFrame(resizeFrame);cancelAnimationFrame(inertia);detail.querySelectorAll('audio,video').forEach(el=>el.pause());};document.addEventListener('mailbox:space-close',suspend);document.addEventListener('mailbox:space-page',()=>{if(pane.hidden)suspend();});
  $('memorySearchToggle').onclick=()=>{const show=$('memoryFilters').hidden;$('memoryFilters').hidden=!show;$('memorySearchToggle').setAttribute('aria-expanded',String(show));if(show)$('memoryTag').focus();};
  chrome.querySelectorAll('[data-memory-kind]').forEach(b=>b.onclick=()=>{kind=b.dataset.memoryKind;render();});
- const resizeObserver=new ResizeObserver(()=>{if(!pane.hidden&&(Math.abs(lastWidth-box.clientWidth)>2||Math.abs(lastHeight-box.clientHeight)>2)){cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);}});resizeObserver.observe(box);
+ function resize(){
+  resizeFrame=0;if(pane.hidden)return;
+  // Keep the existing cards while the sidebar slides. Rebuilding the whole
+  // board for intermediate widths stalls the animation on touch devices.
+  if(pane.closest('.scene-shell')?.getAnimations().some(a=>a.transitionProperty==='grid-template-columns'&&a.playState==='running')){resizeFrame=requestAnimationFrame(resize);return;}
+  render();
+ }
+ const resizeObserver=new ResizeObserver(()=>{if(!pane.hidden&&(Math.abs(lastWidth-box.clientWidth)>2||Math.abs(lastHeight-box.clientHeight)>2)){cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);}});resizeObserver.observe(box);
  document.addEventListener('mailbox:calendar-change',event=>{if(event.detail.room!==state.room)return;calendar=event.detail.events;render();});
  function ready(){if(state.secure){const s=snap();stop=daily.watch(s.room,()=>{if(current(s)&&!pane.hidden)void refresh();});}}
  function reset(){epoch++;renderKey='';lastRefreshAt=0;viewport?.destroy();viewport=null;viewStates={};kind='all';lastTap=null;visibleLimit=36;stop?.();stop=null;cancelAnimationFrame(inertia);for(const url of urls.values())URL.revokeObjectURL(url);urls.clear();history=[];entries=[];calendar=[];listens=[];profile={data:{},revision:0};rows=[];reading=null;saves=Promise.resolve();selected.clear();mode='notes';dark=false;selecting=false;angle=0;box.replaceChildren();detail.replaceChildren();detail.hidden=true;box.hidden=false;editor.hidden=true;$('memoryDate').value='';$('memoryTag').value='';}
