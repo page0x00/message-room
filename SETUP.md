@@ -1,4 +1,4 @@
-# 小小留言室 2.4 · 开通步骤
+# 小小留言室 2.7.3 · 开通步骤
 
 更新 GitHub Pages 会更新前端，**不会自动修改 Supabase**。当前环境没有线上数据库管理员权限，以下操作需要项目所有者执行。旧 `messages` 不删除、不清空。
 
@@ -7,7 +7,7 @@
 1. Supabase → SQL Editor，打开仓库的 [`supabase/INSTALL.sql`](supabase/INSTALL.sql)，复制整份 SQL 执行一次。它把当前全部增量 migration 合成一个事务，可重复执行；已有旧留言会保留，已有邀请房间也不会重建。若执行失败，整个事务回滚。也可以按文件名顺序分别执行 `supabase/migrations/` 下的全部 SQL。
 2. Authentication → Sign In / Providers，启用 **Email**；需要访客时同时启用 **Anonymous Sign-Ins** 与 **Manual Linking**。保持项目现有的验证码等安全设置；如已强制 CAPTCHA，当前还需要补接该组件，不要关闭它来绕过。
 
-本轮关系空间更新需要新的增量迁移。已经安装旧版的项目，也请执行本分支完整 `INSTALL.sql`，或依次执行所有尚未执行的 migration。
+已经安装旧版的项目，请先核对迁移记录，再执行 `main` 中完整的 `INSTALL.sql`，或依次执行所有尚未执行的 migration。2.7.0–2.7.3 的界面修复没有新增 SQL；已完成之前全部迁移的项目无需为本轮界面更新重跑数据库安装。
 
 刷新网页，点首页 `＋` 新建邀请房间，把完整链接交给朋友。已有邀请成员可从最近列表返回；旧链接继续收发文字。
 
@@ -18,7 +18,8 @@ SQL 一并配置私有 `message-media` bucket（20 MB）、成员/附件/纪念�
 | 尚未升级的旧库 | 旧消息可读；新消息发送要求补齐稳定作者字段，不能回退设备身份 |
 | 完整 INSTALL + 邮箱 Auth | 聊天、文件、消息卡片、日常与荷包、一起听、回忆墙及私人胶片 |
 | 再部署推送与定时脚本 | 具备后台通知和失败重试能力；系统权限、实际送达需端侧验收 |
-| 再部署 AI 服务并获得成员授权 | AI 小宠物读取授权普通文字；未配置时明确显示暂未连接 |
+| 完整 SQL + 本机 API + 成员授权 | 本机直连生成小小陪伴记录，Key 不上传数据库；无需 API Edge Function |
+| 再部署 API/AI 服务并配置加密密钥 | 可选的账号同步连接与服务端生成 |
 
 ## 离线推送：额外配置一次
 
@@ -67,18 +68,18 @@ npm run test:browser
 
 端侧重点：两种身份文字/多引用/附件互发、真实录音、共同歌曲进度和自动播放限制、长截图中文识别质量、关闭页面后的推送送达/点击跳回原房间。iPhone/iPad 通常需将网页添加到主屏幕后使用 Web Push；不同浏览器及系统省电设置会影响后台通知。
 
-GitHub Pages 部署 **main / 根目录**，必须保留整个仓库静态文件结构。本更新分支前端版本为 `2.4.2`；JS/CSS 入口带版本参数，Service Worker 只处理通知，不缓存页面、消息或媒体。直接访问 [正式页面](https://page0x00.github.io/message-room/)。
+当前正式版为 **2.7.3**，源码在 `main`。`Publish main to Pages branch` 工作流将 `main` 同步至 `gh-pages` 并保留 `pr-preview/`，随后由 GitHub Pages 发布 `gh-pages` 根目录。维护现有工作流，不要把旧预览分支当作正式部署源。JS/CSS 入口带版本参数，Service Worker 只处理通知，不缓存页面、消息或媒体。直接访问 [正式页面](https://page0x00.github.io/message-room/)。
 
 若需要回退，恢复前端 Git 提交即可，不反向删除数据表、不清空消息、不关闭 RLS。独立 SQL 文件按顺序升级；不要在已升级功能的线上单独重跑旧的 Auth migration 而不接着执行功能 migration。
 
 依据：[Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks)、[Edge Function Secrets](https://supabase.com/docs/guides/functions/secrets)、[MDN PushManager.subscribe](https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe)。
 
 
-## 本轮更新分支：账号与日常空间
+## 账号与日常空间
 
-此轮源码位于 `update/relationship-space-20261001`，不会自动合并 main 或替换正式 GitHub Pages。将前端与数据库都部署后才能进行真实双设备验收。
+账号与日常空间源码已经进入 `main` 并随前端发布。数据库配置与前端发布是独立步骤，需要核对当前项目的迁移和 Auth 设置后进行真实双设备验收。
 
-1. SQL Editor 执行本分支完整 `supabase/INSTALL.sql`。已完成 2.3 配置的项目也可以依次执行 从 `20261001_identity.sql` 至 `20261007_notices.sql` 的全部增量文件，不要遗漏中间文件。脚本增量添加字段、表、权限和 RPC，保留旧消息。
+1. SQL Editor 执行 `main` 中完整的 `supabase/INSTALL.sql`，或按顺序执行尚未应用的增量文件。账号与日常空间的迁移为 `20261001_identity.sql` 至 `20261007_notices.sql`；API 连接及本机陪伴授权另见 `20261008_api_connections.sql`、`20261009_direct_api.sql`。脚本增量添加字段、表、权限和 RPC，保留旧消息。
 2. Auth 开启 Email；保留访客时同时保留 Anonymous Sign-Ins 与 Manual Linking。设置站点和测试预览 Redirect URLs。在原设备先绑定邮箱，再在新设备登录相同邮箱。详见 `docs/UPDATE_20261001.md`。
 3. 新增记录表 `space_entries`、`pockets`、`pocket_entries`、`pocket_leaves` 已在 migration 设置 RLS 与 Realtime；私有图片仍用现有 `message-media`，读权限随记录的私人/共享属性变化。
 4. 荷包 RPC 是记账操作，不接支付平台或托管资金。冷静期与余额检查只允许服务端更新，浏览器不得直接修改交易表。应用内提醒已接通；后台打卡/纪念日/荷包提醒和一起听邀请需下述定时推送配置。
@@ -130,4 +131,4 @@ npm run test:film
 npm run test:companion
 ```
 
-本轮源码只提交到 `update/relationship-space-20261001`，未改变 main 的部署来源。不应把分支提交、SQL 文件和函数源码当成已上线。
+截至 2026-10-09，2.7.3 正式前端发布成功，入口与关键线索板模块已和验证过的源码逐字节核对。Supabase 迁移、Secrets、函数、webhook、定时任务及系统权限的线上状态未在本次发布中核实，不能仅凭仓库中已有源码判定这些配置完成。后续继续任务时，应从实际未配置或验收失败的项目接续，避免重复重做已上线的界面修复。
