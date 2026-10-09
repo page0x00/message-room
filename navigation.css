@@ -25,6 +25,11 @@
 .scene-page-header #roomTitle,.scene-page-header #roomStatus{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #sceneSidebarToggle{display:grid;place-items:center;width:44px;height:44px;min-height:44px;margin:0 0 10px 4px;border:1px solid var(--scene-edge);border-radius:12px;background:var(--scene-inset);color:var(--scene-ink)}
 #sceneSidebarToggle svg{width:23px;height:23px}
+/* Page transforms, canvas layers and glass effects stay below the navigation.
+   Real dialogs live outside the shell and keep their existing modal layer. */
+.scene-shell{isolation:isolate}
+.scene-shell>.scene-sidebar{position:relative;isolation:isolate;pointer-events:auto}
+.scene-shell>.room-screen,.scene-shell>.room-screen.active{isolation:isolate;z-index:0}
 .scene-sidebar{overflow:hidden}
 .scene-rail{min-height:0;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
 .scene-rail button{min-height:48px;flex-shrink:0;touch-action:manipulation}

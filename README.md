@@ -13,7 +13,9 @@
 - [P2 批量截图](docs/P2_IMPORT.md)：普通多文件选择/独立文件夹扫描确认、时间排序、内容去重、完整长图分片 OCR、日期/左右方向与合并整理、可编辑确认发送；私人回忆录保存及导出。
 - Toast、未读/标题/应用角标、可选提示音、权限触发的系统通知；离线 Push 客户端、订阅/RLS、VAPID Edge Function、webhook 去重均已提供，需配置 Secrets 和 webhook。
 
-当前正式版为 **2.7.3**，源码已在 `main`。提交到 `main` 后，由 `Publish main to Pages branch` 工作流同步到 `gh-pages`，再由 GitHub Pages 发布；`pr-preview/` 是独立预览，不是正式入口。
+当前正式版为 **2.7.4**，源码已在 `main`。提交到 `main` 后，由 `Publish main to Pages branch` 工作流同步到 `gh-pages`，再由 GitHub Pages 发布；`pr-preview/` 是独立预览，不是正式入口。
+
+2.7.4 的[侧栏触屏修复](docs/SIDEBAR_TOUCH_20261009.md)：直接响应触屏抬起，抑制重复 click，隔离页面层与侧栏命中区域；拖动、双指操作及弹窗遮挡不会误导航。
 
 2.7.3 的[线索板拖拽修复](docs/CLUE_DRAG_20261009.md)：缩小到 50% 后，便签和照片仍能拖到可见面板四角；保留扩展后的移动空间，避免松手回弹；位置保存、双指缩放、连线与横竖屏变化均已验证。
 
