@@ -7,7 +7,7 @@ export function memoryLayout(width,height=600){
 }
 
 // The canvas owns gestures so a second finger cancels dragging/rotation before zooming.
-export function createMemoryViewport({stage,surface,initial,onChange=()=>{},onSingle,onTap=()=>{},onHover=()=>{}}){
+export function createMemoryViewport({stage,surface,initial,getBounds,onChange=()=>{},onSingle,onTap=()=>{},onHover=()=>{}}){
  let scale=initial?.scale||1,x=initial?.x||0,y=initial?.y||0;
  let gesture=null,pinch=null,blocked=false,suppressUntil=0,frame=0,destroyed=false;
  const pointers=new Map(),controller=new AbortController(),options={signal:controller.signal};
@@ -15,9 +15,10 @@ export function createMemoryViewport({stage,surface,initial,onChange=()=>{},onSi
  const world=p=>({x:(p.x-x)/scale,y:(p.y-y)/scale});
  function paint(){
   if(!stage.isConnected||stage.clientWidth<1||stage.clientHeight<1)return;
-  const w=surface.offsetWidth*scale,h=surface.offsetHeight*scale;
-  x=w<stage.clientWidth?(stage.clientWidth-w)/2:clamp(x,stage.clientWidth-w,0);
-  y=h<stage.clientHeight?(stage.clientHeight-h)/2:clamp(y,stage.clientHeight-h,0);
+  const b=getBounds?.(scale)||{left:0,top:0,right:surface.offsetWidth,bottom:surface.offsetHeight};
+  const w=(b.right-b.left)*scale,h=(b.bottom-b.top)*scale;
+  x=w<stage.clientWidth?(stage.clientWidth-w)/2-b.left*scale:clamp(x,stage.clientWidth-b.right*scale,-b.left*scale);
+  y=h<stage.clientHeight?(stage.clientHeight-h)/2-b.top*scale:clamp(y,stage.clientHeight-b.bottom*scale,-b.top*scale);
   surface.style.transform=`translate3d(${x}px,${y}px,0) scale(${scale})`;
   stage.dataset.zoom=String(Math.round(scale*100));onChange({scale,x,y});
  }
@@ -79,7 +80,7 @@ export function createMemoryViewport({stage,surface,initial,onChange=()=>{},onSi
   if(e.key==='0'){e.preventDefault();scale=1;x=y=0;paint();}
  },options);
  const observer=new ResizeObserver(schedule);observer.observe(stage);observer.observe(surface);paint();
- return {get scale(){return scale;},world,zoom,reset(){scale=1;x=y=0;paint();},
+ return {get scale(){return scale;},get visibleWorld(){return {left:-x/scale,top:-y/scale,right:(stage.clientWidth-x)/scale,bottom:(stage.clientHeight-y)/scale};},world,zoom,reset(){scale=1;x=y=0;paint();},
   destroy(){destroyed=true;stopSingle();controller.abort();observer.disconnect();cancelAnimationFrame(frame);pointers.clear();}
  };
 }

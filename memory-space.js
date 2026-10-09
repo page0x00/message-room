@@ -1,10 +1,10 @@
-import {createMemoryViewport,memoryLayout} from './memory-viewport.js?v=2.7.2';
-import {applyPoetry,poetryMarkup} from './poetry.js?v=2.7.2';
-import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.7.2';
-import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.7.2';
-import * as daily from './daily-backend.js?v=2.7.2';
-import * as db from './memory-backend.js?v=2.7.2';
-import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.7.2';
+import {createMemoryViewport,memoryLayout} from './memory-viewport.js?v=2.7.3';
+import {applyPoetry,poetryMarkup} from './poetry.js?v=2.7.3';
+import {localDate,randomId,storeGet,storeSet} from './core.js?v=2.7.3';
+import {allMessages,events,mediaBlob} from './feature-backend.js?v=2.7.3';
+import * as daily from './daily-backend.js?v=2.7.3';
+import * as db from './memory-backend.js?v=2.7.3';
+import {memoryCollection,memoryLinks,todaySummary,discIndex} from './memory-core.js?v=2.7.3';
 
 export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false}){
  const pane=$('wallSpace'),box=$('wallEntries');box.className='memory-viewport';
@@ -63,7 +63,7 @@ export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false
   else if(mode==='board')single=board(surface,filtered.slice(0,visibleLimit),layout);
   else{const grid=node('div','memory-note-grid');filtered.slice(0,visibleLimit).forEach((r,i)=>grid.append(card(r,i)));surface.append(grid);}
   if(mode!=='disc'&&filtered.length>visibleLimit)surface.append(button('再看看更早的回忆',()=>{visibleLimit+=36;render();},'memory-more btn ghost'));
-  viewport=createMemoryViewport({stage,surface,initial:viewStates[mode],onChange:value=>{viewStates[currentMode]=value;stage.style.setProperty('--canvas-height',stage.clientHeight+'px');stage.dataset.compact=String(stage.clientHeight<460);stage.style.setProperty('--light-radius',Math.min(stage.clientWidth,stage.clientHeight)*lightPercent/200+'px');if($('memoryZoomReset'))$('memoryZoomReset').textContent=Math.round(value.scale*100)+'%';},
+  viewport=createMemoryViewport({stage,surface,initial:viewStates[mode]||single?.initialView,getBounds:single?.getBounds,onChange:value=>{viewStates[currentMode]=value;stage.style.setProperty('--canvas-height',stage.clientHeight+'px');stage.dataset.compact=String(stage.clientHeight<460);stage.style.setProperty('--light-radius',Math.min(stage.clientWidth,stage.clientHeight)*lightPercent/200+'px');if($('memoryZoomReset'))$('memoryZoomReset').textContent=Math.round(value.scale*100)+'%';},
    onHover:p=>{if(dark){stage.style.setProperty('--light-x',p.x+'px');stage.style.setProperty('--light-y',p.y+'px');}},
    onSingle:(e,p)=>{lastTap=lastTap&&e.timeStamp-lastTap.time<350?lastTap:null;if(dark)return {move(){lastTap=null;}};return single?.(e,p);},
    onTap:(target,e)=>{const el=target.closest('[data-memory-id]');if(!el)return;const id=el.dataset.memoryId,m=rows.find(r=>r.id===id);if(!m)return;focus(el);if(selecting){selected.has(id)?selected.delete(id):selected.add(id);el.querySelector('input').checked=selected.has(id);selection();}else if(mode==='disc'||lastTap?.id===id&&e.timeStamp-lastTap.time<350){showDetail(m);lastTap=null;}else lastTap={id,time:e.timeStamp};}
@@ -80,18 +80,40 @@ export function initMemorySpace({$,state,node,toast,notice,ui,isHidden=()=>false
   const rowTops=[];let bottom=layout.padding;
   for(const h of rowHeights){rowTops.push(bottom);bottom+=h+layout.gap;}
   canvas.style.height=Math.max(surface.parentElement.clientHeight,bottom-layout.gap+layout.padding)+'px';
-  // Measure the actual card, not the grid's row spacing: every visible corner is reachable.
-  const bounds=el=>({x:Math.max(8,canvas.clientWidth-el.offsetWidth-8),y:Math.max(12,canvas.clientHeight-el.offsetHeight-8)});
+  const stage=surface.parentElement;
+  // Keep the original normalisation so existing layouts remain in the same place.
+  // Positions outside the unscaled canvas are valid when the board is zoomed out.
+  const baseSize=el=>({x:Math.max(8,canvas.clientWidth-el.offsetWidth-8),y:Math.max(12,canvas.clientHeight-el.offsetHeight-8)});
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+  const shape=el=>{const w=el.offsetWidth,h=el.offsetHeight,m=new DOMMatrixReadOnly(getComputedStyle(el).transform);return {w,h,ox:(Math.abs(m.a)*w+Math.abs(m.c)*h-w)/2,oy:(Math.abs(m.b)*w+Math.abs(m.d)*h-h)/2};};
+  let extended=false;
   for(const [i,m] of visible.entries()){
-   const el=elements.get(m.id),saved=profile.data.positions?.[m.id],limit=bounds(el);
-   const pos={x:clamp(saved?(saved.nx??saved.x/910)*limit.x:layout.padding+(i%layout.columns)*(layout.card+layout.gap),8,limit.x),y:clamp(saved?(saved.ny??saved.y/Math.max(850,canvas.clientHeight))*limit.y:rowTops[Math.floor(i/layout.columns)]+(i%2)*12,12,limit.y)};
+   const el=elements.get(m.id),saved=profile.data.positions?.[m.id],limit=baseSize(el);
+   const nx=saved?.nx??saved?.x/910,ny=saved?.ny??saved?.y/Math.max(850,canvas.clientHeight);
+   const pos={x:Number.isFinite(nx)?nx*limit.x:clamp(layout.padding+(i%layout.columns)*(layout.card+layout.gap),8,limit.x),y:Number.isFinite(ny)?ny*limit.y:clamp(rowTops[Math.floor(i/layout.columns)]+(i%2)*12,12,limit.y)};
+   extended ||= pos.x<0||pos.y<0||pos.x>limit.x||pos.y>limit.y;
    positions.set(m.id,pos);el.style.left=pos.x+'px';el.style.top=pos.y+'px';
   }
   function draw(){svg.replaceChildren();for(const link of memoryLinks(visible,profile.data.links||[])){const a=positions.get(link.from),b=positions.get(link.to);if(!a||!b)continue;const line=document.createElementNS(svg.namespaceURI,'line');line.setAttribute('x1',a.x+elements.get(link.from).offsetWidth*.5);line.setAttribute('y1',a.y+3);line.setAttribute('x2',b.x+elements.get(link.to).offsetWidth*.5);line.setAttribute('y2',b.y+3);const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=link.label;line.append(title);line.dataset.relation=link.label;svg.append(line);}}draw();
-  return e=>{const el=e.target.closest('[data-memory-id]');if(!el||selecting)return null;const id=el.dataset.memoryId,pos=positions.get(id),before={...pos};el.classList.add('is-dragging');const paint=()=>{el.style.left=pos.x+'px';el.style.top=pos.y+'px';draw();};
-   return {move(p,delta){lastTap=null;const limit=bounds(el);pos.x=clamp(before.x+delta.x,8,limit.x);pos.y=clamp(before.y+delta.y,12,limit.y);paint();},end(moved){el.classList.remove('is-dragging');if(moved){const limit=bounds(el);profile.data.positions={...profile.data.positions,[id]:{nx:pos.x/limit.x,ny:pos.y/limit.y}};void save();}},cancel(){lastTap=null;Object.assign(pos,before);el.classList.remove('is-dragging');paint();}};
+  const drag=(e,start)=>{const el=e.target.closest('[data-memory-id]');if(!el||selecting)return null;const id=el.dataset.memoryId,pos=positions.get(id),before={...pos},grab={x:start.x-pos.x,y:start.y-pos.y},s=shape(el);el.classList.add('is-dragging');const paint=()=>{el.style.left=pos.x+'px';el.style.top=pos.y+'px';draw();};
+   return {move(p){
+    lastTap=null;const b=viewport.visibleWorld,pad=8/viewport.scale;
+    const left=b.left+pad+s.ox,right=b.right-pad-s.w-s.ox,top=b.top+pad+s.oy,bottom=b.bottom-pad-s.h-s.oy;
+    // Inverse-transform the visible panel, not the smaller, transformed canvas.
+    // Oversized cards can still move between their two edges at high zoom.
+    pos.x=clamp(p.x-grab.x,Math.min(left,right),Math.max(left,right));pos.y=clamp(p.y-grab.y,Math.min(top,bottom),Math.max(top,bottom));paint();
+   },end(moved){el.classList.remove('is-dragging');if(moved){const limit=baseSize(el);profile.data.positions={...profile.data.positions,[id]:{nx:pos.x/limit.x,ny:pos.y/limit.y}};void save();}},cancel(){lastTap=null;Object.assign(pos,before);el.classList.remove('is-dragging');paint();}};
   };
+  const explored={left:0,top:0,right:canvas.clientWidth,bottom:surface.offsetHeight};
+  drag.getBounds=scale=>{
+   const w=canvas.clientWidth,h=surface.offsetHeight,extraX=Math.max(0,(stage.clientWidth/scale-w)/2),extraY=Math.max(0,(stage.clientHeight/scale-h)/2),pad=8/scale;
+   // Moving a card inward must not shrink explored space and snap the camera on release.
+   for(const [id,pos] of positions){const s=shape(elements.get(id));explored.left=Math.min(explored.left,pos.x-s.ox-pad);explored.top=Math.min(explored.top,pos.y-s.oy-pad);explored.right=Math.max(explored.right,pos.x+s.w+s.ox+pad);explored.bottom=Math.max(explored.bottom,pos.y+s.h+s.oy+pad);}
+   return {left:Math.min(-extraX,explored.left),top:Math.min(-extraY,explored.top),right:Math.max(w+extraX,explored.right),bottom:Math.max(h+extraY,explored.bottom)};
+  };
+  // Reopening a saved, spread-out board must not hide cards beyond the base canvas.
+  if(extended){const b=drag.getBounds(1),scale=clamp(Math.min(stage.clientWidth/(b.right-b.left),stage.clientHeight/(b.bottom-b.top)),.5,1);drag.initialView={scale,x:(stage.clientWidth-(b.left+b.right)*scale)/2,y:(stage.clientHeight-(b.top+b.bottom)*scale)/2};}
+  return drag;
  }
  function discCard(memory,index){const el=node('article','record-memory'+(memory.media?.length?' has-photo':'')+(memory.id.startsWith('message:')?' msg':''));el.dataset.memoryId=memory.id;el.dataset.kind=memory.kind;if(selecting){const c=node('input');c.type='checkbox';c.checked=selected.has(memory.id);c.setAttribute('aria-label','选择回忆');c.onchange=()=>{c.checked?selected.add(memory.id):selected.delete(memory.id);selection();};el.append(c);}void media(memory,el);el.append(node('time','',memory.date),node('h4','',memory.title||({music:'同一段旋律',anniversary:'记得这一天',diary:'日记里的一页'})[memory.kind]||'时光片段'),node('p','',memory.body.slice(0,index?65:150)),button('展开 ›',()=>showDetail(memory)));el.ondblclick=()=>showDetail(memory);return el;}
  function disc(stage,items){

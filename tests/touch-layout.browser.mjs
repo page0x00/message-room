@@ -49,29 +49,30 @@ export async function runTouchLayout({setup,check,secureId,user,fixture,root}){
   await p.setViewportSize({width:1280,height:680});await p.locator('#sceneNavMemory').tap();await p.locator('.memory-card').first().waitFor();
   const stage=await p.locator('.memory-stage').boundingBox(),header=await p.locator('.relation-head').boundingBox();assert.ok(stage.y<=header.y+header.height+2);assert.equal(await p.locator('#memoryTools').isHidden(),true);
   for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){
-   await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.7.2')).setTheme(theme),theme);await tools();
+   await p.evaluate(async theme=>(await import('./ui-v2.js?v=2.7.3')).setTheme(theme),theme);await tools();
    const expanded=await p.locator('.memory-stage').boundingBox();assert.deepEqual(expanded,stage,'opening tools must not shrink the wall');
    const colors=await p.locator('#memoryTools').evaluate(e=>({background:getComputedStyle(e).backgroundColor,text:getComputedStyle(e).color}));assert.notEqual(colors.background,colors.text);
    await p.locator('[aria-label="收起回忆工具"]').tap();
   }
-  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.2')).setTheme('warm-dark'));await tools();await shot('wall-tools');await p.locator('[aria-label="收起回忆工具"]').tap();await mode('disc');await shot('wall-disc');await mode('board');await shot('wall-board');
+  await p.evaluate(async()=>(await import('./ui-v2.js?v=2.7.3')).setTheme('warm-dark'));await tools();await shot('wall-tools');await p.locator('[aria-label="收起回忆工具"]').tap();await mode('disc');await shot('wall-disc');await mode('board');await shot('wall-board');
  });
- await check('a clue card reaches all four canvas corners after resize and zoom and retains its position',async()=>{
+ await check('a clue card reaches all four visible panel corners after resize and zoom and retains its position',async()=>{
   const card=p.locator('[data-memory-id="message:1"]');
   for(const [width,height,zoom] of [[1280,680,1],[1280,840,1],[820,720,.5]]){
    await p.setViewportSize({width,height});await p.waitForTimeout(120);await p.locator('#memoryZoomReset').tap();
    if(zoom===.5)for(let i=0;i<4;i++)await p.locator('#memoryZoomOut').tap();
    const scale=Number(await p.locator('.memory-stage').getAttribute('data-zoom'))/100;
    const stage=await p.locator('.memory-stage').boundingBox(),canvas=await p.locator('.clue-canvas').boundingBox();
+   const frame=await p.locator('.memory-stage').evaluate(e=>{const b=e.getBoundingClientRect();return {x:b.x+e.clientLeft,y:b.y+e.clientTop,width:e.clientWidth,height:e.clientHeight};});
    if(zoom===1)assert.ok(Math.abs(canvas.height-(stage.height-12))<2,'few cards use exactly the visible inner height');
    for(const [x,y] of [[1,1],[0,1],[0,0],[1,0]]){
     const b=await card.boundingBox();
     // Drag from the centre of a visible card to a board corner, clamped by its real size.
     const from={x:b.x+b.width/2,y:b.y+Math.min(b.height/2,80*scale)};
-    const to={x:x?canvas.x+canvas.width-2:canvas.x+2,y:y?canvas.y+canvas.height-2:canvas.y+2};
+    const to={x:x?frame.x+frame.width-2:frame.x+2,y:y?frame.y+frame.height-2:frame.y+2};
     await gesture(from,to);
-    const pos=await card.evaluate(e=>{const c=e.closest('.clue-canvas');return {x:e.offsetLeft,y:e.offsetTop,right:c.clientWidth-e.offsetLeft-e.offsetWidth,bottom:c.clientHeight-e.offsetTop-e.offsetHeight};});
-    assert.ok(x?pos.right<=10:pos.x<=10,JSON.stringify({width,height,x,y,pos}));assert.ok(y?pos.bottom<=10:pos.y<=14,JSON.stringify({width,height,x,y,pos}));
+    const moved=await card.boundingBox(),pos={x:moved.x-frame.x,y:moved.y-frame.y,right:frame.x+frame.width-moved.x-moved.width,bottom:frame.y+frame.height-moved.y-moved.height};
+    assert.ok(x?pos.right<=12:pos.x<=12,JSON.stringify({width,height,x,y,pos}));assert.ok(y?pos.bottom<=12:pos.y<=12,JSON.stringify({width,height,x,y,pos}));
    }
   }
   await p.locator('#sceneNavChat').tap();await p.locator('#sceneNavMemory').tap();assert.equal(await card.isVisible(),true);assert.ok(s.control.memoryProfiles[0].data.positions['message:1']);
