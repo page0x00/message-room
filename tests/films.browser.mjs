@@ -39,7 +39,7 @@ export async function runFilms({setup,check,secureId,user,friend,fixture,root}){
  await check('leaving film panel stops playback and all themes and screen sizes retain usable controls',async()=>{
   await p.locator('#filmPlay').click();await p.locator('#spaceBack').click();assert.equal(await p.locator('#filmProjector').isVisible(),false);assert.equal(await p.locator('#filmBgmAudio').evaluate(e=>e.paused),true);
   await p.locator('#filmSpaceBtn').click();
-  for(const [w,h] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){await p.setViewportSize({width:w,height:h});for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.6')).setTheme(t),theme);assert.ok(await p.locator('#filmSpace').evaluate(e=>e.scrollWidth<=e.clientWidth+1),theme+' '+w);}}
+  for(const [w,h] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){await p.setViewportSize({width:w,height:h});for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.7')).setTheme(t),theme);assert.ok(await p.locator('#filmSpace').evaluate(e=>e.scrollWidth<=e.clientWidth+1),theme+' '+w);}}
   await p.locator('#filmPreview').click();await p.locator('#filmProjector').waitFor({state:'visible'});await p.locator('#filmPlay').click();await p.screenshot({path:root+'/test-results/film-tablet.png'});await p.locator('#filmExit').click();
  });
  assert.deepEqual(s.errors,[]);await s.context.close();

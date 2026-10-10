@@ -13,7 +13,9 @@
 - [P2 批量截图](docs/P2_IMPORT.md)：普通多文件选择/独立文件夹扫描确认、时间排序、内容去重、完整长图分片 OCR、日期/左右方向与合并整理、可编辑确认发送；私人回忆录保存及导出。
 - Toast、未读/标题/应用角标、可选提示音、权限触发的系统通知；离线 Push 客户端、订阅/RLS、VAPID Edge Function、webhook 去重均已提供，需配置 Secrets 和 webhook。
 
-当前正式版为 **2.7.6**，源码已在 `main`。提交到 `main` 后，由 `Publish main to Pages branch` 工作流同步到 `gh-pages`，再由 GitHub Pages 发布；`pr-preview/` 是独立预览，不是正式入口。
+当前正式版为 **2.7.7**，源码已在 `main`。提交到 `main` 后，由 `Publish main to Pages branch` 工作流同步到 `gh-pages`，再由 GitHub Pages 发布；`pr-preview/` 是独立预览，不是正式入口。
+
+2.7.7：便签翻回正面时补上与翻到背面等时长的动画；连续往返翻面均有过渡，首次打开不播放翻面动画，减少动态效果设置对两个方向均生效。
 
 2.7.6：回忆墙、线索板的纸片按正反面内容撑开，“翻面 / 详情”始终留在纸片底部；翻面保持卡片大小，空照片说明不再占位；连续点击或用键盘翻面不会误开详情。
 

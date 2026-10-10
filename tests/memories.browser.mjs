@@ -3,6 +3,36 @@ import assert from 'node:assert/strict';
 export async function runMemories({setup,check,secureId,user,friend,fixture,root}){
  const s=await setup({secure:true,rows:[fixture(1,secureId,'日落以后，我们一起去散步。',friend,{author_id:friend,display_date:'2026-09-20'}),fixture(2,secureId,'记住今天的晚风。',user,{author_id:user,display_date:'2026-09-20'}),fixture(3,secureId,'下一次去看看海。',friend,{author_id:friend,display_date:'2026-09-21'})]}),p=s.page;
  await p.waitForFunction(()=>document.querySelector('#roomStatus').textContent.includes('左滑'));await p.locator('#relationHandle').click();await p.locator('[data-open-view=wall]').click();await p.waitForTimeout(200);
+ await check('notes animate in both flip directions without animating on entry or moving their controls',async()=>{
+  for(const mode of ['notes','board']){
+   await memoryControl(p,`[data-memory-mode=${mode}]`);
+   const card=p.locator('[data-memory-id="message:1"]'),flip=card.getByRole('button',{name:'翻面',exact:true});
+   assert.equal(await card.evaluate(el=>el.getAnimations({subtree:true}).length),0,mode+' opens without a flip');
+   const height=await card.evaluate(el=>el.offsetHeight);let duration;
+   for(const face of ['back','front','back','front']){
+    await flip.click();
+    const motion=await card.locator('.memory-card-'+face).evaluate(el=>{
+     const animation=el.getAnimations()[0];if(!animation)return null;
+     const duration=animation.effect.getTiming().duration;animation.pause();animation.currentTime=duration/2;
+     return {duration,transform:getComputedStyle(el).transform,visibility:getComputedStyle(el).visibility};
+    });
+    assert.ok(motion,mode+' must animate toward the '+face);
+    assert.equal(motion.visibility,'visible');assert.notEqual(motion.transform,'none');
+    assert.ok(motion.duration>=150&&motion.duration<=400);
+    if(duration)assert.equal(motion.duration,duration,'both directions use the same duration');duration=motion.duration;
+    assert.equal(await card.evaluate(el=>el.offsetHeight),height);
+    await card.evaluate(el=>el.getAnimations({subtree:true}).forEach(a=>a.finish()));
+    assert.equal(await p.locator('#memoryDetail').isVisible(),false);
+   }
+   await p.emulateMedia({reducedMotion:'reduce'});
+   for(const face of ['back','front']){
+    await flip.click();assert.equal(await card.locator('.memory-card-'+face).isVisible(),true);
+    assert.equal(await card.evaluate(el=>el.getAnimations({subtree:true}).length),0,'reduced motion applies to both faces');
+   }
+   await p.emulateMedia({reducedMotion:'no-preference'});
+  }
+  await memoryControl(p,'[data-memory-mode=notes]');
+ });
  await check('memory notes show actual sources, flip, edit their backs and leave the chat untouched',async()=>{
   const card=p.locator('[data-memory-id="message:1"]');await card.getByRole('button',{name:'翻面',exact:true}).click();assert.equal(await card.evaluate(e=>e.classList.contains('flipped')),true);await card.getByRole('button',{name:'详情',exact:true}).click();await p.getByRole('button',{name:'补充记录',exact:true}).click();await p.locator('#memoryEditor [name=back]').fill('那天一路聊了很多。');await p.locator('#memoryEditor [name=tags]').fill('散步，晚风');await p.locator('#memoryEditor [name=location]').fill('学校');await p.locator('#memoryEditor [type=submit]').click();await p.locator('#memoryEditor').waitFor({state:'hidden'});assert.equal(s.control.records[0].content,'日落以后，我们一起去散步。');assert.equal(s.control.memoryProfiles[0].data.annotations['message:1'].back,'那天一路聊了很多。');await memoryControl(p,'#memorySearchToggle');await p.locator('#memoryTag').fill('晚风');assert.deepEqual(await p.locator('.memory-card').evaluateAll(cards=>cards.map(c=>c.dataset.memoryId).sort()),['message:1','message:2']);await p.locator('#memoryClear').click();await memoryControl(p,'#memorySearchToggle');
  });
@@ -14,7 +44,7 @@ export async function runMemories({setup,check,secureId,user,friend,fixture,root
  });
  await check('new notes save real entries, daily summaries can be disabled, and all three views fit six themes/five sizes',async()=>{
   await memoryControl(p,'[data-memory-mode=notes]');await memoryControl(p,'#memoryAdd');await p.locator('#memoryEditor [name=title]').fill('一张新的便签');await p.locator('#memoryEditor [name=body]').fill('把普通的一天留下来。');await p.locator('#memoryEditor [type=submit]').click();await p.locator('#memoryEditor').waitFor({state:'hidden'});await memoryControl(p,'#memoryToolsToggle');await p.locator('#memorySummary').uncheck();await p.locator('[aria-label="收起回忆工具"]').click();await p.waitForTimeout(100);assert.equal(s.control.daily.space_entries[0].kind,'memory');assert.equal(s.control.memoryProfiles[0].data.summary,false);
-  for(const [w,h] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){await p.setViewportSize({width:w,height:h});for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.6')).setTheme(t),theme);for(const mode of ['notes','board','disc']){await memoryControl(p,`[data-memory-mode=${mode}]`);assert.ok(await p.locator('#wallSpace').evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${theme} ${w} ${mode}`);}if(w===390&&theme==='ins-dark')await p.screenshot({path:root+'/test-results/memory-disc-phone.png'});if(w===1180&&theme==='warm-light'){await memoryControl(p,'[data-memory-mode=notes]');await p.screenshot({path:root+'/test-results/memory-notes-tablet.png'});}}}
+  for(const [w,h] of [[390,844],[844,390],[820,1180],[1180,820],[1440,900]]){await p.setViewportSize({width:w,height:h});for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.7')).setTheme(t),theme);for(const mode of ['notes','board','disc']){await memoryControl(p,`[data-memory-mode=${mode}]`);assert.ok(await p.locator('#wallSpace').evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${theme} ${w} ${mode}`);}if(w===390&&theme==='ins-dark')await p.screenshot({path:root+'/test-results/memory-disc-phone.png'});if(w===1180&&theme==='warm-light'){await memoryControl(p,'[data-memory-mode=notes]');await p.screenshot({path:root+'/test-results/memory-notes-tablet.png'});}}}
  });
  assert.deepEqual(s.errors,[]);await s.context.close();
 }

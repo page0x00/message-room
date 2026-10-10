@@ -1,6 +1,6 @@
-import {storeGet,storeSet,isMine,compareCreated,normalizeMessage,roomLink,errorText} from './core.js?v=2.7.6';
-import {client,loadMessages} from './backend.js?v=2.7.6';
-import {notificationLabel,noticePanels} from './notice-core.js?v=2.7.6';
+import {storeGet,storeSet,isMine,compareCreated,normalizeMessage,roomLink,errorText} from './core.js?v=2.7.7';
+import {client,loadMessages} from './backend.js?v=2.7.7';
+import {notificationLabel,noticePanels} from './notice-core.js?v=2.7.7';
 export function newRows(rows,cursor,identity){return rows.map(normalizeMessage).filter(row=>!isMine(row,identity)&&cursor&&compareCreated(row,cursor)>0);}
 export function initNotifications({$,state,toast,persist,recentRooms,renderRecent}){
   let channels=[],generation=0,identity='',audioContext,registration,pollBusy=false;

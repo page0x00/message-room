@@ -42,7 +42,7 @@ export async function runClueDrag({setup,check,secureId,user,fixture,root}){
   for(const [width,height] of [[820,1180],[390,844],[1280,730]]){
    await p.setViewportSize({width,height});await p.waitForTimeout(180);
    for(const theme of ['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass']){
-    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.6')).setTheme(t),theme);
+    await p.evaluate(async t=>(await import('./ui-v2.js?v=2.7.7')).setTheme(t),theme);
     for(const mode of ['board','notes']){
      await memoryControl(p,`[data-memory-mode=${mode}]`);await p.locator('#memoryZoomReset').tap();
      await picture.locator('img').evaluate(img=>img.complete&&img.naturalWidth?null:new Promise(resolve=>img.addEventListener('load',resolve,{once:true})));
