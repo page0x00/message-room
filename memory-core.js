@@ -1,4 +1,4 @@
-import {displayDay,localDate} from './core.js?v=2.7.6';
+import {displayDay,localDate} from './core.js?v=2.7.7';
 export function memoryCollection({messages=[],entries=[],events=[],listens=[],profile={}}){
  const rows=[],annotations=profile.data?.annotations||{};
  for(const m of messages){const media=m.media_path?[{path:m.media_path,type:m.message_type,mime:m.media_mime,name:m.media_name,size:m.media_size}]:[];rows.push({id:'message:'+m.id,kind:media[0]?.type||'text',date:displayDay(m,'wall'),title:'',body:m.message_payload?.entries?.map(e=>(e.label?e.label+'：':'')+(e.text||'')).join('\n')||m.content||'',media,owner:m.author_id,source:m});}

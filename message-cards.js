@@ -1,6 +1,6 @@
-import {randomId,localDate,validDate,isMine} from './core.js?v=2.7.6';
-import {client} from './backend.js?v=2.7.6';
-import {mediaBlob} from './feature-backend.js?v=2.7.6';
+import {randomId,localDate,validDate,isMine} from './core.js?v=2.7.7';
+import {client} from './backend.js?v=2.7.7';
+import {mediaBlob} from './feature-backend.js?v=2.7.7';
 
 export const CARD_TYPES=new Set(['screenshot','forward']);
 export function cardData(message){

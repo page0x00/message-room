@@ -1,11 +1,11 @@
-import {initMusicImport} from './music-import.js?v=2.7.6';
-import {poetryMarkup,applyPoetry} from './poetry.js?v=2.7.6';
-import {storeGet,storeSet,randomId,errorText} from './core.js?v=2.7.6';
-import {parseLyrics,activeLyric,playbackPosition} from './feature-core.js?v=2.7.6';
-import {musicStore,saveLocalTrack} from './local-music.js?v=2.7.6';
-import {fullDuration,musicPeriod,libraryTracks,nextTrack,lyricWords} from './music-core.js?v=2.7.6';
-import * as db from './music-backend.js?v=2.7.6';
-import {readListen,setListen} from './feature-backend.js?v=2.7.6';
+import {initMusicImport} from './music-import.js?v=2.7.7';
+import {poetryMarkup,applyPoetry} from './poetry.js?v=2.7.7';
+import {storeGet,storeSet,randomId,errorText} from './core.js?v=2.7.7';
+import {parseLyrics,activeLyric,playbackPosition} from './feature-core.js?v=2.7.7';
+import {musicStore,saveLocalTrack} from './local-music.js?v=2.7.7';
+import {fullDuration,musicPeriod,libraryTracks,nextTrack,lyricWords} from './music-core.js?v=2.7.7';
+import * as db from './music-backend.js?v=2.7.7';
+import {readListen,setListen} from './feature-backend.js?v=2.7.7';
 
 export function initMusicSpace({$,state,node,toast,notice,showSheet,closeSheet}){
  const sheet=$('listenScrim').querySelector('.sheet');

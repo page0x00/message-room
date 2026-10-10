@@ -1,5 +1,5 @@
-import {applyPoetry} from './poetry.js?v=2.7.6';
-import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.6';
+import {applyPoetry} from './poetry.js?v=2.7.7';
+import {storeGet, storeSet, localDate, randomId} from './core.js?v=2.7.7';
 export const THEMES=['ins-light','ins-dark','warm-light','warm-dark','rain-night','moon-glass'];
 export function setTheme(value){
   value=({clean:'ins-light',warm:'warm-light'})[value]||value;

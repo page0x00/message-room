@@ -6,7 +6,7 @@
 <meta content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <meta content="no-referrer" name="referrer"/>
-<meta content="2.7.6" name="application-version"/>
+<meta content="2.7.7" name="application-version"/>
 <title>小小留言室</title>
 <style>
 /* Never expose the legacy markup while the current scene is being assembled. */
@@ -42,22 +42,22 @@ html[data-app-state="error"] .startup-mark{animation:none;border-style:dashed}
  document.addEventListener('mailbox:ready',()=>{clearTimeout(timer);window.removeEventListener('error',failed,true);},{once:true});
 })();
 </script>
-<link rel="modulepreload" href="./app.js?v=2.7.6"/>
+<link rel="modulepreload" href="./app.js?v=2.7.7"/>
 <link rel="preload" href="./assets/fonts/allura.woff" as="font" type="font/woff" crossorigin/>
 
 
 <script src="./vendor/supabase.js?v=2.57.4"></script>
-<link href="./styles.css?v=2.7.6" rel="stylesheet"/><link href="./features.css?v=2.7.6" rel="stylesheet"/><link href="./ui-v2.css?v=2.7.6" rel="stylesheet"/>
-<link href="./daily-space.css?v=2.7.6" rel="stylesheet"/><link href="./space.css?v=2.7.6" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.7.6"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/><link rel="stylesheet" href="music-space.css?v=2.7.6"/>
-<link rel="stylesheet" href="memory-space.css?v=2.7.6"/>
-<link rel="stylesheet" href="film-space.css?v=2.7.6"/>
-<link rel="stylesheet" href="pet-space.css?v=2.7.6"/>
-<link rel="stylesheet" href="skins.css?v=2.7.6"/>
-<link rel="stylesheet" href="scene-layout.css?v=2.7.6"/>
-<link rel="stylesheet" href="api-settings.css?v=2.7.6"/>
-<link rel="stylesheet" href="reference-ui.css?v=2.7.6"/>
-<link rel="stylesheet" href="navigation.css?v=2.7.6"/>
-<link rel="stylesheet" href="workspace-ui.css?v=2.7.6"/>
+<link href="./styles.css?v=2.7.7" rel="stylesheet"/><link href="./features.css?v=2.7.7" rel="stylesheet"/><link href="./ui-v2.css?v=2.7.7" rel="stylesheet"/>
+<link href="./daily-space.css?v=2.7.7" rel="stylesheet"/><link href="./space.css?v=2.7.7" rel="stylesheet"/><link rel="stylesheet" href="./interactions.css?v=2.7.7"/><link href="./manifest.webmanifest" rel="manifest"/><link rel="apple-touch-icon" sizes="180x180" href="./assets/icon-180.png"/><link rel="stylesheet" href="music-space.css?v=2.7.7"/>
+<link rel="stylesheet" href="memory-space.css?v=2.7.7"/>
+<link rel="stylesheet" href="film-space.css?v=2.7.7"/>
+<link rel="stylesheet" href="pet-space.css?v=2.7.7"/>
+<link rel="stylesheet" href="skins.css?v=2.7.7"/>
+<link rel="stylesheet" href="scene-layout.css?v=2.7.7"/>
+<link rel="stylesheet" href="api-settings.css?v=2.7.7"/>
+<link rel="stylesheet" href="reference-ui.css?v=2.7.7"/>
+<link rel="stylesheet" href="navigation.css?v=2.7.7"/>
+<link rel="stylesheet" href="workspace-ui.css?v=2.7.7"/>
 </head>
 <body>
 <div id="appStartup" class="app-startup" role="status" aria-live="polite"><div class="app-startup-card"><span class="startup-mark" aria-hidden="true"></span><p id="startupStatus">正在打开你的空间…</p><button id="startupRetry" type="button" hidden>重新加载</button><noscript>请允许此网站运行 JavaScript，然后重新加载。</noscript></div></div>
@@ -265,6 +265,6 @@ html[data-app-state="error"] .startup-mark{animation:none;border-style:dashed}
 <div class="scrim" id="collectionScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="collectionTitle"><header class="sheet-head"><h2 id="collectionTitle">我的收藏</h2><button data-close="collectionScrim" aria-label="关闭" type="button">×</button></header><p class="sheet-note">仅保存在这台设备和当前身份下。</p><div id="collectionRows"></div></section></div>
 <div class="scrim" id="forwardScrim" hidden><section class="sheet feature-sheet" role="dialog" aria-modal="true" aria-labelledby="forwardTitle"><header class="sheet-head"><h2 id="forwardTitle">转发留言</h2><button data-close="forwardScrim" aria-label="关闭" type="button">×</button></header><label class="field"><span>发送到</span><select id="forwardTarget"></select></label><p class="sheet-note" id="forwardNote" role="status"></p><div id="forwardPreview" class="forward-preview"></div><button class="btn primary wide" id="forwardSend" type="button">确认转发</button></section></div>
 <noscript>留言室需要浏览器启用 JavaScript。</noscript>
-<script src="./app.js?v=2.7.6" type="module"></script>
+<script src="./app.js?v=2.7.7" type="module"></script>
 </body>
 </html>

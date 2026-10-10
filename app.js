@@ -1,13 +1,13 @@
-import {initPoetry} from './poetry.js?v=2.7.6';
-import {initThemedControls} from './theme-controls.js?v=2.7.6';
-import {initViewportLayout} from './viewport-layout.js?v=2.7.6';
-import {initAPISettings} from './api-settings.js?v=2.7.6';
-import {noticePanels} from './notice-core.js?v=2.7.6';
-import {initSceneInterface} from './scene-interface.js?v=2.7.6';
-import {initPetSpace} from './pet-space.js?v=2.7.6';
-import {initFilmSpace} from './film-space.js?v=2.7.6';
-import {initMemorySpace} from './memory-space.js?v=2.7.6';
-import {initDailySpace} from './daily-space.js?v=2.7.6';
+import {initPoetry} from './poetry.js?v=2.7.7';
+import {initThemedControls} from './theme-controls.js?v=2.7.7';
+import {initViewportLayout} from './viewport-layout.js?v=2.7.7';
+import {initAPISettings} from './api-settings.js?v=2.7.7';
+import {noticePanels} from './notice-core.js?v=2.7.7';
+import {initSceneInterface} from './scene-interface.js?v=2.7.7';
+import {initPetSpace} from './pet-space.js?v=2.7.7';
+import {initFilmSpace} from './film-space.js?v=2.7.7';
+import {initMemorySpace} from './memory-space.js?v=2.7.7';
+import {initDailySpace} from './daily-space.js?v=2.7.7';
 import {
   parseRoom,
   roomLink,
@@ -23,15 +23,15 @@ import {
   errorText,
   storeGet,
   storeSet,
-} from "./core.js?v=2.7.6";
-import * as api from "./backend.js?v=2.7.6";
-import { initInterface, setTheme } from "./ui-v2.js?v=2.7.6";
-import { initNotifications } from "./notifications.js?v=2.7.6";
-import { initFeatures } from "./features.js?v=2.7.6";
+} from "./core.js?v=2.7.7";
+import * as api from "./backend.js?v=2.7.7";
+import { initInterface, setTheme } from "./ui-v2.js?v=2.7.7";
+import { initNotifications } from "./notifications.js?v=2.7.7";
+import { initFeatures } from "./features.js?v=2.7.7";
 
-import {initMessageCards} from "./message-cards.js?v=2.7.6";
-import {initAccount} from "./account.js?v=2.7.6";
-import {initMessageActions} from "./message-actions.js?v=2.7.6";
+import {initMessageCards} from "./message-cards.js?v=2.7.7";
+import {initAccount} from "./account.js?v=2.7.7";
+import {initMessageActions} from "./message-actions.js?v=2.7.7";
 let actions;
 
 const $ = (id) => document.getElementById(id);
